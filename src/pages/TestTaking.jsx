@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import PDFPage from '../components/PDFPage.jsx'
 import {
   MODULES, MODULE_ORDER, PDF_PAGE_MAP,
-  ANSWER_KEY, FREE_RESPONSE, calcWeakTopics, rawToScaled, scoreSection
+  ANSWER_KEY, FREE_RESPONSE, QUESTION_CHAPTER_MAP, calcWeakTopics, rawToScaled, scoreSection, freeResponseMatches
 } from '../data/testData.js'
 
 const PDF_URL = '/practice-test-11.pdf'
@@ -85,7 +85,19 @@ export default function TestTaking() {
   const [timerLeft, setTimerLeft] = useState(null)
   const [showBreak, setShowBreak] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [pdfOffsets, setPdfOffsets] = useState({}) // { rw_m1: 0, ... } (0-based page offsets)
   const saveTimer = useRef(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('agora_pdf_offsets_v1')
+      if (raw) setPdfOffsets(JSON.parse(raw) || {})
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('agora_pdf_offsets_v1', JSON.stringify(pdfOffsets || {})) } catch {}
+  }, [pdfOffsets])
 
   useEffect(() => {
     if (!supabase || !user?.id) return
@@ -180,6 +192,73 @@ export default function TestTaking() {
       weak_topics: weakTopics.slice(0, 15),
     }).eq('id', attemptId)
 
+    // Auto-check Study Guide chapters that were mastered on the test (all questions correct for that chapter).
+    try {
+      const nowIso = new Date().toISOString()
+      const stats = {}
+      for (const section of MODULE_ORDER) {
+        const key = ANSWER_KEY[section] || {}
+        const chMap = QUESTION_CHAPTER_MAP[section] || {}
+        const fr = new Set(FREE_RESPONSE[section] || [])
+        const total = MODULES[section]?.questions || 0
+        const sectionAnswers = answers?.[section] || {}
+        for (let q = 1; q <= total; q++) {
+          const ch = chMap[q]
+          const right = key[q]
+          if (!ch || !right) continue
+          if (!stats[ch]) stats[ch] = { total: 0, correct: 0, allCorrect: true }
+          stats[ch].total += 1
+          const given = sectionAnswers[q]
+          const attempted = String(given ?? '').trim().length > 0
+          const ok = attempted && (fr.has(q)
+            ? freeResponseMatches(given, right)
+            : String(given).toUpperCase() === String(right).toUpperCase())
+          if (ok) stats[ch].correct += 1
+          else stats[ch].allCorrect = false
+        }
+      }
+
+      const chapters = Object.keys(stats)
+      if (chapters.length) {
+        const { data: existingRows } = await supabase
+          .from('studied_topics')
+          .select('chapter_id,completed,completed_at,practice')
+          .eq('user_id', user.id)
+          .in('chapter_id', chapters)
+
+        const existingBy = {}
+        for (const r of existingRows || []) existingBy[r.chapter_id] = r
+
+        const upserts = chapters.map((chapterId) => {
+          const s = stats[chapterId]
+          const existing = existingBy[chapterId]
+          const existingPractice = (existing?.practice && typeof existing.practice === 'object') ? existing.practice : {}
+          const nextPractice = {
+            ...existingPractice,
+            test: {
+              correct: s.correct,
+              total: s.total,
+              mastered: Boolean(s.allCorrect && s.total > 0),
+              attempt_id: attemptId,
+              updated_at: nowIso,
+            }
+          }
+          const mastered = Boolean(s.allCorrect && s.total > 0)
+          const completed = Boolean(existing?.completed || mastered)
+          return {
+            user_id: user.id,
+            chapter_id: chapterId,
+            completed,
+            completed_at: completed ? (existing?.completed ? existing?.completed_at : nowIso) : null,
+            practice: nextPractice,
+            updated_at: nowIso,
+          }
+        })
+
+        await supabase.from('studied_topics').upsert(upserts)
+      }
+    } catch {}
+
     navigate(`/results/${attemptId}`)
   }
 
@@ -202,7 +281,9 @@ export default function TestTaking() {
   const mod = MODULES[currentModule]
   const totalQ = mod.questions
   const pageMap = PDF_PAGE_MAP[currentModule] || {}
-  const pdfPage = pageMap[currentQ] ?? 0
+  const basePdfPage = pageMap[currentQ] ?? 0
+  const pdfOffset = Number(pdfOffsets?.[currentModule] || 0)
+  const pdfPage = Math.max(0, basePdfPage + pdfOffset)
   const modAnswers = answers[currentModule] || {}
   const currentAnswer = modAnswers[currentQ]
   const markedList = markedForReview[currentModule] || []
@@ -272,14 +353,46 @@ export default function TestTaking() {
         </div>
       </div>
 
-      {/* Body */}
-      <div className="test-body">
-        {/* PDF Panel */}
-        <div className="test-pdf-panel">
-          <div style={{ width: '100%', maxWidth: 760 }}>
-            <PDFPage pdfUrl={PDF_URL} pageIndex={pdfPage} />
-          </div>
-        </div>
+	      {/* Body */}
+	      <div className="test-body">
+	        {/* PDF Panel */}
+	        <div className="test-pdf-panel">
+	          <div style={{ width: '100%', maxWidth: 760 }}>
+	            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+	              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+	                PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
+	                <span style={{ color: '#94a3b8', fontWeight: 700 }}> · offset {pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}</span>
+	              </div>
+	              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+	                <button
+	                  className="btn btn-outline"
+	                  style={{ padding: '6px 10px', fontSize: 12 }}
+	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: Number(prev?.[currentModule] || 0) - 1 }))}
+	                  title="If the PDF is behind, decrease the offset"
+	                >
+	                  −1 page
+	                </button>
+	                <button
+	                  className="btn btn-outline"
+	                  style={{ padding: '6px 10px', fontSize: 12 }}
+	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: Number(prev?.[currentModule] || 0) + 1 }))}
+	                  title="If the PDF is ahead, increase the offset"
+	                >
+	                  +1 page
+	                </button>
+	                <button
+	                  className="btn btn-outline"
+	                  style={{ padding: '6px 10px', fontSize: 12 }}
+	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: 0 }))}
+	                  title="Reset PDF alignment for this module"
+	                >
+	                  Reset
+	                </button>
+	              </div>
+	            </div>
+	            <PDFPage pdfUrl={PDF_URL} pageIndex={pdfPage} />
+	          </div>
+	        </div>
 
         {/* Answer Panel */}
         <div className="test-answer-panel">

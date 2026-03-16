@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { CHAPTERS } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
-import { getStudiedTopics, setStudiedTopic, setChapterPractice } from '../lib/studyProgress.js'
+import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice } from '../lib/studyProgress.js'
 
 function Navbar() {
   return (
@@ -63,18 +63,67 @@ function DomainList({ domains, selectedId, onSelect, completedMap }) {
   )
 }
 
-function PracticeProblem({ problem, idx, onAnswered, answered }) {
+function hashString(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+function seededShuffle(arr, seed) {
+  const out = arr.slice()
+  let x = seed || 1
+  for (let i = out.length - 1; i > 0; i--) {
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5
+    const j = Math.abs(x) % (i + 1)
+    const tmp = out[i]; out[i] = out[j]; out[j] = tmp
+  }
+  return out
+}
+
+function pickHints(concepts, seed) {
+  const bodies = (concepts || []).map(c => c.body).filter(Boolean)
+  if (!bodies.length) return [
+    'Re-read the question carefully and identify what it is actually asking you to do.',
+    'Eliminate options that contradict the setup before you pick your final choice.',
+  ]
+  const shuffled = seededShuffle(bodies, seed)
+  return shuffled.slice(0, 2)
+}
+
+function extractGuideMap(practice) {
+  if (!practice || typeof practice !== 'object') return {}
+  if (practice.guide && typeof practice.guide === 'object') return practice.guide
+  // Legacy format: practice stored directly as { [idx]: true }
+  return practice
+}
+
+function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
   const [choice, setChoice] = useState(null)
   const [show, setShow] = useState(false)
+  const [reveal, setReveal] = useState(false)
 
   useEffect(() => {
     setChoice(null)
     setShow(false)
+    setReveal(false)
   }, [problem?.q])
 
   const isMC = Boolean(problem?.choices)
-  const correct = problem?.correct
-  const isCorrect = show && choice && String(choice).toUpperCase() === String(correct).toUpperCase()
+  const correctOrig = String(problem?.correct || '').toUpperCase()
+  const qSeed = hashString(`${problem?.q || ''}::${idx}`)
+
+  const shuffledChoices = useMemo(() => {
+    if (!isMC) return null
+    const original = Object.entries(problem.choices || {}) // [['A','text'],...]
+    const order = seededShuffle(original, qSeed)
+    const labels = ['A', 'B', 'C', 'D']
+    const mapped = order.map(([origKey, text], i) => ({ label: labels[i], origKey, text }))
+    const correctLabel = mapped.find(m => m.origKey === correctOrig)?.label || null
+    return { mapped, correctLabel }
+  }, [isMC, problem?.q])
+
+  const isCorrect = show && choice && shuffledChoices?.correctLabel && choice === shuffledChoices.correctLabel
+  const hints = useMemo(() => pickHints(concepts, qSeed), [concepts, qSeed])
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
@@ -87,22 +136,22 @@ function PracticeProblem({ problem, idx, onAnswered, answered }) {
       <div style={{ fontSize: 13, lineHeight: 1.65, color: '#0f172a', whiteSpace: 'pre-line' }}>{problem?.q}</div>
       {isMC && (
         <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-          {Object.entries(problem.choices).map(([k, v]) => (
+          {(shuffledChoices?.mapped || []).map(({ label, text }) => (
             <button
-              key={k}
-              onClick={() => setChoice(k)}
+              key={label}
+              onClick={() => setChoice(label)}
               style={{
                 textAlign: 'left',
                 padding: '10px 12px',
                 borderRadius: 10,
-                border: choice === k ? '2px solid #1a2744' : '1px solid #e2e8f0',
+                border: choice === label ? '2px solid #1a2744' : '1px solid #e2e8f0',
                 background: '#f8fafc',
                 cursor: 'pointer',
                 fontSize: 13,
                 lineHeight: 1.5,
               }}
             >
-              <span style={{ fontWeight: 900, marginRight: 8 }}>{k}.</span> {v}
+              <span style={{ fontWeight: 900, marginRight: 8 }}>{label}.</span> {text}
             </button>
           ))}
         </div>
@@ -113,22 +162,41 @@ function PracticeProblem({ problem, idx, onAnswered, answered }) {
           style={{ padding: '8px 14px', fontSize: 13 }}
           onClick={() => {
             if (isMC && !choice) return
-            const ok = isMC
-              ? (String(choice).toUpperCase() === String(correct).toUpperCase())
-              : true
+            const ok = isMC ? (choice === shuffledChoices?.correctLabel) : true
             setShow(true)
-            onAnswered(ok)
+            if (ok) onAnswered(true)
           }}
         >
-          Check Answer →
+          Check →
         </button>
+        {show && !isCorrect && (
+          <button
+            className="btn btn-outline"
+            style={{ padding: '8px 14px', fontSize: 13 }}
+            onClick={() => { setChoice(null); setShow(false); setReveal(false) }}
+          >
+            Try again
+          </button>
+        )}
         {show && (
           <div style={{ fontSize: 12, fontWeight: 800, color: isCorrect ? '#10b981' : '#ef4444' }}>
-            {isCorrect ? '✅ Correct' : `❌ Correct: ${correct}`}
+            {isCorrect ? '✅ Correct' : `❌ Not quite`}
           </div>
         )}
       </div>
-      {show && (
+      {show && !isCorrect && (
+        <div style={{ marginTop: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.65, color: '#7c2d12' }}>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Try a different approach</div>
+          <ul style={{ marginLeft: 18 }}>
+            {hints.map((h, i) => <li key={i} style={{ marginBottom: 6 }}>{h}</li>)}
+          </ul>
+          <button className="btn btn-outline" style={{ marginTop: 8, padding: '8px 14px', fontSize: 13 }}
+            onClick={() => setReveal(true)}>
+            Reveal explanation
+          </button>
+        </div>
+      )}
+      {(reveal || isCorrect) && (
         <div style={{ marginTop: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.6, color: '#334155' }}>
           <strong>Explanation:</strong> {problem?.exp}
         </div>
@@ -141,13 +209,13 @@ export default function Guide() {
   const { user } = useAuth()
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
-  const [savedPracticeByChapter, setSavedPracticeByChapter] = useState({})
+  const [practiceByChapter, setPracticeByChapter] = useState({})
 
   useEffect(() => {
     if (!user?.id) return
     getStudiedTopics(user.id).then(({ map, practiceByChapter }) => {
       setCompletedMap(map || {})
-      setSavedPracticeByChapter(practiceByChapter || {})
+      setPracticeByChapter(practiceByChapter || {})
     })
   }, [user?.id])
 
@@ -177,6 +245,8 @@ export default function Guide() {
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const totalChapters = Object.keys(CHAPTERS).length
   const pct = Math.round((completedCount / Math.max(1, totalChapters)) * 100)
+  const selectedPractice = selectedId ? (practiceByChapter[selectedId] || {}) : {}
+  const selectedGuideMap = selectedId ? extractGuideMap(selectedPractice) : {}
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
@@ -217,13 +287,12 @@ export default function Guide() {
                   </div>
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain} · Playbook p.{ch?.page}</div>
                 </div>
-                {(() => {
-                  const saved = savedPracticeByChapter[selectedId] || {}
-                  const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(saved[i]))
-                  return (
-                <button
-                  className="btn"
-                  disabled={!allCorrect && !completedMap[selectedId]}
+	                {(() => {
+	                  const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(selectedGuideMap[i]))
+	                  return (
+	                <button
+	                  className="btn"
+	                  disabled={!allCorrect && !completedMap[selectedId]}
                   style={{
                     opacity: (!allCorrect && !completedMap[selectedId]) ? .6 : 1,
                     cursor: (!allCorrect && !completedMap[selectedId]) ? 'not-allowed' : 'pointer',
@@ -268,28 +337,33 @@ export default function Guide() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, color: '#1a2744' }}>🎯 Practice Problems</div>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                    {Object.values(savedPracticeByChapter[selectedId] || {}).filter(Boolean).length}/{expandedProblems.length} correct
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {expandedProblems.map((p, idx) => (
-                    <PracticeProblem
+	                  <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, color: '#1a2744' }}>🎯 Practice Problems</div>
+	                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+	                    {Object.values(selectedGuideMap || {}).filter(Boolean).length}/{expandedProblems.length} correct
+	                  </div>
+	                </div>
+	                <div style={{ display: 'grid', gap: 12 }}>
+	                  {expandedProblems.map((p, idx) => (
+	                    <PracticeProblem
                       key={idx}
-                      idx={idx}
-                      problem={p}
-                      answered={Boolean((savedPracticeByChapter[selectedId] || {})[idx])}
-                      onAnswered={async (correct) => {
-                        const next = { ...(savedPracticeByChapter[selectedId] || {}), [idx]: Boolean(correct) }
-                        setSavedPracticeByChapter(prev => ({ ...prev, [selectedId]: next }))
-                        await setChapterPractice(user.id, selectedId, next)
-                      }}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+	                      idx={idx}
+	                      problem={p}
+	                      concepts={content.concepts}
+	                      answered={Boolean(selectedGuideMap[idx])}
+	                      onAnswered={async (correct) => {
+	                        if (!correct) return
+	                        const existingPractice = practiceByChapter[selectedId] || {}
+	                        const existingGuide = extractGuideMap(existingPractice)
+	                        const nextGuide = { ...existingGuide, [idx]: true }
+	                        const nextPractice = { ...(existingPractice && typeof existingPractice === 'object' ? existingPractice : {}), guide: nextGuide }
+	                        setPracticeByChapter(prev => ({ ...prev, [selectedId]: nextPractice }))
+	                        await setChapterGuidePractice(user.id, selectedId, nextGuide, existingPractice)
+	                      }}
+	                    />
+	                  ))}
+	                </div>
+	              </>
+	            )}
           </div>
         )}
       </div>

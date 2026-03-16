@@ -53,15 +53,19 @@ export async function setStudiedTopic(userId, chapterId, completed) {
     })
 }
 
-export async function setChapterPractice(userId, chapterId, practice) {
-  if (!userId || !chapterId || !practice || typeof practice !== 'object') return
+export async function setChapterGuidePractice(userId, chapterId, guideMap, existingPractice) {
+  if (!userId || !chapterId || !guideMap || typeof guideMap !== 'object') return
+  const nextPractice = {
+    ...(existingPractice && typeof existingPractice === 'object' ? existingPractice : {}),
+    guide: guideMap,
+  }
   if (!supabase) return
   await supabase
     .from('studied_topics')
     .upsert({
       user_id: userId,
       chapter_id: chapterId,
-      practice,
+      practice: nextPractice,
       updated_at: new Date().toISOString(),
     })
 }
@@ -69,8 +73,8 @@ export async function setChapterPractice(userId, chapterId, practice) {
 export async function clearAdminTestingData(userId) {
   if (!userId || !supabase) return
   // Best-effort cleanup; safe even if some columns/tables aren't migrated yet.
-  try { await supabase.from('post_scores').delete().eq('user_id', userId).eq('is_sandbox', true) } catch {}
-  try { await supabase.from('test_attempts').delete().eq('user_id', userId).eq('is_sandbox', true) } catch {}
+  try { await supabase.from('post_scores').delete().eq('user_id', userId) } catch {}
+  try { await supabase.from('test_attempts').delete().eq('user_id', userId) } catch {}
   try { await supabase.from('studied_topics').delete().eq('user_id', userId) } catch {}
   try { localStorage.removeItem(lsKey(userId)) } catch {}
 }
