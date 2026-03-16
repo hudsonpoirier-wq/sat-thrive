@@ -1,7 +1,7 @@
 -- Run this in your Supabase SQL Editor
 
--- Enable RLS
-alter table if exists public.profiles enable row level security;
+-- Extensions (needed for gen_random_uuid)
+create extension if not exists pgcrypto;
 
 -- Profiles table (mirrors auth.users)
 create table if not exists public.profiles (
@@ -38,14 +38,30 @@ create table if not exists public.post_scores (
   recorded_at timestamptz default now()
 );
 
--- RLS Policies
-create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
-create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
+-- Enable RLS (required for policies to take effect)
+alter table public.profiles enable row level security;
+alter table public.test_attempts enable row level security;
+alter table public.post_scores enable row level security;
 
+-- RLS Policies
+drop policy if exists "Users can view own profile" on public.profiles;
+drop policy if exists "Admins see all profiles" on public.profiles;
+create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
+-- Note: no user UPDATE policy on profiles (prevents self-escalation to admin/tutor).
+
+drop policy if exists "Users can view own attempts" on public.test_attempts;
+drop policy if exists "Users can insert own attempts" on public.test_attempts;
+drop policy if exists "Users can update own attempts" on public.test_attempts;
+drop policy if exists "Admins see all attempts" on public.test_attempts;
 create policy "Users can view own attempts" on public.test_attempts for select using (auth.uid() = user_id);
 create policy "Users can insert own attempts" on public.test_attempts for insert with check (auth.uid() = user_id);
-create policy "Users can update own attempts" on public.test_attempts for update using (auth.uid() = user_id);
+create policy "Users can update own attempts" on public.test_attempts for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view own scores" on public.post_scores;
+drop policy if exists "Users can insert own scores" on public.post_scores;
+drop policy if exists "Admins see all scores" on public.post_scores;
 create policy "Users can view own scores" on public.post_scores for select using (auth.uid() = user_id);
 create policy "Users can insert own scores" on public.post_scores for insert with check (auth.uid() = user_id);
 
@@ -70,6 +86,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
