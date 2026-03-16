@@ -196,3 +196,8 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- One-time setup: promote the Agora admin account (safe to run repeatedly).
+update public.profiles
+set role = 'admin'
+where lower(email) = 'agora@admin.org';

@@ -96,6 +96,58 @@ async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
   throw new Error('Could not find the answer key table in this PDF.')
 }
 
+async function extractSimpleAnswerKeyFromAnswerKeyPdf(buf) {
+  // Returns { rw_m1:{}, rw_m2:{}, math_m1:{}, math_m2:{} } when headings are present.
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+  const out = { rw_m1: {}, rw_m2: {}, math_m1: {}, math_m2: {} }
+  const maxQ = { rw_m1: 33, rw_m2: 33, math_m1: 27, math_m2: 27 }
+  const rePair = /(^|\s)(\d{1,2})\s*([A-D])(?=\s|$)/g
+
+  function detectSection(text) {
+    const t = String(text || '').toLowerCase()
+    const isRW = t.includes('reading') || t.includes('writing') || t.includes('r&w')
+    const isMath = t.includes('math')
+    const m1 = t.includes('module 1') || t.includes('mod 1')
+    const m2 = t.includes('module 2') || t.includes('mod 2')
+    if (isRW && m1) return 'rw_m1'
+    if (isRW && m2) return 'rw_m2'
+    if (isMath && m1) return 'math_m1'
+    if (isMath && m2) return 'math_m2'
+    return null
+  }
+
+  let current = null
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p)
+    const tc = await page.getTextContent()
+    const text = (tc.items || []).map(i => String(i.str || '')).join(' ')
+    current = detectSection(text) || current
+
+    const sec = current
+    if (!sec) continue
+
+    let m
+    while ((m = rePair.exec(text)) !== null) {
+      const q = parseInt(m[2], 10)
+      const a = String(m[3] || '').toUpperCase()
+      if (!Number.isFinite(q) || q < 1 || q > maxQ[sec]) continue
+      out[sec][q] = a
+    }
+  }
+
+  const total = Object.keys(out.rw_m1).length + Object.keys(out.rw_m2).length + Object.keys(out.math_m1).length + Object.keys(out.math_m2).length
+  if (total < 40) throw new Error('Could not find enough answers in this PDF.')
+  return out
+}
+
+async function extractAnswerKeyFromPdf(buf) {
+  try {
+    return await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
+  } catch (e) {
+    return await extractSimpleAnswerKeyFromAnswerKeyPdf(buf)
+  }
+}
+
 function pairedTTest(pairs) {
   if (pairs.length < 2) return null
   const diffs = pairs.map(p => p.post - p.pre)
@@ -249,6 +301,8 @@ export default function Admin() {
     const studentById = new Map(students.map(s => [s.id, s]))
     const attemptsByUser = new Map()
     const bestPreByUser = new Map()
+    const bestExtraByUser = new Map()
+    const extraIds = new Set(TESTS.filter(t => t.kind === 'extra').map(t => t.id))
     for (const a of attempts) {
       const list = attemptsByUser.get(a.user_id) || []
       list.push(a)
@@ -259,30 +313,49 @@ export default function Admin() {
         const prev = bestPreByUser.get(a.user_id) || 0
         if (total > prev) bestPreByUser.set(a.user_id, total)
       }
+      if (extraIds.has(a.test_id) && (a.completed_at || a.scores?.total)) {
+        const total = a.scores?.total || 0
+        const prev = bestExtraByUser.get(a.user_id) || 0
+        if (total > prev) bestExtraByUser.set(a.user_id, total)
+      }
     }
     const postByAttemptId = new Map()
     for (const p of postScores) {
       if (!p?.attempt_id) continue
       if (!postByAttemptId.has(p.attempt_id)) postByAttemptId.set(p.attempt_id, p)
     }
-    const pairs = []
+    const pairsPost = []
     for (const a of attempts) {
       const post = postByAttemptId.get(a.id)
       if (!post) continue
       const student = studentById.get(a.user_id)
-      pairs.push({
+      pairsPost.push({
         pre: a.scores?.total,
         post: post.post_score,
         name: student?.full_name || 'Unknown',
       })
     }
-    return { studentById, attemptsByUser, bestPreByUser, postByAttemptId, pairs }
+    const pairsOptional = []
+    for (const [userId, pre] of bestPreByUser.entries()) {
+      const post = bestExtraByUser.get(userId)
+      if (!pre || !post) continue
+      const student = studentById.get(userId)
+      pairsOptional.push({
+        pre,
+        post,
+        name: student?.full_name || 'Unknown',
+      })
+    }
+    return { studentById, attemptsByUser, bestPreByUser, bestExtraByUser, postByAttemptId, pairsPost, pairsOptional }
   }, [students, attempts, postScores])
 
-  const pairs = computed.pairs
+  const pairs = computed.pairsPost
+  const pairsOpt = computed.pairsOptional
 
   const stats = pairedTTest(pairs)
   const avgImprovement = pairs.length > 0 ? Math.round(pairs.reduce((s, p) => s + (p.post - p.pre), 0) / pairs.length) : null
+  const statsOpt = pairedTTest(pairsOpt)
+  const avgImprovementOpt = pairsOpt.length > 0 ? Math.round(pairsOpt.reduce((s, p) => s + (p.post - p.pre), 0) / pairsOpt.length) : null
 
   const chartData = pairs.length > 0 ? {
     labels: pairs.map(p => p.name?.split(' ')[0] || '?'),
@@ -298,6 +371,24 @@ export default function Admin() {
       label: 'Point Gain',
       data: pairs.map(p => p.post - p.pre),
       backgroundColor: pairs.map(p => p.post >= p.pre ? '#10b981' : '#ef4444'),
+      borderRadius: 6, borderSkipped: false,
+    }]
+  } : null
+
+  const chartDataOpt = pairsOpt.length > 0 ? {
+    labels: pairsOpt.map(p => p.name?.split(' ')[0] || '?'),
+    datasets: [
+      { label: 'Pre-Test', data: pairsOpt.map(p => p.pre), backgroundColor: '#94a3b8', borderRadius: 6, borderSkipped: false },
+      { label: 'Best Optional', data: pairsOpt.map(p => p.post), backgroundColor: '#0ea5e9', borderRadius: 6, borderSkipped: false },
+    ]
+  } : null
+
+  const gainDataOpt = pairsOpt.length > 0 ? {
+    labels: pairsOpt.map(p => p.name?.split(' ')[0] || '?'),
+    datasets: [{
+      label: 'Point Gain',
+      data: pairsOpt.map(p => p.post - p.pre),
+      backgroundColor: pairsOpt.map(p => p.post >= p.pre ? '#10b981' : '#ef4444'),
       borderRadius: 6, borderSkipped: false,
     }]
   } : null
@@ -561,6 +652,56 @@ export default function Admin() {
                 )}
               </>
             )}
+
+            {/* Optional practice proof (best optional vs best pre) */}
+            <div style={{ marginTop: 20 }}>
+              {pairsOpt.length < 2 ? (
+                <div className="card" style={{ textAlign: 'center', padding: '44px 24px', color: '#94a3b8' }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>🧠</div>
+                  <h3 style={{ color: '#475569', marginBottom: 4 }}>Optional practice proof needs more data</h3>
+                  <p>Currently {pairsOpt.length} student(s) have both a pre-test score and at least one optional test score.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="card" style={{ marginBottom: 20 }}>
+                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Score Comparison: Pre vs Best Optional</h3>
+                    <div style={{ height: 260 }}>
+                      <Bar data={chartDataOpt} options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
+                        scales: {
+                          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
+                          y: { min: 300, max: 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
+                        }
+                      }} />
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ marginBottom: 20 }}>
+                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Point Gain Per Student (Optional)</h3>
+                    <div style={{ height: 180 }}>
+                      <Bar data={gainDataOpt} options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
+                          y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
+                        }
+                      }} />
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>📐 Paired T-Test (Optional)</h3>
+                    {statsOpt && (
+                      <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>
+                        n={statsOpt.n} · mean gain {statsOpt.mean.toFixed(1)} · {statsOpt.pLabel} · Cohen’s d {statsOpt.d.toFixed(2)} · avg gain {avgImprovementOpt} points
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -595,20 +736,25 @@ export default function Admin() {
 	                          <button
 	                            className="btn btn-outline"
 	                            disabled={testKeyStatus.loading}
-	                            onClick={async () => {
-	                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key…` })
-	                              try {
-	                                const res = await fetch(t.akUrl)
-	                                if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
-	                                const buf = new Uint8Array(await res.arrayBuffer())
-	                                const parsed = await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
-	                                await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
-	                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
-	                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length} answers)` })
-	                              } catch (e) {
-	                                setTestKeyStatus({ loading: false, msg: `⚠️ ${e?.message || 'Import failed'}` })
-	                              }
-	                            }}
+		                            onClick={async () => {
+		                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key…` })
+		                              try {
+		                                const res = await fetch(t.akUrl)
+		                                if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
+		                                const buf = new Uint8Array(await res.arrayBuffer())
+		                                const parsed = await extractAnswerKeyFromPdf(buf)
+		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+		                                if (up.error) throw up.error
+		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
+		                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length} answers)` })
+		                              } catch (e) {
+		                                const msg = String(e?.message || 'Import failed')
+		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
+		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
+		                                  : ''
+		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${msg}${hint}` })
+		                              }
+		                            }}
 	                            title="Import from the bundled scoring guide PDF"
 	                          >
 	                            Import bundled AK
@@ -625,10 +771,10 @@ export default function Admin() {
 	                              const file = e.target.files?.[0]
 	                              if (!file) return
 	                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
-	                              try {
-	                                const buf = new Uint8Array(await file.arrayBuffer())
-	                                let parsed
-	                                if (t.id === FINAL_TEST_ID) {
+		                              try {
+		                                const buf = new Uint8Array(await file.arrayBuffer())
+		                                let parsed
+		                                if (t.id === FINAL_TEST_ID) {
 	                                  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
 	                                  let text = ''
 	                                  for (let p = 1; p <= pdf.numPages; p++) {
@@ -644,22 +790,27 @@ export default function Admin() {
 	                                    if (!Number.isFinite(n)) continue
 	                                    map[n] = m[3].toUpperCase()
 	                                  }
-	                                  parsed = map
-	                                } else {
-	                                  parsed = await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
-	                                }
-	                                const parsedCount = parsed?.rw_m1
-	                                  ? (Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length)
-	                                  : Object.keys(parsed || {}).length
-	                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
-	                                await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
-	                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
-	                                setTestKeyStatus({ loading: false, msg: `✅ Saved ${t.label} (${parsedCount} answers)` })
-	                              } catch (err) {
-	                                setTestKeyStatus({ loading: false, msg: `⚠️ ${err?.message || 'Could not parse PDF'}` })
-	                              } finally {
-	                                e.target.value = ''
-	                              }
+		                                  parsed = map
+		                                } else {
+		                                  parsed = await extractAnswerKeyFromPdf(buf)
+		                                }
+		                                const parsedCount = parsed?.rw_m1
+		                                  ? (Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length)
+		                                  : Object.keys(parsed || {}).length
+		                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
+		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+		                                if (up.error) throw up.error
+		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
+		                                setTestKeyStatus({ loading: false, msg: `✅ Saved ${t.label} (${parsedCount} answers)` })
+		                              } catch (err) {
+		                                const msg = String(err?.message || 'Could not parse PDF')
+		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
+		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
+		                                  : ''
+		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${msg}${hint}` })
+		                              } finally {
+		                                e.target.value = ''
+		                              }
 	                              }}
 	                            />
 	                          </label>

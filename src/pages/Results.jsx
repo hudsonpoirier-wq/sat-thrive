@@ -100,7 +100,13 @@ function QuestionReview({ answers }) {
                           Your answer: <strong style={{ color: '#dc2626' }}>{given || '—'}</strong>
                           &nbsp;&nbsp;Correct: <strong style={{ color: '#10b981' }}>{right}</strong>
                         </div>
-                        {chData && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>📖 {chData.name} — Playbook p.{chData.page}</div>}
+                        {chData && (
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                            📖 Study Guide: <Link to={`/guide?chapter=${encodeURIComponent(ch)}`} style={{ color: '#1a2744', fontWeight: 800 }}>
+                              Chapter {ch} — {chData.name}
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

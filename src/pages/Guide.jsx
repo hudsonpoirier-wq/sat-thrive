@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { CHAPTERS } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
@@ -207,9 +207,16 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
 
 export default function Guide() {
   const { user } = useAuth()
+  const location = useLocation()
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
   const [practiceByChapter, setPracticeByChapter] = useState({})
+
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search || '')
+    const id = sp.get('chapter')
+    if (id && CHAPTERS[id]) setSelectedId(id)
+  }, [location.search])
 
   useEffect(() => {
     if (!user?.id) return

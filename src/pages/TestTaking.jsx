@@ -308,7 +308,8 @@ export default function TestTaking() {
       completed_at: new Date().toISOString(),
       answers,
       scores,
-      weak_topics: weakTopics.slice(0, 15),
+      // Store the full set so domain/topic charts are accurate (avoid truncating to top N).
+      weak_topics: weakTopics.slice(0, 250),
     }).eq('id', attemptId)
     if (up.error) {
       alert(up.error.message || 'Could not submit test. Please try again.')
