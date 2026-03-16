@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div style={{
       minHeight: '100vh',
-      padding: '36px 18px',
+      padding: '18px 12px',
       background: 'radial-gradient(1200px 700px at 30% 20%, rgba(14,165,233,.18), transparent 60%), radial-gradient(900px 500px at 80% 40%, rgba(99,102,241,.18), transparent 55%), linear-gradient(135deg, #0b1220 0%, #172554 48%, #0b1220 100%)',
       display: 'flex',
       alignItems: 'center',
@@ -37,7 +37,7 @@ export default function Login() {
     }}>
       <div style={{
         width: '100%',
-        maxWidth: 1120,
+        maxWidth: 1320,
         display: 'flex',
         flexWrap: 'wrap',
         gap: 18,
@@ -61,8 +61,8 @@ export default function Login() {
               src="/logo.png"
               alt="The Agora Project"
               style={{
-                width: 104,
-                height: 104,
+                width: 150,
+                height: 150,
                 objectFit: 'contain',
                 filter: 'drop-shadow(0 16px 30px rgba(0,0,0,.45)) drop-shadow(0 0 18px rgba(14,165,233,.22))'
               }}
