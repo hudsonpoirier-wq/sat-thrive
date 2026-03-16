@@ -6,6 +6,7 @@ import TestTaking from './pages/TestTaking.jsx'
 import Results from './pages/Results.jsx'
 import Admin from './pages/Admin.jsx'
 import Guide from './pages/Guide.jsx'
+import FinalTest from './pages/FinalTest.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
+          <Route path="/final" element={<ProtectedRoute><FinalTest /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

@@ -45,8 +45,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return
     Promise.all([
-      supabase.from('test_attempts').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
-      supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
+      supabase.from('test_attempts').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('started_at', { ascending: false }),
+      supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('recorded_at', { ascending: false })
     ]).then(([a, p]) => {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
@@ -64,6 +64,7 @@ export default function Dashboard() {
     const { data, error } = await supabase.from('test_attempts').insert({
       user_id: user.id,
       test_id: 'practice_test_11',
+      is_sandbox: profile?.role === 'admin',
       current_section: 'rw_m1',
       answers: {},
       module_time_remaining: { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 }
@@ -77,8 +78,8 @@ export default function Dashboard() {
     if (isNaN(sc) || sc < 400 || sc > 1600) return alert('Enter a valid score (400–1600)')
     const rw = Math.round(sc * 0.5 / 10) * 10
     const math = sc - rw
-    await supabase.from('post_scores').insert({ user_id: user.id, attempt_id: attemptId, post_score: sc, post_rw: rw, post_math: math })
-    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
+    await supabase.from('post_scores').insert({ user_id: user.id, attempt_id: attemptId, is_sandbox: profile?.role === 'admin', post_score: sc, post_rw: rw, post_math: math })
+    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('recorded_at', { ascending: false })
     setPostScores(data || [])
     setAddingPost(null); setPostInput('')
   }
@@ -209,8 +210,21 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
+            <Link
+              to="/final"
+              className="btn"
+              style={{
+                background: studiedCount >= 34 && completed.length > 0 ? '#10b981' : '#e2e8f0',
+                color: studiedCount >= 34 && completed.length > 0 ? 'white' : '#64748b',
+                pointerEvents: studiedCount >= 34 && completed.length > 0 ? 'auto' : 'none',
+                fontWeight: 900,
+              }}
+              title={studiedCount >= 34 && completed.length > 0 ? 'Final test unlocked' : 'Complete the guide + pretest to unlock'}
+            >
+              🏁 Final Test
+            </Link>
           </div>
         </div>
 

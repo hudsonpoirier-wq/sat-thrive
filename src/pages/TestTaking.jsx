@@ -10,24 +10,26 @@ import {
 
 const PDF_URL = '/practice-test-11.pdf'
 
-function Timer({ seconds, onExpire }) {
+function Timer({ seconds, onExpire, onTick }) {
   const [timeLeft, setTimeLeft] = useState(seconds)
   const [hidden, setHidden] = useState(false)
   const intervalRef = useRef(null)
 
   useEffect(() => {
     setTimeLeft(seconds)
+    if (onTick) onTick(seconds)
   }, [seconds])
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) { clearInterval(intervalRef.current); onExpire(); return 0 }
+        if (onTick) onTick(t - 1)
         return t - 1
       })
     }, 1000)
     return () => clearInterval(intervalRef.current)
-  }, [onExpire])
+  }, [onExpire, onTick])
 
   const mins = Math.floor(timeLeft / 60)
   const secs = timeLeft % 60
@@ -80,6 +82,7 @@ export default function TestTaking() {
   const [answers, setAnswers] = useState({}) // { rw_m1: { 1: 'A', 2: 'C', ... }, ... }
   const [markedForReview, setMarkedForReview] = useState({}) // { rw_m1: [2, 5], ... }
   const [moduleTimeLeft, setModuleTimeLeft] = useState({})
+  const [timerLeft, setTimerLeft] = useState(null)
   const [showBreak, setShowBreak] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const saveTimer = useRef(null)
@@ -89,6 +92,10 @@ export default function TestTaking() {
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', user.id).single()
       .then(({ data }) => {
         if (!data) { navigate('/dashboard'); return }
+        if (data.is_sandbox) {
+          // Sandbox attempts are for admin testing and should not persist across sessions.
+          // We allow completing/viewing within the session, but they won't show on dashboards.
+        }
         if (data.completed_at) { navigate(`/results/${attemptId}`); return }
         setAttempt(data)
         setCurrentModule(data.current_section || 'rw_m1')
@@ -205,6 +212,21 @@ export default function TestTaking() {
   const isLastModule = MODULE_ORDER.indexOf(currentModule) === MODULE_ORDER.length - 1
   const choices = ['A', 'B', 'C', 'D']
 
+  const moduleTotalTime = mod.time
+  const currentLeft = timerLeft ?? (moduleTimeLeft[currentModule] || moduleTotalTime)
+  const elapsed = Math.max(0, moduleTotalTime - currentLeft)
+  const secPerQ = moduleTotalTime / totalQ
+  const targetElapsed = (currentQ - 1) * secPerQ
+  const delta = Math.round(targetElapsed - elapsed) // + means ahead, - means behind
+  const paceLabel = (() => {
+    const abs = Math.abs(delta)
+    const mm = Math.floor(abs / 60)
+    const ss = abs % 60
+    const fmt = `${mm}:${String(ss).padStart(2, '0')}`
+    if (abs < 10) return 'On pace'
+    return delta > 0 ? `Ahead by ${fmt}` : `Behind by ${fmt}`
+  })()
+
   return (
     <div className="test-layout">
       {/* Header */}
@@ -217,7 +239,26 @@ export default function TestTaking() {
           key={currentModule}
           seconds={moduleTimeLeft[currentModule] || mod.time}
           onExpire={handleTimerExpire}
+          onTick={(t) => setTimerLeft(t)}
         />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 160 }}>
+          <div style={{
+            fontSize: 12,
+            fontWeight: 800,
+            color: paceLabel === 'On pace' ? 'rgba(255,255,255,.75)' : (delta > 0 ? '#86efac' : '#fecaca'),
+            background: 'rgba(255,255,255,.08)',
+            border: '1px solid rgba(255,255,255,.14)',
+            padding: '6px 10px',
+            borderRadius: 999,
+            lineHeight: 1,
+            whiteSpace: 'nowrap'
+          }}>
+            {paceLabel}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', fontWeight: 700 }}>
+            Target: {Math.floor(targetElapsed / 60)}:{String(Math.round(targetElapsed % 60)).padStart(2, '0')} by Q{currentQ}
+          </div>
+        </div>
         <div className="test-header-right">
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>
             {Object.keys(modAnswers).length}/{totalQ} answered
@@ -293,7 +334,7 @@ export default function TestTaking() {
                   onClick={() => setAnswer(currentQ, letter)}
                 >
                   <span className="choice-letter">{letter}</span>
-                  <span style={{ paddingTop: 4 }}>{letter}</span>
+                  <span style={{ paddingTop: 4, fontWeight: 800 }}>Choose {letter}</span>
                 </button>
               ))
             )}
