@@ -159,6 +159,7 @@ export default function Dashboard() {
   const hasStudyPlan = completed.some(a => a.study_plan)
   const extraTests = TESTS.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
+  const hasTakenPretest = completedPre.length > 0
 
   const trendAttempts = completed
     .map(a => ({ a, scores: a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {}) }))
@@ -260,91 +261,14 @@ export default function Dashboard() {
 	          </div>
 	        )}
 
-	        {/* Journey tracker */}
-	        <div className="card" style={{ marginBottom: 24 }}>
+        {/* Journey tracker + Study Guide */}
+        <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
               <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗺 Journey Tracker</h2>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                 Work through these steps to be ready for the final test.
-	        </div>
-
-	        {/* Optional extra practice tests */}
-	        {extraTests.length > 0 && (
-	          <div className="card" style={{ marginBottom: 24 }}>
-	            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-	              <div>
-	                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
-	                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-	                  These tests are optional skill builders. They’re not required, but they help reinforce your weak topics and track improvement.
-	                </div>
-	              </div>
-	              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-	                Completed: {completedExtra.length}/{extraTests.length}
-	              </div>
-	            </div>
-
-	            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 14 }}>
-	              {extraTests.map(t => {
-	                const done = completed.some(a => a.test_id === t.id && (a.completed_at || a.scores?.total))
-	                const prog = inProgress.find(a => a.test_id === t.id)
-	                return (
-	                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-	                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-	                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
-	                      <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8' }}>
-	                        {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
-	                      </div>
-	                    </div>
-	                    <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-	                      {prog ? (
-	                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
-	                          Resume →
-	                        </button>
-	                      ) : (
-	                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => startNewTest(t.id)}>
-	                          Start →
-	                        </button>
-	                      )}
-	                      {done && (
-	                        <button className="btn btn-outline" onClick={() => {
-	                          const last = completed.find(a => a.test_id === t.id)
-	                          if (last) navigate(`/results/${last.id}`)
-	                        }}>
-	                          View Results →
-	                        </button>
-	                      )}
-	                    </div>
-	                  </div>
-	                )
-	              })}
-	            </div>
-	          </div>
-	        )}
-
-	        {/* Score trend */}
-	        {trendData && (
-	          <div className="card" style={{ marginBottom: 24 }}>
-	            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>📈 Your Improvement</h2>
-	            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
-	              Track how your scores change across the Pre Test and optional skill builders.
-	            </div>
-	            <div style={{ height: 220 }}>
-	              <Line
-	                data={trendData}
-	                options={{
-	                  responsive: true,
-	                  maintainAspectRatio: false,
-	                  plugins: { legend: { display: false } },
-	                  scales: {
-	                    x: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { display: false } },
-	                    y: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { color: '#f1f5f9' } }
-	                  }
-	                }}
-	              />
-	            </div>
-	          </div>
-	        )}
+              </div>
             </div>
             <div style={{ minWidth: 260 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
@@ -358,13 +282,13 @@ export default function Dashboard() {
             </div>
           </div>
 
-	          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
-	            {[
-	              { title: '1) Take the Pretest', done: completedPre.length > 0, desc: 'Complete the Pre Test.' },
-	              { title: '2) Review Results', done: completedPre.length > 0, desc: 'Use your results to find weak topics.' },
-	              { title: '3) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
-	              { title: '4) Complete Study Guide', done: studiedCount >= 34, desc: 'Work through chapters and mark them complete.' },
-	            ].map((s) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
+            {[
+              { title: '1) Take the Pretest', done: hasTakenPretest, desc: 'Complete the Pre Test.' },
+              { title: '2) Review Results', done: hasTakenPretest, desc: 'Use your results to find weak topics.' },
+              { title: '3) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
+              { title: '4) Complete Study Guide', done: studiedCount >= 34, desc: 'Work through all chapters and get every question correct to mark it complete.' },
+            ].map((s) => (
               <div key={s.title} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
@@ -374,23 +298,77 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
-	            <Link
-	              to="/final"
-	              className="btn"
-	              style={{
-	                background: studiedCount >= 34 && completedPre.length > 0 ? '#10b981' : '#e2e8f0',
-	                color: studiedCount >= 34 && completedPre.length > 0 ? 'white' : '#64748b',
-	                pointerEvents: studiedCount >= 34 && completedPre.length > 0 ? 'auto' : 'none',
-	                fontWeight: 900,
-	              }}
-	              title={studiedCount >= 34 && completedPre.length > 0 ? 'Final test unlocked' : 'Complete the guide + pretest to unlock'}
-	            >
+            <Link
+              to="/final"
+              className="btn"
+              style={{
+                background: studiedCount >= 34 && hasTakenPretest ? '#10b981' : '#e2e8f0',
+                color: studiedCount >= 34 && hasTakenPretest ? 'white' : '#64748b',
+                pointerEvents: studiedCount >= 34 && hasTakenPretest ? 'auto' : 'none',
+                fontWeight: 900,
+              }}
+              title={studiedCount >= 34 && hasTakenPretest ? 'Final test unlocked' : 'Complete the guide + pretest to unlock'}
+            >
               🏁 Final Test
             </Link>
           </div>
         </div>
+
+        {/* Optional extra practice tests (hidden until pretest is taken) */}
+        {hasTakenPretest && extraTests.length > 0 && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  These tests are optional skill builders. They’re not required, but they help reinforce your weak topics and track improvement.
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Completed: {completedExtra.length}/{extraTests.length}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 14 }}>
+              {extraTests.map(t => {
+                const done = completed.some(a => a.test_id === t.id && (a.completed_at || a.scores?.total))
+                const prog = inProgress.find(a => a.test_id === t.id)
+                return (
+                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8' }}>
+                        {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {prog ? (
+                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
+                          Resume →
+                        </button>
+                      ) : (
+                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => startNewTest(t.id)}>
+                          Start →
+                        </button>
+                      )}
+                      {done && (
+                        <button className="btn btn-outline" onClick={() => {
+                          const last = completed.find(a => a.test_id === t.id)
+                          if (last) navigate(`/results/${last.id}`)
+                        }}>
+                          View Results →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Completed tests */}
         {completed.length > 0 && (
@@ -456,6 +434,30 @@ export default function Dashboard() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Score trend (hidden until pretest is taken) */}
+        {hasTakenPretest && trendData && (
+          <div className="card" style={{ marginTop: 24 }}>
+            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>📈 Your Improvement</h2>
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+              Track how your scores change across the Pre Test and optional skill builders.
+            </div>
+            <div style={{ height: 220 }}>
+              <Line
+                data={trendData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { display: false } },
+                    y: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { color: '#f1f5f9' } }
+                  }
+                }}
+              />
             </div>
           </div>
         )}

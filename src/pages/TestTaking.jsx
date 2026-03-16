@@ -131,31 +131,72 @@ export default function TestTaking() {
   const [timerLeft, setTimerLeft] = useState(null)
   const [showBreak, setShowBreak] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [pdfOffsets, setPdfOffsets] = useState({}) // { rw_m1: 0, ... } (0-based page offsets)
-  const [pdfOverrides, setPdfOverrides] = useState({}) // { rw_m1: { [qNum]: pageIndex }, ... }
+  const [pdfOffsetsByTest, setPdfOffsetsByTest] = useState({}) // { [testId]: { rw_m1: 0, ... } } (0-based page offsets)
+  const [pdfOverridesByTest, setPdfOverridesByTest] = useState({}) // { [testId]: { rw_m1: { [qNum]: pageIndex }, ... } }
   const saveTimer = useRef(null)
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('agora_pdf_offsets_v1')
-      if (raw) setPdfOffsets(JSON.parse(raw) || {})
+      const rawV2 = localStorage.getItem('agora_pdf_offsets_v2')
+      if (rawV2) { setPdfOffsetsByTest(JSON.parse(rawV2) || {}); return }
+      const rawV1 = localStorage.getItem('agora_pdf_offsets_v1')
+      if (rawV1) {
+        const legacy = JSON.parse(rawV1) || {}
+        setPdfOffsetsByTest({ pre_test: legacy })
+      }
     } catch {}
   }, [])
 
   useEffect(() => {
-    try { localStorage.setItem('agora_pdf_offsets_v1', JSON.stringify(pdfOffsets || {})) } catch {}
-  }, [pdfOffsets])
+    try { localStorage.setItem('agora_pdf_offsets_v2', JSON.stringify(pdfOffsetsByTest || {})) } catch {}
+  }, [pdfOffsetsByTest])
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('agora_pdf_overrides_v1')
-      if (raw) setPdfOverrides(JSON.parse(raw) || {})
+      const rawV2 = localStorage.getItem('agora_pdf_overrides_v2')
+      if (rawV2) { setPdfOverridesByTest(JSON.parse(rawV2) || {}); return }
+      const rawV1 = localStorage.getItem('agora_pdf_overrides_v1')
+      if (rawV1) {
+        const legacy = JSON.parse(rawV1) || {}
+        setPdfOverridesByTest({ pre_test: legacy })
+      }
     } catch {}
   }, [])
 
   useEffect(() => {
-    try { localStorage.setItem('agora_pdf_overrides_v1', JSON.stringify(pdfOverrides || {})) } catch {}
-  }, [pdfOverrides])
+    try { localStorage.setItem('agora_pdf_overrides_v2', JSON.stringify(pdfOverridesByTest || {})) } catch {}
+  }, [pdfOverridesByTest])
+
+  const currentTestId = attempt?.test_id || testConfig?.id || 'pre_test'
+  const pdfOffsets = pdfOffsetsByTest?.[currentTestId] || {}
+  const pdfOverrides = pdfOverridesByTest?.[currentTestId] || {}
+
+  function setPdfOffsetFor(moduleId, nextOffset) {
+    setPdfOffsetsByTest(prev => ({
+      ...(prev || {}),
+      [currentTestId]: { ...(prev?.[currentTestId] || {}), [moduleId]: nextOffset }
+    }))
+  }
+
+  function setPdfOverrideFor(moduleId, qNum, pageIndex) {
+    setPdfOverridesByTest(prev => ({
+      ...(prev || {}),
+      [currentTestId]: {
+        ...(prev?.[currentTestId] || {}),
+        [moduleId]: { ...(prev?.[currentTestId]?.[moduleId] || {}), [qNum]: pageIndex }
+      }
+    }))
+  }
+
+  function clearPdfOverrideFor(moduleId, qNum) {
+    setPdfOverridesByTest(prev => {
+      const next = { ...(prev || {}) }
+      const mod = { ...(next?.[currentTestId]?.[moduleId] || {}) }
+      delete mod[qNum]
+      next[currentTestId] = { ...(next?.[currentTestId] || {}), [moduleId]: mod }
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!supabase || !user?.id) return
@@ -480,10 +521,7 @@ export default function TestTaking() {
 	                    const n = Number(String(page || '').trim())
 	                    if (!Number.isFinite(n) || n < 1) return
 	                    const idx = Math.max(0, Math.floor(n - 1))
-	                    setPdfOverrides(prev => ({
-	                      ...(prev || {}),
-	                      [currentModule]: { ...(prev?.[currentModule] || {}), [currentQ]: idx }
-	                    }))
+	                    setPdfOverrideFor(currentModule, currentQ, idx)
 	                  }}
 	                  title="If the mapping is glitchy, set an exact PDF page for this question"
 	                >
@@ -493,11 +531,7 @@ export default function TestTaking() {
 	                  <button
 	                    className="btn btn-outline"
 	                    style={{ padding: '6px 10px', fontSize: 12 }}
-	                    onClick={() => setPdfOverrides(prev => {
-	                      const nextMod = { ...(prev?.[currentModule] || {}) }
-	                      delete nextMod[currentQ]
-	                      return { ...(prev || {}), [currentModule]: nextMod }
-	                    })}
+	                    onClick={() => clearPdfOverrideFor(currentModule, currentQ)}
 	                    title="Remove the per-question page override"
 	                  >
 	                    Clear override
@@ -506,7 +540,7 @@ export default function TestTaking() {
 	                <button
 	                  className="btn btn-outline"
 	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: Number(prev?.[currentModule] || 0) - 1 }))}
+	                  onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) - 1)}
 	                  title="If the PDF is behind, decrease the offset"
 	                >
 	                  −1 page
@@ -514,7 +548,7 @@ export default function TestTaking() {
 	                <button
 	                  className="btn btn-outline"
 	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: Number(prev?.[currentModule] || 0) + 1 }))}
+	                  onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) + 1)}
 	                  title="If the PDF is ahead, increase the offset"
 	                >
 	                  +1 page
@@ -522,7 +556,7 @@ export default function TestTaking() {
 	                <button
 	                  className="btn btn-outline"
 	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsets(prev => ({ ...(prev || {}), [currentModule]: 0 }))}
+	                  onClick={() => setPdfOffsetFor(currentModule, 0)}
 	                  title="Reset PDF alignment for this module"
 	                >
 	                  Reset

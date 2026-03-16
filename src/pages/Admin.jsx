@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
+import { clearAdminTestingData } from '../lib/studyProgress.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
@@ -167,13 +168,22 @@ export default function Admin() {
     setResettingUserId(userId)
     setResetMsg('')
     try {
-      const ps = await supabase.from('post_scores').delete().eq('user_id', userId)
-      if (ps.error) throw ps.error
-      const ta = await supabase.from('test_attempts').delete().eq('user_id', userId)
-      if (ta.error) throw ta.error
-      const st = await supabase.from('studied_topics').delete().eq('user_id', userId)
-      if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
-        throw st.error
+      const rpc = await supabase.rpc('admin_reset_user', { target_user_id: userId })
+      if (rpc.error) {
+        const msg = String(rpc.error.message || '')
+        // Back-compat: if the RPC isn't installed yet, fall back to direct deletes.
+        if (msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('admin_reset_user')) {
+          const ps = await supabase.from('post_scores').delete().eq('user_id', userId)
+          if (ps.error) throw ps.error
+          const ta = await supabase.from('test_attempts').delete().eq('user_id', userId)
+          if (ta.error) throw ta.error
+          const st = await supabase.from('studied_topics').delete().eq('user_id', userId)
+          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
+            throw st.error
+          }
+        } else {
+          throw rpc.error
+        }
       }
       setResetMsg('✅ Student reset complete.')
       // Refresh tables
@@ -197,15 +207,25 @@ export default function Admin() {
     setResettingUserId(profile.id)
     setResetMsg('')
     try {
-      const ps = await supabase.from('post_scores').delete().eq('user_id', profile.id)
-      if (ps.error) throw ps.error
-      const ta = await supabase.from('test_attempts').delete().eq('user_id', profile.id)
-      if (ta.error) throw ta.error
-      const st = await supabase.from('studied_topics').delete().eq('user_id', profile.id)
-      if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
-        throw st.error
+      const rpc = await supabase.rpc('reset_my_data')
+      if (rpc.error) {
+        const msg = String(rpc.error.message || '')
+        if (msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('reset_my_data')) {
+          const ps = await supabase.from('post_scores').delete().eq('user_id', profile.id)
+          if (ps.error) throw ps.error
+          const ta = await supabase.from('test_attempts').delete().eq('user_id', profile.id)
+          if (ta.error) throw ta.error
+          const st = await supabase.from('studied_topics').delete().eq('user_id', profile.id)
+          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
+            throw st.error
+          }
+        } else {
+          throw rpc.error
+        }
       }
+      await clearAdminTestingData(profile.id)
       setResetMsg('✅ Your data was reset.')
+      setTimeout(() => { window.location.assign('/dashboard') }, 400)
     } catch (e) {
       setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
     } finally {

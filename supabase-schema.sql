@@ -88,6 +88,39 @@ as $$
   );
 $$;
 
+-- Reset helpers (security definer so the admin can truly clear data even if RLS changes)
+create or replace function public.reset_my_data()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.post_scores where user_id = auth.uid();
+  delete from public.test_attempts where user_id = auth.uid();
+  delete from public.studied_topics where user_id = auth.uid();
+end;
+$$;
+
+create or replace function public.admin_reset_user(target_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized';
+  end if;
+  delete from public.post_scores where user_id = target_user_id;
+  delete from public.test_attempts where user_id = target_user_id;
+  delete from public.studied_topics where user_id = target_user_id;
+end;
+$$;
+
+grant execute on function public.reset_my_data() to authenticated;
+grant execute on function public.admin_reset_user(uuid) to authenticated;
+
 -- RLS Policies (drop/recreate safe)
 drop policy if exists "Users can view own profile" on public.profiles;
 drop policy if exists "Admins see all profiles" on public.profiles;

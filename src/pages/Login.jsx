@@ -33,10 +33,17 @@ export default function Login() {
     }}>
       {/* Left branding panel */}
       <div style={{flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'60px', color:'white', maxWidth:560}}>
-        <div style={{fontFamily:'Sora,sans-serif', fontSize:36, fontWeight:800, lineHeight:1.1, marginBottom:20}}>
-          🎯 The Agora Project
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+          <img
+            src="/logo.png"
+            alt="The Agora Project"
+            style={{ width: 52, height: 52, objectFit: 'contain' }}
+          />
+          <div style={{fontFamily:'Sora,sans-serif', fontSize:36, fontWeight:800, lineHeight:1.1}}>
+            The Agora Project
           <div style={{fontSize:18, fontWeight:600, color:'rgba(255,255,255,.7)', marginTop:6}}>
             Your Path to SAT Excellence
+          </div>
           </div>
         </div>
         <p style={{fontSize:16, color:'rgba(255,255,255,.6)', lineHeight:1.7, marginBottom:32, maxWidth:400}}>
