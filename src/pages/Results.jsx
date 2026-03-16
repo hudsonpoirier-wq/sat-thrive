@@ -218,7 +218,7 @@ export default function Results() {
     <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
       {/* Nav */}
       <nav className="nav">
-        <a className="nav-brand" href="/dashboard">SAT <span>Thrive</span></a>
+        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
         <div className="nav-actions">
           <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
             ← Dashboard

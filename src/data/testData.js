@@ -44,7 +44,7 @@ export const FREE_RESPONSE = {
   math_m2: [6,7,13,14,20,21,27]
 }
 
-// Chapter map — each chapter from the SAT Thrive Playbook
+// Chapter map — each chapter from the Agora Project Playbook
 export const CHAPTERS = {
   '2.1': { name: 'Words in Context', page: 6, domain: 'Craft & Structure', color: '#3b82f6' },
   '2.2': { name: 'Text Structure & Purpose', page: 7, domain: 'Craft & Structure', color: '#3b82f6' },

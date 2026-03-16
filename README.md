@@ -1,4 +1,4 @@
-# SAT Thrive — 1550+ Architect (v3)
+# The Agora Project — SAT Prep App
 
 ## What this repo is
 

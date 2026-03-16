@@ -34,9 +34,9 @@ export default function Login() {
       {/* Left branding panel */}
       <div style={{flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'60px', color:'white', maxWidth:560}}>
         <div style={{fontFamily:'Sora,sans-serif', fontSize:36, fontWeight:800, lineHeight:1.1, marginBottom:20}}>
-          🎯 SAT Thrive
+          🎯 The Agora Project
           <div style={{fontSize:18, fontWeight:600, color:'rgba(255,255,255,.7)', marginTop:6}}>
-            The 1550+ Architect Strategy
+            Your Path to SAT Excellence
           </div>
         </div>
         <p style={{fontSize:16, color:'rgba(255,255,255,.6)', lineHeight:1.7, marginBottom:32, maxWidth:400}}>
@@ -59,7 +59,7 @@ export default function Login() {
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}
           </div>
           <div style={{fontSize:13, color:'#64748b', marginBottom:28}}>
-            {mode === 'signin' ? 'Sign in to continue your SAT prep' : 'Start your journey to 1550+'}
+            {mode === 'signin' ? 'Sign in to continue' : 'Create an account to begin'}
           </div>
 
           <form onSubmit={handleSubmit}>

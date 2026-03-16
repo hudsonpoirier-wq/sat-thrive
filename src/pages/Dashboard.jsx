@@ -9,14 +9,14 @@ function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">SAT <span>Thrive</span></a>
+      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
         {profile?.role === 'admin' && (
           <Link to="/admin" className="btn btn-outline" style={{padding:'6px 14px',fontSize:12,color:'white',borderColor:'rgba(255,255,255,.3)'}}>
             Admin
           </Link>
         )}
-        <span className="nav-user">{profile?.full_name || profile?.email}</span>
+          <span className="nav-user">{profile?.full_name || profile?.email}</span>
         <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
           style={{padding:'6px 14px',fontSize:12,color:'rgba(255,255,255,.7)',borderColor:'rgba(255,255,255,.2)',background:'rgba(255,255,255,.08)'}}>
           Sign Out
@@ -92,7 +92,7 @@ export default function Dashboard() {
           <h1 style={{fontFamily:'Sora,sans-serif',fontSize:26,fontWeight:800,color:'#1a2744'}}>
             Hey {profile?.full_name?.split(' ')[0] || 'there'} 👋
           </h1>
-          <p style={{color:'#64748b',marginTop:4}}>Your SAT Thrive dashboard — track your progress to 1550+</p>
+          <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your SAT progress</p>
         </div>
 
         {/* Stats */}
