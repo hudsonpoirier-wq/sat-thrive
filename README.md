@@ -31,7 +31,7 @@ To deploy to Vercel: connect the repo and it deploys automatically (`vercel.json
 
 Create this Supabase Auth user:
 - Email: `admin@sat.org`
-- Password: `demo123`
+- Password: `demo1234`
 
 Then, in Supabase SQL Editor, run:
 ```sql
