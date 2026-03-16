@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { rawToScaled } from '../data/testData.js'
+import { rawToScaled, scoreSection } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 
 function Navbar() {
@@ -62,6 +62,21 @@ export default function Dashboard() {
   const [postInput, setPostInput] = useState('')
   const [confirmStart, setConfirmStart] = useState(false)
 
+  function computeScoresFromAnswers(attempt) {
+    try {
+      const ans = attempt?.answers || {}
+      const rwM1 = scoreSection('rw_m1', ans.rw_m1)
+      const rwM2 = scoreSection('rw_m2', ans.rw_m2)
+      const mM1 = scoreSection('math_m1', ans.math_m1)
+      const mM2 = scoreSection('math_m2', ans.math_m2)
+      const rawRW = (rwM1?.correct || 0) + (rwM2?.correct || 0)
+      const rawMath = (mM1?.correct || 0) + (mM2?.correct || 0)
+      return rawToScaled(rawRW, rawMath)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     if (!user) return
     const sandbox = profile?.role === 'admin'
@@ -69,11 +84,24 @@ export default function Dashboard() {
       supabase.from('test_attempts').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('started_at', { ascending: false }),
       supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('recorded_at', { ascending: false })
     ]).then(([a, p]) => {
-      setAttempts(a.data || [])
+      const rows = a.data || []
+      setAttempts(rows)
       setPostScores(p.data || [])
       getStudiedTopics(user.id).then(({ map }) => {
         setStudied(map || {})
         setLoading(false)
+      })
+
+      // If an attempt was completed but scores didn't persist for some reason,
+      // compute them client-side and patch the row (best-effort).
+      const needsPatch = rows.filter(r => r.completed_at && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
+      needsPatch.slice(0, 3).forEach(async (r) => {
+        const computed = computeScoresFromAnswers(r)
+        if (!computed?.total) return
+        try {
+          await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
+          setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
+        } catch {}
       })
     })
   }, [user, profile?.role])
@@ -123,7 +151,8 @@ export default function Dashboard() {
 
   const completed = attempts.filter(a => a.completed_at)
   const inProgress = attempts.filter(a => !a.completed_at)
-  const bestScore = completed.length ? Math.max(...completed.map(a => a.scores?.total || 0)) : null
+  const completedTotals = completed.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
+  const bestScore = completedTotals.length ? Math.max(...completedTotals) : null
   const latestPostScore = postScores[0]?.post_score
   const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
   const studiedCount = Object.values(studied).filter(Boolean).length
@@ -283,15 +312,16 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {completed.map(a => {
-                    const post = postScores.find(p => p.attempt_id === a.id)
-                    const gain = post ? post.post_score - (a.scores?.total || 0) : null
-                    return (
-                      <tr key={a.id} style={{borderBottom:'1px solid #f1f5f9'}}>
-                        <td style={{padding:'12px'}}>{new Date(a.started_at).toLocaleDateString()}</td>
-                        <td style={{padding:'12px', fontWeight:700}}>{a.scores?.rw || '—'}</td>
-                        <td style={{padding:'12px', fontWeight:700}}>{a.scores?.math || '—'}</td>
-                        <td style={{padding:'12px', fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:'#1a2744'}}>{a.scores?.total || '—'}</td>
+	                  {completed.map(a => {
+	                    const rowScores = a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {})
+	                    const post = postScores.find(p => p.attempt_id === a.id)
+	                    const gain = post ? post.post_score - (rowScores?.total || 0) : null
+	                    return (
+	                      <tr key={a.id} style={{borderBottom:'1px solid #f1f5f9'}}>
+	                        <td style={{padding:'12px'}}>{new Date(a.started_at).toLocaleDateString()}</td>
+	                        <td style={{padding:'12px', fontWeight:700}}>{rowScores?.rw || '—'}</td>
+	                        <td style={{padding:'12px', fontWeight:700}}>{rowScores?.math || '—'}</td>
+	                        <td style={{padding:'12px', fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:'#1a2744'}}>{rowScores?.total || '—'}</td>
                         <td style={{padding:'12px'}}>
                           {addingPost === a.id ? (
                             <div style={{display:'flex', gap:6}}>

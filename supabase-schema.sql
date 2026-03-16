@@ -100,6 +100,7 @@ drop policy if exists "Users can view own attempts" on public.test_attempts;
 drop policy if exists "Users can insert own attempts" on public.test_attempts;
 drop policy if exists "Users can update own attempts" on public.test_attempts;
 drop policy if exists "Users can delete own sandbox attempts" on public.test_attempts;
+drop policy if exists "Admins can delete any attempts" on public.test_attempts;
 drop policy if exists "Admins see all attempts" on public.test_attempts;
 drop policy if exists "Admins can insert attempts" on public.test_attempts;
 drop policy if exists "Admins can update attempts" on public.test_attempts;
@@ -107,6 +108,7 @@ create policy "Users can view own attempts" on public.test_attempts for select u
 create policy "Users can insert own attempts" on public.test_attempts for insert with check (auth.uid() = user_id);
 create policy "Users can update own attempts" on public.test_attempts for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Users can delete own sandbox attempts" on public.test_attempts for delete using (auth.uid() = user_id and is_sandbox = true);
+create policy "Admins can delete any attempts" on public.test_attempts for delete using (public.is_admin());
 create policy "Admins see all attempts" on public.test_attempts for select using (public.is_admin());
 create policy "Admins can insert attempts" on public.test_attempts for insert with check (public.is_admin());
 create policy "Admins can update attempts" on public.test_attempts for update using (public.is_admin()) with check (public.is_admin());
@@ -114,12 +116,14 @@ create policy "Admins can update attempts" on public.test_attempts for update us
 drop policy if exists "Users can view own scores" on public.post_scores;
 drop policy if exists "Users can insert own scores" on public.post_scores;
 drop policy if exists "Users can delete own sandbox scores" on public.post_scores;
+drop policy if exists "Admins can delete any scores" on public.post_scores;
 drop policy if exists "Admins see all scores" on public.post_scores;
 drop policy if exists "Admins can insert scores" on public.post_scores;
 drop policy if exists "Admins can update scores" on public.post_scores;
 create policy "Users can view own scores" on public.post_scores for select using (auth.uid() = user_id);
 create policy "Users can insert own scores" on public.post_scores for insert with check (auth.uid() = user_id);
 create policy "Users can delete own sandbox scores" on public.post_scores for delete using (auth.uid() = user_id and is_sandbox = true);
+create policy "Admins can delete any scores" on public.post_scores for delete using (public.is_admin());
 create policy "Admins see all scores" on public.post_scores for select using (public.is_admin());
 create policy "Admins can insert scores" on public.post_scores for insert with check (public.is_admin());
 create policy "Admins can update scores" on public.post_scores for update using (public.is_admin()) with check (public.is_admin());
@@ -127,11 +131,13 @@ create policy "Admins can update scores" on public.post_scores for update using 
 drop policy if exists "Users can view own studied topics" on public.studied_topics;
 drop policy if exists "Users can upsert own studied topics" on public.studied_topics;
 drop policy if exists "Admins can clear own studied topics" on public.studied_topics;
+drop policy if exists "Admins can delete any studied topics" on public.studied_topics;
 drop policy if exists "Admins see all studied topics" on public.studied_topics;
 create policy "Users can view own studied topics" on public.studied_topics for select using (auth.uid() = user_id);
 create policy "Users can upsert own studied topics" on public.studied_topics for insert with check (auth.uid() = user_id);
 create policy "Users can update own studied topics" on public.studied_topics for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Admins can clear own studied topics" on public.studied_topics for delete using (auth.uid() = user_id and public.is_admin());
+create policy "Admins can delete any studied topics" on public.studied_topics for delete using (public.is_admin());
 create policy "Admins see all studied topics" on public.studied_topics for select using (public.is_admin());
 
 drop policy if exists "Users can view test answer keys" on public.test_answer_keys;

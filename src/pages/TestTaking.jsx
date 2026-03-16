@@ -86,6 +86,7 @@ export default function TestTaking() {
   const [showBreak, setShowBreak] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [pdfOffsets, setPdfOffsets] = useState({}) // { rw_m1: 0, ... } (0-based page offsets)
+  const [pdfOverrides, setPdfOverrides] = useState({}) // { rw_m1: { [qNum]: pageIndex }, ... }
   const saveTimer = useRef(null)
 
   useEffect(() => {
@@ -98,6 +99,17 @@ export default function TestTaking() {
   useEffect(() => {
     try { localStorage.setItem('agora_pdf_offsets_v1', JSON.stringify(pdfOffsets || {})) } catch {}
   }, [pdfOffsets])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('agora_pdf_overrides_v1')
+      if (raw) setPdfOverrides(JSON.parse(raw) || {})
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('agora_pdf_overrides_v1', JSON.stringify(pdfOverrides || {})) } catch {}
+  }, [pdfOverrides])
 
   useEffect(() => {
     if (!supabase || !user?.id) return
@@ -283,7 +295,8 @@ export default function TestTaking() {
   const pageMap = PDF_PAGE_MAP[currentModule] || {}
   const basePdfPage = pageMap[currentQ] ?? 0
   const pdfOffset = Number(pdfOffsets?.[currentModule] || 0)
-  const pdfPage = Math.max(0, basePdfPage + pdfOffset)
+  const overridePage = pdfOverrides?.[currentModule]?.[currentQ]
+  const pdfPage = Math.max(0, Number.isFinite(Number(overridePage)) ? Number(overridePage) : (basePdfPage + pdfOffset))
   const modAnswers = answers[currentModule] || {}
   const currentAnswer = modAnswers[currentQ]
   const markedList = markedForReview[currentModule] || []
@@ -361,9 +374,42 @@ export default function TestTaking() {
 	            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
 	              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
 	                PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
-	                <span style={{ color: '#94a3b8', fontWeight: 700 }}> · offset {pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}</span>
+	                <span style={{ color: '#94a3b8', fontWeight: 700 }}>
+	                  {Number.isFinite(Number(overridePage)) ? ' · (override)' : ` · offset ${pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}`}
+	                </span>
 	              </div>
 	              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+	                <button
+	                  className="btn btn-outline"
+	                  style={{ padding: '6px 10px', fontSize: 12 }}
+	                  onClick={() => {
+	                    const page = window.prompt('Set the PDF page number for this question (1-based):', String(pdfPage + 1))
+	                    const n = Number(String(page || '').trim())
+	                    if (!Number.isFinite(n) || n < 1) return
+	                    const idx = Math.max(0, Math.floor(n - 1))
+	                    setPdfOverrides(prev => ({
+	                      ...(prev || {}),
+	                      [currentModule]: { ...(prev?.[currentModule] || {}), [currentQ]: idx }
+	                    }))
+	                  }}
+	                  title="If the mapping is glitchy, set an exact PDF page for this question"
+	                >
+	                  Set page
+	                </button>
+	                {Number.isFinite(Number(overridePage)) && (
+	                  <button
+	                    className="btn btn-outline"
+	                    style={{ padding: '6px 10px', fontSize: 12 }}
+	                    onClick={() => setPdfOverrides(prev => {
+	                      const nextMod = { ...(prev?.[currentModule] || {}) }
+	                      delete nextMod[currentQ]
+	                      return { ...(prev || {}), [currentModule]: nextMod }
+	                    })}
+	                    title="Remove the per-question page override"
+	                  >
+	                    Clear override
+	                  </button>
+	                )}
 	                <button
 	                  className="btn btn-outline"
 	                  style={{ padding: '6px 10px', fontSize: 12 }}
@@ -390,7 +436,7 @@ export default function TestTaking() {
 	                </button>
 	              </div>
 	            </div>
-	            <PDFPage pdfUrl={PDF_URL} pageIndex={pdfPage} />
+	            <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={PDF_URL} pageIndex={pdfPage} />
 	          </div>
 	        </div>
 

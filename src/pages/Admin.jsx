@@ -50,6 +50,8 @@ export default function Admin() {
   const [tab, setTab] = useState('students')
   const [finalKey, setFinalKey] = useState(null)
   const [finalKeyStatus, setFinalKeyStatus] = useState({ loading: false, msg: '' })
+  const [resettingUserId, setResettingUserId] = useState(null)
+  const [resetMsg, setResetMsg] = useState('')
 
   useEffect(() => {
     if (!supabase) return
@@ -71,6 +73,37 @@ export default function Admin() {
     }
     load().catch(() => setLoading(false))
   }, [profile, navigate])
+
+  async function resetStudentData(userId, email) {
+    if (!supabase || profile?.role !== 'admin') return
+    const ok = window.confirm(
+      `Reset this student's progress?\n\nThis will delete their tests, post-test scores, and study guide progress:\n${email || userId}\n\nTheir login account will still exist.`
+    )
+    if (!ok) return
+    setResettingUserId(userId)
+    setResetMsg('')
+    try {
+      const [ps, ta, st] = await Promise.all([
+        supabase.from('post_scores').delete().eq('user_id', userId),
+        supabase.from('test_attempts').delete().eq('user_id', userId),
+        supabase.from('studied_topics').delete().eq('user_id', userId),
+      ])
+      const err = ps.error || ta.error || st.error
+      if (err) throw err
+      setResetMsg('✅ Student reset complete.')
+      // Refresh tables
+      const [a, p] = await Promise.all([
+        supabase.from('test_attempts').select('id,user_id,started_at,completed_at,scores,weak_topics').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+        supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').eq('is_sandbox', false).order('recorded_at', { ascending: false }).limit(5000),
+      ])
+      setAttempts(a.data || [])
+      setPostScores(p.data || [])
+    } catch (e) {
+      setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setResettingUserId(null)
+    }
+  }
 
   useEffect(() => {
     if (!supabase || profile?.role !== 'admin') return
@@ -194,10 +227,15 @@ export default function Admin() {
         {tab === 'students' && (
           <div className="card" style={{ overflowX: 'auto' }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>All Students</h3>
+            {resetMsg && (
+              <div style={{ marginBottom: 12, fontSize: 13, color: resetMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+                {resetMsg}
+              </div>
+            )}
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Name', 'Email', 'Role', 'Joined', 'Tests', 'Best Score'].map(h => (
+                  {['Name', 'Email', 'Role', 'Joined', 'Tests', 'Best Score', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
                   ))}
                 </tr>
@@ -218,6 +256,17 @@ export default function Admin() {
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td style={{ padding: '12px' }}>{userAttempts.length}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }}>{best || '—'}</td>
+                      <td style={{ padding: '12px' }}>
+                        <button
+                          className="btn btn-outline"
+                          style={{ padding: '6px 10px', fontSize: 12, opacity: resettingUserId === s.id ? 0.6 : 1 }}
+                          disabled={resettingUserId === s.id}
+                          onClick={() => resetStudentData(s.id, s.email)}
+                          title="Delete this student's tests, scores, and study progress"
+                        >
+                          {resettingUserId === s.id ? 'Resetting…' : 'Reset'}
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
