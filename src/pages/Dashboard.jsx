@@ -4,10 +4,12 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, scoreSection } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
+import UserMenu from '../components/UserMenu.jsx'
 
 function Navbar() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
   return (
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
@@ -25,7 +27,7 @@ function Navbar() {
         >
           Study Guide
         </Link>
-        {profile?.role === 'admin' && (
+        {isAdmin && (
           <Link
             to="/admin"
             className="btn btn-outline"
@@ -40,7 +42,7 @@ function Navbar() {
             Admin
           </Link>
         )}
-        <span className="nav-user">{profile?.full_name || profile?.email}</span>
+        <UserMenu profile={profile} />
         <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
           style={{padding:'6px 14px',fontSize:12,color:'rgba(255,255,255,.7)',borderColor:'rgba(255,255,255,.2)',background:'rgba(255,255,255,.08)'}}>
           Sign Out
@@ -79,10 +81,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return
-    const sandbox = profile?.role === 'admin'
     Promise.all([
-      supabase.from('test_attempts').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('started_at', { ascending: false }),
-      supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('recorded_at', { ascending: false })
+      supabase.from('test_attempts').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
+      supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
     ]).then(([a, p]) => {
       const rows = a.data || []
       setAttempts(rows)
@@ -94,7 +95,7 @@ export default function Dashboard() {
 
       // If an attempt was completed but scores didn't persist for some reason,
       // compute them client-side and patch the row (best-effort).
-      const needsPatch = rows.filter(r => r.completed_at && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
+      const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
       needsPatch.slice(0, 3).forEach(async (r) => {
         const computed = computeScoresFromAnswers(r)
         if (!computed?.total) return
@@ -104,7 +105,7 @@ export default function Dashboard() {
         } catch {}
       })
     })
-  }, [user, profile?.role])
+  }, [user])
 
   async function startNewTest() {
     if (!confirmStart) { setConfirmStart(true); return }
@@ -113,17 +114,11 @@ export default function Dashboard() {
     const payload = {
       user_id: user.id,
       test_id: 'practice_test_11',
-      is_sandbox: profile?.role === 'admin',
       current_section: 'rw_m1',
       answers: {},
       module_time_remaining: { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 }
     }
-    let res = await supabase.from('test_attempts').insert(payload).select().single()
-    if (res.error && String(res.error.message || '').includes('is_sandbox')) {
-      // Backward compatibility if schema migration hasn't been run yet
-      const { is_sandbox, ...fallback } = payload
-      res = await supabase.from('test_attempts').insert(fallback).select().single()
-    }
+    const res = await supabase.from('test_attempts').insert(payload).select().single()
     if (!res.error && res.data) navigate(`/test/${res.data.id}`)
     else {
       alert(res.error?.message || 'Could not start test. Please try again.')
@@ -136,20 +131,15 @@ export default function Dashboard() {
     if (isNaN(sc) || sc < 400 || sc > 1600) return alert('Enter a valid score (400–1600)')
     const rw = Math.round(sc * 0.5 / 10) * 10
     const math = sc - rw
-    const payload = { user_id: user.id, attempt_id: attemptId, is_sandbox: profile?.role === 'admin', post_score: sc, post_rw: rw, post_math: math }
-    let ins = await supabase.from('post_scores').insert(payload)
-    if (ins.error && String(ins.error.message || '').includes('is_sandbox')) {
-      const { is_sandbox, ...fallback } = payload
-      ins = await supabase.from('post_scores').insert(fallback)
-    }
+    const payload = { user_id: user.id, attempt_id: attemptId, post_score: sc, post_rw: rw, post_math: math }
+    const ins = await supabase.from('post_scores').insert(payload)
     if (ins.error) alert(ins.error.message)
-    const sandbox = profile?.role === 'admin'
-    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('recorded_at', { ascending: false })
+    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
     setPostScores(data || [])
     setAddingPost(null); setPostInput('')
   }
 
-  const completed = attempts.filter(a => a.completed_at)
+  const completed = attempts.filter(a => a.completed_at || a.scores?.total)
   const inProgress = attempts.filter(a => !a.completed_at)
   const completedTotals = completed.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
   const bestScore = completedTotals.length ? Math.max(...completedTotals) : null
@@ -264,7 +254,7 @@ export default function Dashboard() {
             {[
               { title: '1) Take the Pretest', done: completed.length > 0, desc: 'Complete Practice Test #11.' },
               { title: '2) Review Results', done: completed.length > 0, desc: 'Use your results to find weak topics.' },
-              { title: '3) Complete Study Guide', done: studiedCount > 0, desc: 'Work through chapters and mark them complete.' },
+              { title: '3) Complete Study Guide', done: studiedCount >= 34, desc: 'Work through chapters and mark them complete.' },
               { title: '4) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
             ].map((s) => (
               <div key={s.title} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>

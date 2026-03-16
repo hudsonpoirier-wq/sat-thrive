@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
+import UserMenu from '../components/UserMenu.jsx'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -43,6 +44,7 @@ function pairedTTest(pairs) {
 export default function Admin() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
   const [students, setStudents] = useState([])
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
@@ -55,7 +57,7 @@ export default function Admin() {
 
   useEffect(() => {
     if (!supabase) return
-    if (profile && profile.role !== 'admin') {
+    if (profile && !isAdmin) {
       navigate('/dashboard')
       return
     }
@@ -72,10 +74,10 @@ export default function Admin() {
       setLoading(false)
     }
     load().catch(() => setLoading(false))
-  }, [profile, navigate])
+  }, [profile, isAdmin, navigate])
 
   async function resetStudentData(userId, email) {
-    if (!supabase || profile?.role !== 'admin') return
+    if (!supabase || !isAdmin) return
     const ok = window.confirm(
       `Reset this student's progress?\n\nThis will delete their tests, post-test scores, and study guide progress:\n${email || userId}\n\nTheir login account will still exist.`
     )
@@ -83,13 +85,14 @@ export default function Admin() {
     setResettingUserId(userId)
     setResetMsg('')
     try {
-      const [ps, ta, st] = await Promise.all([
-        supabase.from('post_scores').delete().eq('user_id', userId),
-        supabase.from('test_attempts').delete().eq('user_id', userId),
-        supabase.from('studied_topics').delete().eq('user_id', userId),
-      ])
-      const err = ps.error || ta.error || st.error
-      if (err) throw err
+      const ps = await supabase.from('post_scores').delete().eq('user_id', userId)
+      if (ps.error) throw ps.error
+      const ta = await supabase.from('test_attempts').delete().eq('user_id', userId)
+      if (ta.error) throw ta.error
+      const st = await supabase.from('studied_topics').delete().eq('user_id', userId)
+      if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
+        throw st.error
+      }
       setResetMsg('✅ Student reset complete.')
       // Refresh tables
       const [a, p] = await Promise.all([
@@ -98,6 +101,29 @@ export default function Admin() {
       ])
       setAttempts(a.data || [])
       setPostScores(p.data || [])
+    } catch (e) {
+      setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setResettingUserId(null)
+    }
+  }
+
+  async function resetMyData() {
+    if (!supabase || !isAdmin || !profile?.id) return
+    const ok = window.confirm('Reset your admin testing data?\n\nThis will delete your tests, scores, and study progress.')
+    if (!ok) return
+    setResettingUserId(profile.id)
+    setResetMsg('')
+    try {
+      const ps = await supabase.from('post_scores').delete().eq('user_id', profile.id)
+      if (ps.error) throw ps.error
+      const ta = await supabase.from('test_attempts').delete().eq('user_id', profile.id)
+      if (ta.error) throw ta.error
+      const st = await supabase.from('studied_topics').delete().eq('user_id', profile.id)
+      if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
+        throw st.error
+      }
+      setResetMsg('✅ Your data was reset.')
     } catch (e) {
       setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
     } finally {
@@ -180,13 +206,22 @@ export default function Admin() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
-      <nav className="nav">
-        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
-        <div className="nav-actions">
-          <span className="nav-user">Admin Panel</span>
-          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-            ← Dashboard
-          </Link>
+	      <nav className="nav">
+	        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+	        <div className="nav-actions">
+	          <UserMenu profile={profile} />
+	          <button
+	            className="btn btn-outline"
+	            onClick={resetMyData}
+	            disabled={resettingUserId === profile?.id}
+	            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.9)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
+	            title="Reset your admin testing data"
+	          >
+	            {resettingUserId === profile?.id ? 'Resetting…' : 'Reset My Data'}
+	          </button>
+	          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+	            ← Dashboard
+	          </Link>
           <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
             style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
             Sign Out

@@ -1,6 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
-import { clearAdminTestingData } from '../lib/studyProgress.js'
 
 const AuthContext = createContext(null)
 
@@ -54,22 +53,6 @@ export function AuthProvider({ children }) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
     setLoading(false)
-    if (data?.role === 'admin') {
-      // Clear admin testing data once per login session (so admin can test the app like a student,
-      // but relogging starts from a clean slate).
-      try {
-        const marker = session?.refresh_token || session?.access_token || String(Date.now())
-        const key = `agora_admin_clear_marker_v1:${userId}`
-        const prev = localStorage.getItem(key)
-        if (prev !== marker) {
-          await clearAdminTestingData(userId)
-          localStorage.setItem(key, marker)
-        }
-      } catch {
-        // If localStorage isn't available, fall back to best-effort cleanup.
-        clearAdminTestingData(userId)
-      }
-    }
   }
 
   async function signUp(email, password, fullName) {

@@ -197,12 +197,17 @@ export default function TestTaking() {
     const scores = rawToScaled(rawRW, rawMath)
     const weakTopics = calcWeakTopics(answers)
 
-    await supabase.from('test_attempts').update({
+    const up = await supabase.from('test_attempts').update({
       completed_at: new Date().toISOString(),
       answers,
       scores,
       weak_topics: weakTopics.slice(0, 15),
     }).eq('id', attemptId)
+    if (up.error) {
+      alert(up.error.message || 'Could not submit test. Please try again.')
+      setSubmitting(false)
+      return
+    }
 
     // Auto-check Study Guide chapters that were mastered on the test (all questions correct for that chapter).
     try {
