@@ -48,6 +48,13 @@ Vercel build settings:
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
+## Database setup (Supabase)
+
+Run `supabase-schema.sql` in Supabase SQL Editor. It creates:
+- `profiles`, `test_attempts`, `post_scores`
+- `studied_topics` (chapter completion tracking)
+- RLS policies (users see only their own data; admin sees all)
+
 ## File structure
 ```
 src/
