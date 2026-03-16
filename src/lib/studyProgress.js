@@ -23,13 +23,17 @@ export async function getStudiedTopics(userId) {
   if (!supabase) return { source: 'local', map: readLocal(userId) }
   const { data, error } = await supabase
     .from('studied_topics')
-    .select('chapter_id,completed')
+    .select('chapter_id,completed,practice')
     .eq('user_id', userId)
   if (error) return { source: 'local', map: readLocal(userId) }
   const map = {}
-  for (const row of data || []) map[row.chapter_id] = Boolean(row.completed)
+  const practiceByChapter = {}
+  for (const row of data || []) {
+    map[row.chapter_id] = Boolean(row.completed)
+    if (row.practice && typeof row.practice === 'object') practiceByChapter[row.chapter_id] = row.practice
+  }
   writeLocal(userId, map)
-  return { source: 'supabase', map }
+  return { source: 'supabase', map, practiceByChapter }
 }
 
 export async function setStudiedTopic(userId, chapterId, completed) {
@@ -49,3 +53,24 @@ export async function setStudiedTopic(userId, chapterId, completed) {
     })
 }
 
+export async function setChapterPractice(userId, chapterId, practice) {
+  if (!userId || !chapterId || !practice || typeof practice !== 'object') return
+  if (!supabase) return
+  await supabase
+    .from('studied_topics')
+    .upsert({
+      user_id: userId,
+      chapter_id: chapterId,
+      practice,
+      updated_at: new Date().toISOString(),
+    })
+}
+
+export async function clearAdminTestingData(userId) {
+  if (!userId || !supabase) return
+  // Best-effort cleanup; safe even if some columns/tables aren't migrated yet.
+  try { await supabase.from('post_scores').delete().eq('user_id', userId).eq('is_sandbox', true) } catch {}
+  try { await supabase.from('test_attempts').delete().eq('user_id', userId).eq('is_sandbox', true) } catch {}
+  try { await supabase.from('studied_topics').delete().eq('user_id', userId) } catch {}
+  try { localStorage.removeItem(lsKey(userId)) } catch {}
+}

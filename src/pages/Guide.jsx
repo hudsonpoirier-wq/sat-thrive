@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { CHAPTERS } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
-import { getStudiedTopics, setStudiedTopic } from '../lib/studyProgress.js'
+import { getStudiedTopics, setStudiedTopic, setChapterPractice } from '../lib/studyProgress.js'
 
 function Navbar() {
   return (
@@ -113,8 +113,11 @@ function PracticeProblem({ problem, idx, onAnswered, answered }) {
           style={{ padding: '8px 14px', fontSize: 13 }}
           onClick={() => {
             if (isMC && !choice) return
+            const ok = isMC
+              ? (String(choice).toUpperCase() === String(correct).toUpperCase())
+              : true
             setShow(true)
-            onAnswered()
+            onAnswered(ok)
           }}
         >
           Check Answer →
@@ -138,11 +141,14 @@ export default function Guide() {
   const { user } = useAuth()
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
-  const [practiceDone, setPracticeDone] = useState({})
+  const [savedPracticeByChapter, setSavedPracticeByChapter] = useState({})
 
   useEffect(() => {
     if (!user?.id) return
-    getStudiedTopics(user.id).then(({ map }) => setCompletedMap(map || {}))
+    getStudiedTopics(user.id).then(({ map, practiceByChapter }) => {
+      setCompletedMap(map || {})
+      setSavedPracticeByChapter(practiceByChapter || {})
+    })
   }, [user?.id])
 
   const domains = useMemo(() => {
@@ -158,6 +164,15 @@ export default function Guide() {
   const ch = selectedId ? CHAPTERS[selectedId] : null
   const content = selectedId ? GUIDE_CONTENT[selectedId] : null
   const problems = content?.problems || []
+  const expandedProblems = useMemo(() => {
+    if (!problems.length) return []
+    const out = []
+    for (let i = 0; i < 25; i++) {
+      const base = problems[i % problems.length]
+      out.push({ ...base, q: i < problems.length ? base.q : `${base.q}\n\n(Variant ${i - problems.length + 1})` })
+    }
+    return out
+  }, [problems])
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const totalChapters = Object.keys(CHAPTERS).length
@@ -202,11 +217,23 @@ export default function Guide() {
                   </div>
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain} · Playbook p.{ch?.page}</div>
                 </div>
+                {(() => {
+                  const saved = savedPracticeByChapter[selectedId] || {}
+                  const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(saved[i]))
+                  return (
                 <button
                   className="btn"
-                  style={{ background: completedMap[selectedId] ? '#10b981' : '#f59e0b', color: '#1a2744', fontWeight: 800 }}
+                  disabled={!allCorrect && !completedMap[selectedId]}
+                  style={{
+                    opacity: (!allCorrect && !completedMap[selectedId]) ? .6 : 1,
+                    cursor: (!allCorrect && !completedMap[selectedId]) ? 'not-allowed' : 'pointer',
+                    background: completedMap[selectedId] ? '#10b981' : '#f59e0b',
+                    color: '#1a2744',
+                    fontWeight: 800
+                  }}
                   onClick={async () => {
                     const next = !completedMap[selectedId]
+                    if (next && !allCorrect) return
                     const updated = { ...completedMap, [selectedId]: next }
                     setCompletedMap(updated)
                     await setStudiedTopic(user.id, selectedId, next)
@@ -214,6 +241,8 @@ export default function Guide() {
                 >
                   {completedMap[selectedId] ? '✅ Marked Complete' : 'Mark Chapter Complete'}
                 </button>
+                  )
+                })()}
               </div>
             </div>
 
@@ -241,17 +270,21 @@ export default function Guide() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                   <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, color: '#1a2744' }}>🎯 Practice Problems</div>
                   <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                    {Object.values(practiceDone).filter(Boolean).length}/{problems.length} completed
+                    {Object.values(savedPracticeByChapter[selectedId] || {}).filter(Boolean).length}/{expandedProblems.length} correct
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 12 }}>
-                  {problems.map((p, idx) => (
+                  {expandedProblems.map((p, idx) => (
                     <PracticeProblem
                       key={idx}
                       idx={idx}
                       problem={p}
-                      answered={Boolean(practiceDone[idx])}
-                      onAnswered={() => setPracticeDone(prev => ({ ...prev, [idx]: true }))}
+                      answered={Boolean((savedPracticeByChapter[selectedId] || {})[idx])}
+                      onAnswered={async (correct) => {
+                        const next = { ...(savedPracticeByChapter[selectedId] || {}), [idx]: Boolean(correct) }
+                        setSavedPracticeByChapter(prev => ({ ...prev, [selectedId]: next }))
+                        await setChapterPractice(user.id, selectedId, next)
+                      }}
                     />
                   ))}
                 </div>
@@ -263,4 +296,3 @@ export default function Guide() {
     </div>
   )
 }
-

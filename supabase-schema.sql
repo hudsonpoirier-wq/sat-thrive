@@ -17,7 +17,6 @@ create table if not exists public.test_attempts (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
   test_id text not null default 'practice_test_11',
-  is_sandbox boolean not null default false,
   started_at timestamptz not null default now(),
   completed_at timestamptz,
   current_section text not null default 'rw_m1',
@@ -33,7 +32,6 @@ create table if not exists public.post_scores (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
   attempt_id uuid references public.test_attempts(id) on delete set null,
-  is_sandbox boolean not null default false,
   post_score integer check (post_score between 400 and 1600),
   post_rw integer check (post_rw between 200 and 800),
   post_math integer check (post_math between 200 and 800),
@@ -56,6 +54,11 @@ create table if not exists public.test_answer_keys (
   answer_key jsonb not null,
   updated_at timestamptz not null default now()
 );
+
+-- Migrations (safe to run repeatedly)
+alter table public.test_attempts add column if not exists is_sandbox boolean not null default false;
+alter table public.post_scores add column if not exists is_sandbox boolean not null default false;
+alter table public.studied_topics add column if not exists practice jsonb not null default '{}';
 
 -- Helpful indexes for scale
 create index if not exists idx_test_attempts_user_started on public.test_attempts(user_id, started_at desc);
@@ -123,10 +126,12 @@ create policy "Admins can update scores" on public.post_scores for update using 
 
 drop policy if exists "Users can view own studied topics" on public.studied_topics;
 drop policy if exists "Users can upsert own studied topics" on public.studied_topics;
+drop policy if exists "Admins can clear own studied topics" on public.studied_topics;
 drop policy if exists "Admins see all studied topics" on public.studied_topics;
 create policy "Users can view own studied topics" on public.studied_topics for select using (auth.uid() = user_id);
 create policy "Users can upsert own studied topics" on public.studied_topics for insert with check (auth.uid() = user_id);
 create policy "Users can update own studied topics" on public.studied_topics for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Admins can clear own studied topics" on public.studied_topics for delete using (auth.uid() = user_id and public.is_admin());
 create policy "Admins see all studied topics" on public.studied_topics for select using (public.is_admin());
 
 drop policy if exists "Users can view test answer keys" on public.test_answer_keys;

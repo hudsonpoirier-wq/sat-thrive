@@ -61,16 +61,25 @@ export default function Dashboard() {
     if (!confirmStart) { setConfirmStart(true); return }
     setConfirmStart(false)
     setStartingTest(true)
-    const { data, error } = await supabase.from('test_attempts').insert({
+    const payload = {
       user_id: user.id,
       test_id: 'practice_test_11',
       is_sandbox: profile?.role === 'admin',
       current_section: 'rw_m1',
       answers: {},
       module_time_remaining: { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 }
-    }).select().single()
-    if (!error && data) navigate(`/test/${data.id}`)
-    else setStartingTest(false)
+    }
+    let res = await supabase.from('test_attempts').insert(payload).select().single()
+    if (res.error && String(res.error.message || '').includes('is_sandbox')) {
+      // Backward compatibility if schema migration hasn't been run yet
+      const { is_sandbox, ...fallback } = payload
+      res = await supabase.from('test_attempts').insert(fallback).select().single()
+    }
+    if (!res.error && res.data) navigate(`/test/${res.data.id}`)
+    else {
+      alert(res.error?.message || 'Could not start test. Please try again.')
+      setStartingTest(false)
+    }
   }
 
   async function savePostScore(attemptId) {
@@ -78,7 +87,13 @@ export default function Dashboard() {
     if (isNaN(sc) || sc < 400 || sc > 1600) return alert('Enter a valid score (400–1600)')
     const rw = Math.round(sc * 0.5 / 10) * 10
     const math = sc - rw
-    await supabase.from('post_scores').insert({ user_id: user.id, attempt_id: attemptId, is_sandbox: profile?.role === 'admin', post_score: sc, post_rw: rw, post_math: math })
+    const payload = { user_id: user.id, attempt_id: attemptId, is_sandbox: profile?.role === 'admin', post_score: sc, post_rw: rw, post_math: math }
+    let ins = await supabase.from('post_scores').insert(payload)
+    if (ins.error && String(ins.error.message || '').includes('is_sandbox')) {
+      const { is_sandbox, ...fallback } = payload
+      ins = await supabase.from('post_scores').insert(fallback)
+    }
+    if (ins.error) alert(ins.error.message)
     const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('recorded_at', { ascending: false })
     setPostScores(data || [])
     setAddingPost(null); setPostInput('')

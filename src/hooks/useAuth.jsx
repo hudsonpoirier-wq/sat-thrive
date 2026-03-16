@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
+import { clearAdminTestingData } from '../lib/studyProgress.js'
 
 const AuthContext = createContext(null)
 
@@ -53,6 +54,7 @@ export function AuthProvider({ children }) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
     setLoading(false)
+    if (data?.role === 'admin') clearAdminTestingData(userId)
   }
 
   async function signUp(email, password, fullName) {
