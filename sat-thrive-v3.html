@@ -346,6 +346,8 @@ tbody tr:hover td{background:#fafbfd}
 .modal h3{font-size:20px;font-weight:800;margin-bottom:8px}
 .modal p{font-size:14px;color:var(--gray);margin-bottom:22px;line-height:1.65}
 .modal-btns{display:flex;gap:10px;justify-content:center}
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:999;animation:fadeUp .2s ease}
+#modal-overlay.active{display:flex}
 
 /* ════════════ TOAST / FEEDBACK ════════════ */
 #toast{position:fixed;bottom:24px;right:24px;padding:13px 20px;border-radius:11px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;max-width:300px}
@@ -396,7 +398,13 @@ a{color:var(--blue);font-weight:600;cursor:pointer}
 </head>
 <body>
 <div id="toast"></div>
-<div id="modal-container"></div>
+<div id="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-btns" id="modal-btns"></div>
+  </div>
+</div>
 
 <!-- ════════════════════════════════════
      LOGIN
