@@ -8,6 +8,7 @@ import {
   ANSWER_KEY, QUESTION_CHAPTER_MAP, CHAPTERS, rawToScaled, freeResponseMatches
 } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
+import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 
 function isChoiceLetter(v) {
   const s = String(v || '').trim().toUpperCase()
@@ -222,18 +223,67 @@ export default function TestTaking() {
       setKeyStatus({ loading: false, msg: '' })
       return
     }
+
+    const CACHE_KEY = 'agora_answer_keys_cache_v1'
+    const readCache = (testId) => {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY)
+        const obj = raw ? JSON.parse(raw) : {}
+        return obj?.[testId] || null
+      } catch {
+        return null
+      }
+    }
+    const writeCache = (testId, keyObj) => {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY)
+        const obj = raw ? JSON.parse(raw) : {}
+        obj[testId] = keyObj
+        localStorage.setItem(CACHE_KEY, JSON.stringify(obj))
+      } catch {}
+    }
+
+    const cached = readCache(cfg.id)
+    if (cached) {
+      setKeyBySection(cached)
+      setKeyStatus({ loading: false, msg: '' })
+      return
+    }
+
     setKeyStatus({ loading: true, msg: 'Loading answer key…' })
-    supabase.from('test_answer_keys').select('*').eq('test_id', cfg.id).single()
-      .then(({ data, error }) => {
-        if (error || !data?.answer_key) {
-          setKeyBySection(null)
-          setKeyStatus({ loading: false, msg: 'Missing answer key. Ask the admin to import it in Admin → Test Setup.' })
+    ;(async () => {
+      // 1) Try Supabase (if the admin imported keys)
+      try {
+        const { data } = await supabase.from('test_answer_keys').select('*').eq('test_id', cfg.id).single()
+        if (data?.answer_key) {
+          setKeyBySection(data.answer_key)
+          writeCache(cfg.id, data.answer_key)
+          setKeyStatus({ loading: false, msg: '' })
           return
         }
-        setKeyBySection(data.answer_key)
-        setKeyStatus({ loading: false, msg: '' })
-      })
-      .catch(() => setKeyStatus({ loading: false, msg: 'Could not load answer key.' }))
+      } catch {}
+
+      // 2) Built-in fallback: parse the bundled AK PDF (no admin setup required)
+      if (cfg.akUrl) {
+        try {
+          const res = await fetch(cfg.akUrl)
+          if (!res.ok) throw new Error('Could not fetch bundled answer key.')
+          const buf = new Uint8Array(await res.arrayBuffer())
+          const parsed = await extractAnswerKeyFromPdf(buf)
+          setKeyBySection(parsed)
+          writeCache(cfg.id, parsed)
+          setKeyStatus({ loading: false, msg: '' })
+          return
+        } catch (e) {
+          setKeyBySection(null)
+          setKeyStatus({ loading: false, msg: `Could not load answer key: ${e?.message || 'unknown error'}` })
+          return
+        }
+      }
+
+      setKeyBySection(null)
+      setKeyStatus({ loading: false, msg: 'Missing answer key.' })
+    })()
   }, [attempt?.test_id])
 
   const saveProgress = useCallback(async (updatedAnswers, mod, timeRemaining) => {

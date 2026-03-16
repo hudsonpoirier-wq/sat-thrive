@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { clearAdminTestingData } from '../lib/studyProgress.js'
+import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
@@ -15,138 +16,6 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const FINAL_TEST_ID = 'final_test'
-
-function isChoiceLetter(v) {
-  const s = String(v || '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
-}
-
-async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
-  // Returns { rw_m1:{}, rw_m2:{}, math_m1:{}, math_m2:{} }
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
-  const sections = ['rw_m1', 'rw_m2', 'math_m1', 'math_m2']
-  const maxQ = { rw_m1: 33, rw_m2: 33, math_m1: 27, math_m2: 27 }
-
-  async function tryParsePage(p) {
-    const page = await pdf.getPage(p)
-    const tc = await page.getTextContent()
-    const items = (tc.items || [])
-      .map(i => ({ s: String(i.str || '').trim(), x: i.transform?.[4] ?? 0, y: i.transform?.[5] ?? 0 }))
-      .filter(i => i.s)
-
-    const qTokens = items
-      .map(i => ({ ...i, q: /^\d{1,2}$/.test(i.s) ? parseInt(i.s, 10) : null }))
-      .filter(i => Number.isFinite(i.q) && i.q >= 1 && i.q <= 33)
-
-    if (qTokens.length < 60) return null
-
-    const xs = qTokens.map(t => t.x).sort((a, b) => a - b)
-    const clusters = []
-    const thresh = 40
-    for (const x of xs) {
-      const last = clusters[clusters.length - 1]
-      if (!last || Math.abs(x - last.center) > thresh) clusters.push({ center: x, n: 1 })
-      else { last.center = (last.center * last.n + x) / (last.n + 1); last.n += 1 }
-    }
-    clusters.sort((a, b) => b.n - a.n)
-    const top = clusters.slice(0, 6).sort((a, b) => a.center - b.center)
-
-    // Pick 4 well-separated centers.
-    const picked = []
-    for (const c of top) {
-      if (!picked.length || Math.abs(c.center - picked[picked.length - 1]) > 60) picked.push(c.center)
-      if (picked.length === 4) break
-    }
-    if (picked.length < 4) return null
-
-    const cols = picked.sort((a, b) => a - b)
-    function nearestColIndex(x) {
-      let best = 0
-      let bestD = Infinity
-      for (let i = 0; i < cols.length; i++) {
-        const d = Math.abs(x - cols[i])
-        if (d < bestD) { bestD = d; best = i }
-      }
-      return best
-    }
-
-    const out = { rw_m1: {}, rw_m2: {}, math_m1: {}, math_m2: {} }
-    for (const qt of qTokens) {
-      const idx = nearestColIndex(qt.x)
-      const section = sections[idx]
-      if (qt.q > maxQ[section]) continue
-      const candidates = items
-        .filter(it => Math.abs(it.y - qt.y) < 2.2 && it.x > qt.x + 10 && it.x < qt.x + 140)
-        .sort((a, b) => a.x - b.x)
-      const ans = candidates[0]?.s
-      if (!ans) continue
-      if (!isChoiceLetter(ans) && !/^[0-9.+/()^piπ-]+$/i.test(ans)) continue
-      out[section][qt.q] = String(ans).toUpperCase().replace('Π', 'PI')
-    }
-
-    const count = Object.keys(out.rw_m1).length + Object.keys(out.rw_m2).length + Object.keys(out.math_m1).length + Object.keys(out.math_m2).length
-    if (count < 80) return null
-    return out
-  }
-
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const parsed = await tryParsePage(p)
-    if (parsed) return parsed
-  }
-  throw new Error('Could not find the answer key table in this PDF.')
-}
-
-async function extractSimpleAnswerKeyFromAnswerKeyPdf(buf) {
-  // Returns { rw_m1:{}, rw_m2:{}, math_m1:{}, math_m2:{} } when headings are present.
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
-  const out = { rw_m1: {}, rw_m2: {}, math_m1: {}, math_m2: {} }
-  const maxQ = { rw_m1: 33, rw_m2: 33, math_m1: 27, math_m2: 27 }
-  const rePair = /(^|\s)(\d{1,2})\s*([A-D])(?=\s|$)/g
-
-  function detectSection(text) {
-    const t = String(text || '').toLowerCase()
-    const isRW = t.includes('reading') || t.includes('writing') || t.includes('r&w')
-    const isMath = t.includes('math')
-    const m1 = t.includes('module 1') || t.includes('mod 1')
-    const m2 = t.includes('module 2') || t.includes('mod 2')
-    if (isRW && m1) return 'rw_m1'
-    if (isRW && m2) return 'rw_m2'
-    if (isMath && m1) return 'math_m1'
-    if (isMath && m2) return 'math_m2'
-    return null
-  }
-
-  let current = null
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p)
-    const tc = await page.getTextContent()
-    const text = (tc.items || []).map(i => String(i.str || '')).join(' ')
-    current = detectSection(text) || current
-
-    const sec = current
-    if (!sec) continue
-
-    let m
-    while ((m = rePair.exec(text)) !== null) {
-      const q = parseInt(m[2], 10)
-      const a = String(m[3] || '').toUpperCase()
-      if (!Number.isFinite(q) || q < 1 || q > maxQ[sec]) continue
-      out[sec][q] = a
-    }
-  }
-
-  const total = Object.keys(out.rw_m1).length + Object.keys(out.rw_m2).length + Object.keys(out.math_m1).length + Object.keys(out.math_m2).length
-  if (total < 40) throw new Error('Could not find enough answers in this PDF.')
-  return out
-}
-
-async function extractAnswerKeyFromPdf(buf) {
-  try {
-    return await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
-  } catch (e) {
-    return await extractSimpleAnswerKeyFromAnswerKeyPdf(buf)
-  }
-}
 
 function pairedTTest(pairs) {
   if (pairs.length < 2) return null
