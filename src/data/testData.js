@@ -166,7 +166,7 @@ export function calcWeakTopics(answers) {
       const ch = chMap[qNum]
       if (!ch) return
       const isCorrect = FREE_RESPONSE[section]?.includes(Number(qNum))
-        ? String(given).replace(/\s/g,'') === String(correct).replace(/\s/g,'')
+        ? freeResponseMatches(given, correct)
         : String(given).toUpperCase() === String(correct).toUpperCase()
       if (!isCorrect) {
         counts[ch] = (counts[ch] || 0) + 1
@@ -178,6 +178,29 @@ export function calcWeakTopics(answers) {
     .map(([ch, count]) => ({ ch, count, ...CHAPTERS[ch] }))
 }
 
+function parseFreeResponse(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return { kind: 'empty', raw: '' }
+  const cleaned = raw.replace(/\s/g, '')
+  const frac = cleaned.match(/^([+-]?\d+(?:\.\d+)?)\/([+-]?\d+(?:\.\d+)?)$/)
+  if (frac) {
+    const num = Number(frac[1])
+    const den = Number(frac[2])
+    if (Number.isFinite(num) && Number.isFinite(den) && den !== 0) return { kind: 'num', value: num / den, raw: cleaned }
+  }
+  const asNum = Number(cleaned)
+  if (Number.isFinite(asNum)) return { kind: 'num', value: asNum, raw: cleaned }
+  return { kind: 'text', raw: cleaned }
+}
+
+export function freeResponseMatches(given, correct) {
+  const g = parseFreeResponse(given)
+  const c = parseFreeResponse(correct)
+  if (g.kind === 'empty' || c.kind === 'empty') return false
+  if (g.kind === 'num' && c.kind === 'num') return Math.abs(g.value - c.value) < 1e-9
+  return g.raw === c.raw
+}
+
 // Score individual section from answers
 export function scoreSection(section, answers) {
   const key = ANSWER_KEY[section]
@@ -187,7 +210,7 @@ export function scoreSection(section, answers) {
     const rightAnswer = key[qNum]
     if (!rightAnswer) return
     const isCorrect = fr.includes(Number(qNum))
-      ? String(given).replace(/\s/g,'') === String(rightAnswer).replace(/\s/g,'')
+      ? freeResponseMatches(given, rightAnswer)
       : String(given).toUpperCase() === String(rightAnswer).toUpperCase()
     if (isCorrect) correct++
   })

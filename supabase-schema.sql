@@ -38,16 +38,28 @@ create table if not exists public.post_scores (
   recorded_at timestamptz not null default now()
 );
 
+-- Study progress (per chapter)
+create table if not exists public.studied_topics (
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  chapter_id text not null,
+  completed boolean not null default false,
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, chapter_id)
+);
+
 -- Helpful indexes for scale
 create index if not exists idx_test_attempts_user_started on public.test_attempts(user_id, started_at desc);
 create index if not exists idx_test_attempts_completed_at on public.test_attempts(completed_at);
 create index if not exists idx_post_scores_user_recorded on public.post_scores(user_id, recorded_at desc);
 create index if not exists idx_post_scores_attempt_id on public.post_scores(attempt_id);
+create index if not exists idx_studied_topics_user_completed on public.studied_topics(user_id, completed);
 
 -- Enable RLS (required for policies to take effect)
 alter table public.profiles enable row level security;
 alter table public.test_attempts enable row level security;
 alter table public.post_scores enable row level security;
+alter table public.studied_topics enable row level security;
 
 -- Role helper (admin only)
 create or replace function public.is_admin()
@@ -92,6 +104,14 @@ create policy "Users can insert own scores" on public.post_scores for insert wit
 create policy "Admins see all scores" on public.post_scores for select using (public.is_admin());
 create policy "Admins can insert scores" on public.post_scores for insert with check (public.is_admin());
 create policy "Admins can update scores" on public.post_scores for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "Users can view own studied topics" on public.studied_topics;
+drop policy if exists "Users can upsert own studied topics" on public.studied_topics;
+drop policy if exists "Admins see all studied topics" on public.studied_topics;
+create policy "Users can view own studied topics" on public.studied_topics for select using (auth.uid() = user_id);
+create policy "Users can upsert own studied topics" on public.studied_topics for insert with check (auth.uid() = user_id);
+create policy "Users can update own studied topics" on public.studied_topics for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Admins see all studied topics" on public.studied_topics for select using (public.is_admin());
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()

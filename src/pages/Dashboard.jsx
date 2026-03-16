@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled } from '../data/testData.js'
+import { getStudiedTopics } from '../lib/studyProgress.js'
 
 function Navbar() {
   const { profile, signOut } = useAuth()
@@ -11,12 +12,15 @@ function Navbar() {
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
+        <Link to="/guide" className="btn btn-outline" style={{padding:'6px 14px',fontSize:12,color:'white',borderColor:'rgba(255,255,255,.3)'}}>
+          Study Guide
+        </Link>
         {profile?.role === 'admin' && (
           <Link to="/admin" className="btn btn-outline" style={{padding:'6px 14px',fontSize:12,color:'white',borderColor:'rgba(255,255,255,.3)'}}>
             Admin
           </Link>
         )}
-          <span className="nav-user">{profile?.full_name || profile?.email}</span>
+        <span className="nav-user">{profile?.full_name || profile?.email}</span>
         <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
           style={{padding:'6px 14px',fontSize:12,color:'rgba(255,255,255,.7)',borderColor:'rgba(255,255,255,.2)',background:'rgba(255,255,255,.08)'}}>
           Sign Out
@@ -31,10 +35,12 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
+  const [studied, setStudied] = useState({})
   const [loading, setLoading] = useState(true)
   const [startingTest, setStartingTest] = useState(false)
   const [addingPost, setAddingPost] = useState(null)
   const [postInput, setPostInput] = useState('')
+  const [confirmStart, setConfirmStart] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -44,11 +50,16 @@ export default function Dashboard() {
     ]).then(([a, p]) => {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
-      setLoading(false)
+      getStudiedTopics(user.id).then(({ map }) => {
+        setStudied(map || {})
+        setLoading(false)
+      })
     })
   }, [user])
 
   async function startNewTest() {
+    if (!confirmStart) { setConfirmStart(true); return }
+    setConfirmStart(false)
     setStartingTest(true)
     const { data, error } = await supabase.from('test_attempts').insert({
       user_id: user.id,
@@ -77,6 +88,9 @@ export default function Dashboard() {
   const bestScore = completed.length ? Math.max(...completed.map(a => a.scores?.total || 0)) : null
   const latestPostScore = postScores[0]?.post_score
   const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
+  const studiedCount = Object.values(studied).filter(Boolean).length
+  const studiedPct = Math.round((studiedCount / 34) * 100)
+  const hasStudyPlan = completed.some(a => a.study_plan)
 
   if (loading) return <>
     <Navbar />
@@ -139,6 +153,64 @@ export default function Dashboard() {
                 {startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : '🚀 Start Practice Test'}
               </button>
             )}
+          </div>
+          {confirmStart && (
+            <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
+              <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
+                This is a full timed test (about 2.5 hours with a break). Once you start, your timer runs.
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
+                  Cancel
+                </button>
+                <button className="btn" onClick={startNewTest} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
+                  ✅ Yes — Start Test
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Journey tracker */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗺 Journey Tracker</h2>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                Work through these steps to be ready for the final test.
+              </div>
+            </div>
+            <div style={{ minWidth: 260 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                <span>Study Progress</span>
+                <span>{studiedCount}/34</span>
+              </div>
+              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, studiedPct)}%`, background: studiedPct >= 80 ? '#10b981' : studiedPct >= 40 ? '#f59e0b' : '#ef4444', transition: 'width .6s ease' }} />
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>{studiedPct}% complete</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
+            {[
+              { title: '1) Take the Pretest', done: completed.length > 0, desc: 'Complete Practice Test #11.' },
+              { title: '2) Review Results', done: completed.length > 0, desc: 'Use your results to find weak topics.' },
+              { title: '3) Complete Study Guide', done: studiedCount > 0, desc: 'Work through chapters and mark them complete.' },
+              { title: '4) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
+            ].map((s) => (
+              <div key={s.title} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: s.done ? '#10b981' : '#94a3b8' }}>{s.done ? 'DONE' : 'TODO'}</div>
+                </div>
+                <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
           </div>
         </div>
 

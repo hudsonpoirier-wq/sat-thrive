@@ -1,26 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-let pdfLib = null
-let loadingLib = false
-const callbacks = []
-
-function loadPdfJs() {
-  return new Promise((resolve) => {
-    if (pdfLib) { resolve(pdfLib); return }
-    callbacks.push(resolve)
-    if (loadingLib) return
-    loadingLib = true
-    const script = document.createElement('script')
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-    script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-      pdfLib = window.pdfjsLib
-      callbacks.forEach(cb => cb(pdfLib))
-    }
-    document.head.appendChild(script)
-  })
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const pdfCache = {}
 
@@ -34,11 +16,10 @@ export default function PDFPage({ pdfUrl, pageIndex }) {
     setStatus('loading')
 
     async function render() {
-      const lib = await loadPdfJs()
       if (cancelled) return
 
       if (!pdfCache[pdfUrl]) {
-        pdfCache[pdfUrl] = lib.getDocument(pdfUrl).promise
+        pdfCache[pdfUrl] = pdfjsLib.getDocument(pdfUrl).promise
       }
       const pdf = await pdfCache[pdfUrl]
       if (cancelled) return

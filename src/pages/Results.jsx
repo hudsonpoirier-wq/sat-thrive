@@ -140,7 +140,7 @@ export default function Results() {
     try {
       const txt = buildStudyPlan(attempt)
       setPlan(txt)
-      await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId)
+      await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', user.id)
       setPlanSaved(true)
     } catch (e) {
       setPlan('Error generating plan. Please try again.')
