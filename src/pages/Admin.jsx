@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import UserMenu from '../components/UserMenu.jsx'
+import { TESTS } from '../data/tests.js'
+import { ANSWER_KEY } from '../data/testData.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -12,6 +14,86 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const FINAL_TEST_ID = 'final_test'
+
+function isChoiceLetter(v) {
+  const s = String(v || '').trim().toUpperCase()
+  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+}
+
+async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
+  // Returns { rw_m1:{}, rw_m2:{}, math_m1:{}, math_m2:{} }
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+  const sections = ['rw_m1', 'rw_m2', 'math_m1', 'math_m2']
+  const maxQ = { rw_m1: 33, rw_m2: 33, math_m1: 27, math_m2: 27 }
+
+  async function tryParsePage(p) {
+    const page = await pdf.getPage(p)
+    const tc = await page.getTextContent()
+    const items = (tc.items || [])
+      .map(i => ({ s: String(i.str || '').trim(), x: i.transform?.[4] ?? 0, y: i.transform?.[5] ?? 0 }))
+      .filter(i => i.s)
+
+    const qTokens = items
+      .map(i => ({ ...i, q: /^\d{1,2}$/.test(i.s) ? parseInt(i.s, 10) : null }))
+      .filter(i => Number.isFinite(i.q) && i.q >= 1 && i.q <= 33)
+
+    if (qTokens.length < 60) return null
+
+    const xs = qTokens.map(t => t.x).sort((a, b) => a - b)
+    const clusters = []
+    const thresh = 40
+    for (const x of xs) {
+      const last = clusters[clusters.length - 1]
+      if (!last || Math.abs(x - last.center) > thresh) clusters.push({ center: x, n: 1 })
+      else { last.center = (last.center * last.n + x) / (last.n + 1); last.n += 1 }
+    }
+    clusters.sort((a, b) => b.n - a.n)
+    const top = clusters.slice(0, 6).sort((a, b) => a.center - b.center)
+
+    // Pick 4 well-separated centers.
+    const picked = []
+    for (const c of top) {
+      if (!picked.length || Math.abs(c.center - picked[picked.length - 1]) > 60) picked.push(c.center)
+      if (picked.length === 4) break
+    }
+    if (picked.length < 4) return null
+
+    const cols = picked.sort((a, b) => a - b)
+    function nearestColIndex(x) {
+      let best = 0
+      let bestD = Infinity
+      for (let i = 0; i < cols.length; i++) {
+        const d = Math.abs(x - cols[i])
+        if (d < bestD) { bestD = d; best = i }
+      }
+      return best
+    }
+
+    const out = { rw_m1: {}, rw_m2: {}, math_m1: {}, math_m2: {} }
+    for (const qt of qTokens) {
+      const idx = nearestColIndex(qt.x)
+      const section = sections[idx]
+      if (qt.q > maxQ[section]) continue
+      const candidates = items
+        .filter(it => Math.abs(it.y - qt.y) < 2.2 && it.x > qt.x + 10 && it.x < qt.x + 140)
+        .sort((a, b) => a.x - b.x)
+      const ans = candidates[0]?.s
+      if (!ans) continue
+      if (!isChoiceLetter(ans) && !/^[0-9.+/()^piπ-]+$/i.test(ans)) continue
+      out[section][qt.q] = String(ans).toUpperCase().replace('Π', 'PI')
+    }
+
+    const count = Object.keys(out.rw_m1).length + Object.keys(out.rw_m2).length + Object.keys(out.math_m1).length + Object.keys(out.math_m2).length
+    if (count < 80) return null
+    return out
+  }
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const parsed = await tryParsePage(p)
+    if (parsed) return parsed
+  }
+  throw new Error('Could not find the answer key table in this PDF.')
+}
 
 function pairedTTest(pairs) {
   if (pairs.length < 2) return null
@@ -50,8 +132,8 @@ export default function Admin() {
   const [postScores, setPostScores] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('students')
-  const [finalKey, setFinalKey] = useState(null)
-  const [finalKeyStatus, setFinalKeyStatus] = useState({ loading: false, msg: '' })
+  const [keysByTest, setKeysByTest] = useState({})
+  const [testKeyStatus, setTestKeyStatus] = useState({ loading: false, msg: '' })
   const [resettingUserId, setResettingUserId] = useState(null)
   const [resetMsg, setResetMsg] = useState('')
 
@@ -65,8 +147,8 @@ export default function Admin() {
       setLoading(true)
       const [p, a, ps] = await Promise.all([
         supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
-        supabase.from('test_attempts').select('id,user_id,started_at,completed_at,scores,weak_topics').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
-        supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').eq('is_sandbox', false).order('recorded_at', { ascending: false }).limit(5000),
+        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+        supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
       ])
       setStudents(p.data || [])
       setAttempts(a.data || [])
@@ -133,8 +215,12 @@ export default function Admin() {
 
   useEffect(() => {
     if (!supabase || profile?.role !== 'admin') return
-    supabase.from('test_answer_keys').select('*').eq('test_id', FINAL_TEST_ID).single()
-      .then(({ data }) => setFinalKey(data?.answer_key || null))
+    supabase.from('test_answer_keys').select('*')
+      .then(({ data }) => {
+        const map = {}
+        for (const row of data || []) map[row.test_id] = row.answer_key
+        setKeysByTest(map)
+      })
       .catch(() => {})
   }, [profile?.role])
 
@@ -147,9 +233,12 @@ export default function Admin() {
       const list = attemptsByUser.get(a.user_id) || []
       list.push(a)
       attemptsByUser.set(a.user_id, list)
-      const total = a.scores?.total || 0
-      const prev = bestPreByUser.get(a.user_id) || 0
-      if (total > prev) bestPreByUser.set(a.user_id, total)
+      const isPre = a.test_id === 'pre_test' || a.test_id === 'practice_test_11' || !a.test_id
+      if (isPre) {
+        const total = a.scores?.total || 0
+        const prev = bestPreByUser.get(a.user_id) || 0
+        if (total > prev) bestPreByUser.set(a.user_id, total)
+      }
     }
     const postByAttemptId = new Map()
     for (const p of postScores) {
@@ -455,82 +544,125 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Tests tab */}
-        {tab === 'tests' && (
-          <div className="card">
-            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 12 }}>🧩 Test Setup</h3>
-            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 14 }}>
-              Upload the Final Test answer key PDF so students can score the Final Test page.
-            </div>
+	        {/* Tests tab */}
+	        {tab === 'tests' && (
+	          <div className="card">
+	            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 12 }}>🧩 Test Setup</h3>
+	            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 14 }}>
+	              Manage your test PDFs and answer keys. Skill Builder keys can be imported directly from the scoring guide PDFs.
+	            </div>
 
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 900, color: '#1a2744' }}>Final Test Answer Key</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-                      Current status: {finalKey ? `Loaded (${Object.keys(finalKey).length} answers)` : 'Not set'}
-                    </div>
-                  </div>
-                  <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-                    Upload PDF…
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      style={{ display: 'none' }}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        setFinalKeyStatus({ loading: true, msg: 'Parsing PDF…' })
-                        try {
-                          const buf = await file.arrayBuffer()
-                          const pdf = await pdfjsLib.getDocument({ data: buf }).promise
-                          let text = ''
-                          for (let p = 1; p <= pdf.numPages; p++) {
-                            const page = await pdf.getPage(p)
-                            const tc = await page.getTextContent()
-                            text += ' ' + tc.items.map(i => i.str).join(' ')
-                          }
-                          const map = {}
-                          const re = /(^|\\s)(\\d{1,3})\\s*([A-D])(?=\\s|$)/g
-                          let m
-                          while ((m = re.exec(text)) !== null) {
-                            const n = parseInt(m[2], 10)
-                            if (!Number.isFinite(n)) continue
-                            map[n] = m[3].toUpperCase()
-                          }
-                          const count = Object.keys(map).length
-                          if (count < 10) throw new Error('Could not find enough answers in the PDF. (Try a clearer answer key format.)')
-                          await supabase.from('test_answer_keys').upsert({
-                            test_id: FINAL_TEST_ID,
-                            answer_key: map,
-                            updated_at: new Date().toISOString(),
-                          })
-                          setFinalKey(map)
-                          setFinalKeyStatus({ loading: false, msg: `Saved (${count} answers)` })
-                        } catch (err) {
-                          setFinalKeyStatus({ loading: false, msg: `Error: ${err?.message || 'Could not parse PDF'}` })
-                        } finally {
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
+	            <div style={{ display: 'grid', gap: 12 }}>
+	              {[
+	                ...TESTS,
+	                { id: FINAL_TEST_ID, label: 'Final Test', pdfUrl: '/final-test-questions.pdf' }
+	              ].map((t) => {
+	                const key = t.id === 'pre_test' ? ANSWER_KEY : (keysByTest?.[t.id] || null)
+	                const count = key && typeof key === 'object'
+	                  ? (key.rw_m1 ? (Object.keys(key.rw_m1 || {}).length + Object.keys(key.rw_m2 || {}).length + Object.keys(key.math_m1 || {}).length + Object.keys(key.math_m2 || {}).length) : Object.keys(key).length)
+	                  : 0
+	                return (
+	                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+	                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+	                      <div>
+	                        <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
+	                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+	                          Answer key: {t.id === 'pre_test' ? `Built-in (${count} answers)` : (key ? `Loaded (${count} answers)` : 'Not set')}
+	                        </div>
+	                      </div>
+	                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+	                        {t.akUrl && (
+	                          <button
+	                            className="btn btn-outline"
+	                            disabled={testKeyStatus.loading}
+	                            onClick={async () => {
+	                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key…` })
+	                              try {
+	                                const res = await fetch(t.akUrl)
+	                                if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
+	                                const buf = new Uint8Array(await res.arrayBuffer())
+	                                const parsed = await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
+	                                await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+	                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
+	                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length} answers)` })
+	                              } catch (e) {
+	                                setTestKeyStatus({ loading: false, msg: `⚠️ ${e?.message || 'Import failed'}` })
+	                              }
+	                            }}
+	                            title="Import from the bundled scoring guide PDF"
+	                          >
+	                            Import bundled AK
+	                          </button>
+	                        )}
+	                        {t.id !== 'pre_test' && (
+	                          <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
+	                            Upload AK PDF…
+	                            <input
+	                              type="file"
+	                              accept="application/pdf"
+	                              style={{ display: 'none' }}
+	                              onChange={async (e) => {
+	                              const file = e.target.files?.[0]
+	                              if (!file) return
+	                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
+	                              try {
+	                                const buf = new Uint8Array(await file.arrayBuffer())
+	                                let parsed
+	                                if (t.id === FINAL_TEST_ID) {
+	                                  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+	                                  let text = ''
+	                                  for (let p = 1; p <= pdf.numPages; p++) {
+	                                    const page = await pdf.getPage(p)
+	                                    const tc = await page.getTextContent()
+	                                    text += ' ' + tc.items.map(i => i.str).join(' ')
+	                                  }
+	                                  const map = {}
+	                                  const re = /(^|\\s)(\\d{1,3})\\s*([A-D])(?=\\s|$)/g
+	                                  let m
+	                                  while ((m = re.exec(text)) !== null) {
+	                                    const n = parseInt(m[2], 10)
+	                                    if (!Number.isFinite(n)) continue
+	                                    map[n] = m[3].toUpperCase()
+	                                  }
+	                                  parsed = map
+	                                } else {
+	                                  parsed = await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
+	                                }
+	                                const parsedCount = parsed?.rw_m1
+	                                  ? (Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length)
+	                                  : Object.keys(parsed || {}).length
+	                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
+	                                await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+	                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
+	                                setTestKeyStatus({ loading: false, msg: `✅ Saved ${t.label} (${parsedCount} answers)` })
+	                              } catch (err) {
+	                                setTestKeyStatus({ loading: false, msg: `⚠️ ${err?.message || 'Could not parse PDF'}` })
+	                              } finally {
+	                                e.target.value = ''
+	                              }
+	                              }}
+	                            />
+	                          </label>
+	                        )}
+	                        <a className="btn btn-outline" href={t.pdfUrl} target="_blank" rel="noreferrer">Open PDF →</a>
+	                      </div>
+	                    </div>
+	                  </div>
+	                )
+	              })}
+	            </div>
 
-                {finalKeyStatus.msg && (
-                  <div style={{ marginTop: 10, fontSize: 12, color: finalKeyStatus.msg.startsWith('Error') ? '#ef4444' : '#10b981', fontWeight: 800 }}>
-                    {finalKeyStatus.loading ? '⏳ ' : ''}{finalKeyStatus.msg}
-                  </div>
-                )}
+	            {testKeyStatus.msg && (
+	              <div style={{ marginTop: 12, fontSize: 12, color: testKeyStatus.msg.startsWith('✅') ? '#10b981' : '#ef4444', fontWeight: 900 }}>
+	                {testKeyStatus.loading ? '⏳ ' : ''}{testKeyStatus.msg}
+	              </div>
+	            )}
 
-                <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-                  Final Test page: <Link to="/final" style={{ color: '#1a2744', fontWeight: 800 }}>Open →</Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+	            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+	              Final Test page: <Link to="/final" style={{ color: '#1a2744', fontWeight: 800 }}>Open →</Link>
+	            </div>
+	          </div>
+	        )}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { CHAPTERS, ANSWER_KEY, QUESTION_CHAPTER_MAP, FREE_RESPONSE, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
+import { getTestConfig } from '../data/tests.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -196,6 +197,7 @@ export default function Results() {
   const scores = attempt.scores || {}
   const weakTopics = attempt.weak_topics || []
   const answers = attempt.answers || {}
+  const isPreTest = attempt?.test_id === 'pre_test' || attempt?.test_id === 'practice_test_11' || !attempt?.test_id
 
   // Domain summary for chart
   const domainCounts = {}
@@ -230,7 +232,7 @@ export default function Results() {
         {/* Score Hero */}
         <div className="results-score-hero" style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', opacity: .6, marginBottom: 8 }}>
-            SAT Practice Test #11 — Pre-Test Score
+            {(getTestConfig(attempt.test_id)?.label || 'Pre Test')} — Score
           </div>
           <div className="results-total">{scores.total || '—'}</div>
           <div className="results-label">out of 1600</div>
@@ -250,12 +252,18 @@ export default function Results() {
           </div>
         </div>
 
-        {/* Section breakdown */}
-        <SectionBreakdown answers={answers} />
+	        {/* Section breakdown */}
+	        {isPreTest ? (
+	          <SectionBreakdown answers={answers} />
+	        ) : (
+	          <div className="card" style={{ marginBottom: 24, color: '#64748b', lineHeight: 1.7 }}>
+	            Detailed module-by-module review is currently available for the Pre Test only.
+	          </div>
+	        )}
 
-        {/* Weak topics */}
-        {weakTopics.length > 0 && (
-          <div className="card" style={{ marginBottom: 24 }}>
+	        {/* Weak topics */}
+	        {isPreTest && weakTopics.length > 0 && (
+	          <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
               🚩 Weak Areas — Mapped to Your Playbook
             </h3>
@@ -279,9 +287,9 @@ export default function Results() {
           </div>
         )}
 
-        {/* Domain chart */}
-        {Object.keys(domainCounts).length > 0 && (
-          <div className="card" style={{ marginBottom: 24 }}>
+	        {/* Domain chart */}
+	        {isPreTest && Object.keys(domainCounts).length > 0 && (
+	          <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>
               📊 Missed Questions by Domain
             </h3>
@@ -321,8 +329,8 @@ export default function Results() {
           )}
         </div>
 
-        {/* Q-by-Q review */}
-        <QuestionReview answers={answers} />
+	        {/* Q-by-Q review */}
+	        {isPreTest && <QuestionReview answers={answers} />}
 
         {/* CTA */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 40 }}>

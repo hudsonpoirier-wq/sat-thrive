@@ -5,10 +5,53 @@ import { supabase } from '../lib/supabase.js'
 import PDFPage from '../components/PDFPage.jsx'
 import {
   MODULES, MODULE_ORDER, PDF_PAGE_MAP,
-  ANSWER_KEY, FREE_RESPONSE, QUESTION_CHAPTER_MAP, calcWeakTopics, rawToScaled, scoreSection, freeResponseMatches
+  ANSWER_KEY, QUESTION_CHAPTER_MAP, CHAPTERS, rawToScaled, freeResponseMatches
 } from '../data/testData.js'
+import { getTestConfig } from '../data/tests.js'
 
-const PDF_URL = '/practice-test-11.pdf'
+function isChoiceLetter(v) {
+  const s = String(v || '').trim().toUpperCase()
+  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+}
+
+function scoreFromKey(section, sectionAnswers, sectionKey) {
+  const total = MODULES[section]?.questions || 0
+  let correct = 0
+  for (let q = 1; q <= total; q++) {
+    const right = sectionKey?.[q]
+    if (right == null) continue
+    const given = sectionAnswers?.[q]
+    const ok = isChoiceLetter(right)
+      ? String(given || '').toUpperCase() === String(right).toUpperCase()
+      : freeResponseMatches(given, right)
+    if (ok) correct++
+  }
+  return { correct, total, wrong: total - correct }
+}
+
+function calcWeakTopicsFromKey(allAnswers, keyBySection) {
+  const counts = {}
+  Object.entries(allAnswers || {}).forEach(([section, sectionAnswers]) => {
+    const key = keyBySection?.[section]
+    const chMap = QUESTION_CHAPTER_MAP?.[section]
+    if (!key || !chMap) return
+    const total = MODULES[section]?.questions || 0
+    for (let q = 1; q <= total; q++) {
+      const given = sectionAnswers?.[q]
+      const right = key?.[q]
+      if (right == null) continue
+      const ch = chMap?.[q]
+      if (!ch) continue
+      const ok = isChoiceLetter(right)
+        ? String(given || '').toUpperCase() === String(right).toUpperCase()
+        : freeResponseMatches(given, right)
+      if (!ok) counts[ch] = (counts[ch] || 0) + 1
+    }
+  })
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([ch, count]) => ({ ch, count, ...CHAPTERS[ch] }))
+}
 
 function Timer({ seconds, onExpire, onTick }) {
   const [timeLeft, setTimeLeft] = useState(seconds)
@@ -77,6 +120,9 @@ export default function TestTaking() {
 
   const [attempt, setAttempt] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [testConfig, setTestConfig] = useState(null)
+  const [keyBySection, setKeyBySection] = useState(null)
+  const [keyStatus, setKeyStatus] = useState({ loading: false, msg: '' })
   const [currentModule, setCurrentModule] = useState('rw_m1')
   const [currentQ, setCurrentQ] = useState(1)
   const [answers, setAnswers] = useState({}) // { rw_m1: { 1: 'A', 2: 'C', ... }, ... }
@@ -116,18 +162,38 @@ export default function TestTaking() {
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', user.id).single()
       .then(({ data }) => {
         if (!data) { navigate('/dashboard'); return }
-        if (data.is_sandbox) {
-          // Sandbox attempts are for admin testing and should not persist across sessions.
-          // We allow completing/viewing within the session, but they won't show on dashboards.
-        }
         if (data.completed_at) { navigate(`/results/${attemptId}`); return }
         setAttempt(data)
+        const cfg = getTestConfig(data.test_id) || getTestConfig('pre_test')
+        setTestConfig(cfg)
         setCurrentModule(data.current_section || 'rw_m1')
         setAnswers(data.answers || {})
         setModuleTimeLeft(data.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 })
         setLoading(false)
       })
   }, [attemptId, user?.id, navigate])
+
+  useEffect(() => {
+    if (!supabase || !attempt?.test_id) return
+    const cfg = getTestConfig(attempt.test_id) || getTestConfig('pre_test')
+    if (cfg?.id === 'pre_test') {
+      setKeyBySection(ANSWER_KEY)
+      setKeyStatus({ loading: false, msg: '' })
+      return
+    }
+    setKeyStatus({ loading: true, msg: 'Loading answer key…' })
+    supabase.from('test_answer_keys').select('*').eq('test_id', cfg.id).single()
+      .then(({ data, error }) => {
+        if (error || !data?.answer_key) {
+          setKeyBySection(null)
+          setKeyStatus({ loading: false, msg: 'Missing answer key. Ask the admin to import it in Admin → Test Setup.' })
+          return
+        }
+        setKeyBySection(data.answer_key)
+        setKeyStatus({ loading: false, msg: '' })
+      })
+      .catch(() => setKeyStatus({ loading: false, msg: 'Could not load answer key.' }))
+  }, [attempt?.test_id])
 
   const saveProgress = useCallback(async (updatedAnswers, mod, timeRemaining) => {
     if (!attemptId) return
@@ -188,14 +254,14 @@ export default function TestTaking() {
 
   async function submitTest() {
     setSubmitting(true)
-    const rwM1 = scoreSection('rw_m1', answers.rw_m1)
-    const rwM2 = scoreSection('rw_m2', answers.rw_m2)
-    const mM1 = scoreSection('math_m1', answers.math_m1)
-    const mM2 = scoreSection('math_m2', answers.math_m2)
-    const rawRW = rwM1.correct + rwM2.correct
-    const rawMath = mM1.correct + mM2.correct
+    const rwM1 = scoreFromKey('rw_m1', answers.rw_m1, keyBySection?.rw_m1)
+    const rwM2 = scoreFromKey('rw_m2', answers.rw_m2, keyBySection?.rw_m2)
+    const mM1 = scoreFromKey('math_m1', answers.math_m1, keyBySection?.math_m1)
+    const mM2 = scoreFromKey('math_m2', answers.math_m2, keyBySection?.math_m2)
+    const rawRW = (rwM1.correct || 0) + (rwM2.correct || 0)
+    const rawMath = (mM1.correct || 0) + (mM2.correct || 0)
     const scores = rawToScaled(rawRW, rawMath)
-    const weakTopics = calcWeakTopics(answers)
+    const weakTopics = calcWeakTopicsFromKey(answers, keyBySection || ANSWER_KEY)
 
     const up = await supabase.from('test_attempts').update({
       completed_at: new Date().toISOString(),
@@ -214,9 +280,8 @@ export default function TestTaking() {
       const nowIso = new Date().toISOString()
       const stats = {}
       for (const section of MODULE_ORDER) {
-        const key = ANSWER_KEY[section] || {}
+        const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
         const chMap = QUESTION_CHAPTER_MAP[section] || {}
-        const fr = new Set(FREE_RESPONSE[section] || [])
         const total = MODULES[section]?.questions || 0
         const sectionAnswers = answers?.[section] || {}
         for (let q = 1; q <= total; q++) {
@@ -227,9 +292,9 @@ export default function TestTaking() {
           stats[ch].total += 1
           const given = sectionAnswers[q]
           const attempted = String(given ?? '').trim().length > 0
-          const ok = attempted && (fr.has(q)
-            ? freeResponseMatches(given, right)
-            : String(given).toUpperCase() === String(right).toUpperCase())
+          const ok = attempted && (isChoiceLetter(right)
+            ? String(given).toUpperCase() === String(right).toUpperCase()
+            : freeResponseMatches(given, right))
           if (ok) stats[ch].correct += 1
           else stats[ch].allCorrect = false
         }
@@ -289,6 +354,28 @@ export default function TestTaking() {
     </div>
   )
 
+  if (keyStatus.loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Sora,sans-serif', color: '#64748b' }}>
+        Loading answer key…
+      </div>
+    )
+  }
+
+  if (!keyBySection && keyStatus.msg) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: '#f1f5f9' }}>
+        <div style={{ maxWidth: 720, width: '100%', background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20 }}>
+          <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>Missing answer key</div>
+          <div style={{ color: '#64748b', lineHeight: 1.6, fontSize: 14, marginBottom: 12 }}>
+            {keyStatus.msg}
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</button>
+        </div>
+      </div>
+    )
+  }
+
   if (showBreak) {
     const idx = MODULE_ORDER.indexOf(currentModule)
     const nextMod = MODULE_ORDER[idx + 1]
@@ -306,7 +393,8 @@ export default function TestTaking() {
   const currentAnswer = modAnswers[currentQ]
   const markedList = markedForReview[currentModule] || []
   const isMarked = markedList.includes(currentQ)
-  const isFR = (FREE_RESPONSE[currentModule] || []).includes(currentQ)
+  const right = keyBySection?.[currentModule]?.[currentQ]
+  const isFR = right != null && !isChoiceLetter(right)
   const isLastQ = currentQ === totalQ
   const isLastModule = MODULE_ORDER.indexOf(currentModule) === MODULE_ORDER.length - 1
   const choices = ['A', 'B', 'C', 'D']
@@ -330,10 +418,10 @@ export default function TestTaking() {
     <div className="test-layout">
       {/* Header */}
       <div className="test-header">
-        <div className="test-header-left">
-          <div className="test-section-label">{mod.section} · SAT Practice Test #11</div>
-          <div className="test-module-label">{mod.label} — {mod.module}</div>
-        </div>
+	        <div className="test-header-left">
+	          <div className="test-section-label">{mod.section} · {testConfig?.label || 'Pre Test'}</div>
+	          <div className="test-module-label">{mod.label} — {mod.module}</div>
+	        </div>
         <Timer
           key={currentModule}
           seconds={moduleTimeLeft[currentModule] || mod.time}
@@ -441,7 +529,7 @@ export default function TestTaking() {
 	                </button>
 	              </div>
 	            </div>
-	            <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={PDF_URL} pageIndex={pdfPage} />
+	            <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />
 	          </div>
 	        </div>
 

@@ -253,12 +253,12 @@ export default function Guide() {
       <Navbar />
       <div className="page fade-up">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
-          <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📖 Study Guide</h1>
-            <div style={{ color: '#64748b', marginTop: 4, fontSize: 13 }}>
-              Work through chapters, complete practice, and mark each chapter done.
-            </div>
-          </div>
+	          <div>
+	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📖 Study Guide</h1>
+	            <div style={{ color: '#64748b', marginTop: 4, fontSize: 13 }}>
+	              Work through chapters, complete practice, and mark each chapter done. To mark a chapter complete, you must get all 25 practice questions correct.
+	            </div>
+	          </div>
           <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '12px 14px', minWidth: 280 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
               <span>Progress</span>
