@@ -188,6 +188,144 @@ function parseFreeResponse(value) {
     const den = Number(frac[2])
     if (Number.isFinite(num) && Number.isFinite(den) && den !== 0) return { kind: 'num', value: num / den, raw: cleaned }
   }
+
+  // Expression support for student-produced responses (safe parsing; no eval):
+  // - pi / π
+  // - exponents using ^
+  // - + - * / and parentheses
+  function normalizeExpr(input) {
+    let s = String(input || '').toLowerCase().replace(/\s/g, '').replace(/π/g, 'pi')
+    if (!s) return ''
+    // Insert implicit multiplication (e.g., 2pi, (2)(3), pi2, 2(pi))
+    s = s.replace(/(\d)(pi)/g, '$1*pi')
+    s = s.replace(/(pi)(\d)/g, '$1*$2')
+    s = s.replace(/(\))(\d|pi|\()/g, '$1*$2')
+    s = s.replace(/(\d|pi)(\()/g, '$1*(')
+    return s
+  }
+
+  function tokenizeExpr(expr) {
+    const tokens = []
+    let i = 0
+    while (i < expr.length) {
+      const ch = expr[i]
+      if (ch === 'p' && expr.slice(i, i + 2) === 'pi') {
+        tokens.push({ type: 'num', value: Math.PI })
+        i += 2
+        continue
+      }
+      if (ch === '(' || ch === ')') {
+        tokens.push({ type: ch })
+        i += 1
+        continue
+      }
+      if ('+-*/^'.includes(ch)) {
+        tokens.push({ type: 'op', op: ch })
+        i += 1
+        continue
+      }
+      if ((ch >= '0' && ch <= '9') || ch === '.') {
+        let j = i + 1
+        while (j < expr.length && ((expr[j] >= '0' && expr[j] <= '9') || expr[j] === '.')) j++
+        const num = Number(expr.slice(i, j))
+        if (!Number.isFinite(num)) return null
+        tokens.push({ type: 'num', value: num })
+        i = j
+        continue
+      }
+      return null
+    }
+    return tokens
+  }
+
+  function evalExpr(expr) {
+    if (!expr || expr.length > 64) return null
+    const tokens = tokenizeExpr(expr)
+    if (!tokens) return null
+
+    const prec = { 'u-': 5, '^': 4, '*': 3, '/': 3, '+': 2, '-': 2 }
+    const rightAssoc = new Set(['^', 'u-'])
+    const out = []
+    const stack = []
+    let prev = null
+
+    for (const t of tokens) {
+      if (t.type === 'num') {
+        out.push(t)
+        prev = 'num'
+        continue
+      }
+      if (t.type === '(') {
+        stack.push(t)
+        prev = '('
+        continue
+      }
+      if (t.type === ')') {
+        while (stack.length && stack[stack.length - 1].type !== '(') out.push(stack.pop())
+        if (!stack.length) return null
+        stack.pop()
+        prev = ')'
+        continue
+      }
+      if (t.type === 'op') {
+        let op = t.op
+        // unary minus
+        if (op === '-' && (prev === null || prev === 'op' || prev === '(')) op = 'u-'
+        const p = prec[op]
+        if (!p) return null
+        while (stack.length) {
+          const top = stack[stack.length - 1]
+          if (top.type !== 'op') break
+          const p2 = prec[top.op]
+          if (p2 > p || (p2 === p && !rightAssoc.has(op))) out.push(stack.pop())
+          else break
+        }
+        stack.push({ type: 'op', op })
+        prev = 'op'
+        continue
+      }
+      return null
+    }
+
+    while (stack.length) {
+      const top = stack.pop()
+      if (top.type === '(') return null
+      out.push(top)
+    }
+
+    const st = []
+    for (const t of out) {
+      if (t.type === 'num') { st.push(t.value); continue }
+      if (t.type === 'op') {
+        if (t.op === 'u-') {
+          if (st.length < 1) return null
+          st.push(-st.pop())
+          continue
+        }
+        if (st.length < 2) return null
+        const b = st.pop()
+        const a = st.pop()
+        let v
+        if (t.op === '+') v = a + b
+        else if (t.op === '-') v = a - b
+        else if (t.op === '*') v = a * b
+        else if (t.op === '/') v = a / b
+        else if (t.op === '^') v = Math.pow(a, b)
+        else return null
+        if (!Number.isFinite(v)) return null
+        st.push(v)
+        continue
+      }
+      return null
+    }
+    if (st.length !== 1) return null
+    return st[0]
+  }
+
+  const expr = normalizeExpr(cleaned)
+  const exprVal = evalExpr(expr)
+  if (Number.isFinite(exprVal)) return { kind: 'num', value: exprVal, raw: expr }
+
   const asNum = Number(cleaned)
   if (Number.isFinite(asNum)) return { kind: 'num', value: asNum, raw: cleaned }
   return { kind: 'text', raw: cleaned }

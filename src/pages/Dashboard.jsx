@@ -12,11 +12,31 @@ function Navbar() {
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
-        <Link to="/guide" className="btn btn-outline" style={{padding:'6px 14px',fontSize:12,color:'white',borderColor:'rgba(255,255,255,.3)'}}>
+        <Link
+          to="/guide"
+          className="btn btn-outline"
+          style={{
+            padding: '6px 14px',
+            fontSize: 12,
+            color: 'rgba(255,255,255,.9)',
+            borderColor: 'rgba(255,255,255,.3)',
+            background: 'rgba(255,255,255,.08)'
+          }}
+        >
           Study Guide
         </Link>
         {profile?.role === 'admin' && (
-          <Link to="/admin" className="btn btn-outline" style={{padding:'6px 14px',fontSize:12,color:'white',borderColor:'rgba(255,255,255,.3)'}}>
+          <Link
+            to="/admin"
+            className="btn btn-outline"
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              color: 'rgba(255,255,255,.9)',
+              borderColor: 'rgba(255,255,255,.3)',
+              background: 'rgba(255,255,255,.08)'
+            }}
+          >
             Admin
           </Link>
         )}
@@ -44,9 +64,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return
+    const sandbox = profile?.role === 'admin'
     Promise.all([
-      supabase.from('test_attempts').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('started_at', { ascending: false }),
-      supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('recorded_at', { ascending: false })
+      supabase.from('test_attempts').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('started_at', { ascending: false }),
+      supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('recorded_at', { ascending: false })
     ]).then(([a, p]) => {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
@@ -55,7 +76,7 @@ export default function Dashboard() {
         setLoading(false)
       })
     })
-  }, [user])
+  }, [user, profile?.role])
 
   async function startNewTest() {
     if (!confirmStart) { setConfirmStart(true); return }
@@ -94,7 +115,8 @@ export default function Dashboard() {
       ins = await supabase.from('post_scores').insert(fallback)
     }
     if (ins.error) alert(ins.error.message)
-    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', false).order('recorded_at', { ascending: false })
+    const sandbox = profile?.role === 'admin'
+    const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).eq('is_sandbox', sandbox).order('recorded_at', { ascending: false })
     setPostScores(data || [])
     setAddingPost(null); setPostInput('')
   }

@@ -425,7 +425,7 @@ export default function TestTaking() {
             {isFR ? (
               <div>
                 <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>
-                  Enter your answer (numbers only):
+                  Enter your answer (numbers or simple expressions):
                 </div>
                 <input
                   type="text"
@@ -436,7 +436,7 @@ export default function TestTaking() {
                   autoComplete="off"
                 />
                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
-                  Decimals OK. Enter as fraction (1/2) or decimal (.5)
+                  Examples: <code>75</code>, <code>1/2</code>, <code>.5</code>, <code>pi</code> (or <code>π</code>), <code>2^3</code>, <code>3*pi/2</code>
                 </div>
               </div>
             ) : (

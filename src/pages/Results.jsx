@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { CHAPTERS, ANSWER_KEY, QUESTION_CHAPTER_MAP, FREE_RESPONSE, MODULE_ORDER, MODULES } from '../data/testData.js'
+import { CHAPTERS, ANSWER_KEY, QUESTION_CHAPTER_MAP, FREE_RESPONSE, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -26,7 +26,7 @@ function SectionBreakdown({ answers }) {
           const right = key[q]
           if (!right) return
           const ok = fr.includes(Number(q))
-            ? String(v).replace(/\s/g, '') === String(right).replace(/\s/g, '')
+            ? freeResponseMatches(v, right)
             : String(v).toUpperCase() === String(right).toUpperCase()
           if (ok) correct++
         })
@@ -65,7 +65,7 @@ function QuestionReview({ answers }) {
           const right = key[q]
           if (!right) continue
           const isCorrect = fr.includes(q)
-            ? given && String(given).replace(/\s/g, '') === String(right).replace(/\s/g, '')
+            ? given && freeResponseMatches(given, right)
             : given && String(given).toUpperCase() === String(right).toUpperCase()
           if (!isCorrect) wrongs.push({ q, given, right, ch: chMap[q] })
         }
