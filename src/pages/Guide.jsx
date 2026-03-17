@@ -256,7 +256,7 @@ export default function Guide() {
   const selectedGuideMap = selectedId ? extractGuideMap(selectedPractice) : {}
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar />
       <div className="page fade-up">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>

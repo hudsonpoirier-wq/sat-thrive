@@ -274,8 +274,8 @@ export default function Admin() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
-	      <nav className="nav">
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
+		      <nav className="nav">
 	        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
 	        <div className="nav-actions">
 	          <UserMenu profile={profile} />

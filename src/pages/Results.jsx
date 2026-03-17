@@ -223,7 +223,7 @@ export default function Results() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       {/* Nav */}
       <nav className="nav">
         <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>

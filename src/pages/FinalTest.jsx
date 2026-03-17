@@ -57,7 +57,7 @@ export default function FinalTest() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar />
       <div className="page fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
@@ -147,4 +147,3 @@ export default function FinalTest() {
     </div>
   )
 }
-
