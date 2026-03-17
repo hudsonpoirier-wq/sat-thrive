@@ -22,7 +22,12 @@ export default function Login() {
       if (!fullName.trim()) { setError('Please enter your full name'); setLoading(false); return }
       const { error } = await signUp(email, password, fullName)
       if (error) setError(error.message)
-      else setSuccess('Account created! Check your email to confirm, then sign in.')
+      else {
+        setSuccess('Account created! Check your email to confirm, then sign in.')
+        // Most users expect to sign in next; keep their email filled.
+        setMode('signin')
+        setPassword('')
+      }
     } else {
       const { error } = await signIn(email, password)
       if (error) {
@@ -157,6 +162,32 @@ export default function Login() {
               {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : mode === 'signup' ? 'Create Account →' : 'Send Reset Link →'}
             </button>
           </form>
+
+          {success && mode !== 'forgot' && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: 13 }}>
+              <button
+                onClick={async () => {
+                  if (!email) { setError('Enter your email first.'); return }
+                  setError(''); setLoading(true)
+                  const { error } = await resendConfirmation(email)
+                  if (error) setError(error.message)
+                  else setSuccess('Confirmation email sent. Check your inbox (and spam).')
+                  setLoading(false)
+                }}
+                style={{ background: 'none', border: 'none', color: '#1a2744', fontWeight: 750, cursor: 'pointer', padding: 0 }}
+                title="Resend the email confirmation link"
+              >
+                Resend confirmation
+              </button>
+              <button
+                onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
+                style={{ background: 'none', border: 'none', color: '#1a2744', fontWeight: 750, cursor: 'pointer', padding: 0 }}
+                title="Send a password reset email"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           {mode === 'signin' && (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: 13 }}>
