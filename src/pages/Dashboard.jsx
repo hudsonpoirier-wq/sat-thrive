@@ -482,25 +482,35 @@ export default function Dashboard() {
             })()}
           </div>
 
-          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn btn-outline" onClick={() => navigate('/report')} disabled={!hasTakenPretest}>
-              Progress Report →
-            </button>
-            <button
-              className="btn"
-              onClick={() => startNewTest('final_test')}
-              disabled={!(studiedCount >= 34 && hasTakenPretest)}
-              style={{
-                background: studiedCount >= 34 && hasTakenPretest ? '#10b981' : '#e2e8f0',
-                color: studiedCount >= 34 && hasTakenPretest ? 'white' : '#64748b',
-                fontWeight: 900,
-              }}
-              title={studiedCount >= 34 && hasTakenPretest ? 'Final test unlocked' : 'Complete the guide + pretest to unlock'}
-            >
-              🏁 Final Test
-            </button>
-          </div>
-        </div>
+	          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+	            <button className="btn btn-outline" onClick={() => navigate('/report')} disabled={!hasTakenPretest}>
+	              Progress Report →
+	            </button>
+	            {(() => {
+	              const unlocked = studiedCount >= 34 && hasTakenPretest
+	              return (
+	            <button
+	              className="btn"
+	              onClick={() => startNewTest('final_test')}
+	              disabled={!unlocked}
+	              style={{
+	                background: unlocked ? '#10b981' : '#e2e8f0',
+	                color: unlocked ? 'white' : '#64748b',
+	                fontWeight: 900,
+	              }}
+	              title={unlocked ? 'Final test unlocked' : 'Finish the Journey Tracker to unlock the Final Test'}
+	            >
+	              {unlocked ? '🏁 Final Test' : '🔒 Final Test (Unlocks after Journey Tracker)'}
+	            </button>
+	              )
+	            })()}
+	          </div>
+	          {!(studiedCount >= 34 && hasTakenPretest) && (
+	            <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#64748b' }}>
+	              The <b>Final Test unlocks automatically</b> once you complete the Journey Tracker (Pre Test + review results + review missed questions + complete the Study Guide).
+	            </div>
+	          )}
+	        </div>
 
         {/* Study Plan + optional extra practice (side-by-side on desktop, stacked on mobile) */}
         {hasTakenPretest && (
