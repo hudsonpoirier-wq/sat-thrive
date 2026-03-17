@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [status, setStatus] = useState({ loading: true, msg: 'Opening reset link…' })
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [pwReveal, setPwReveal] = useState(false)
-  const [pw2Reveal, setPw2Reveal] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -78,28 +77,22 @@ export default function ResetPassword() {
             </div>
             <div className="input-wrap">
               <label className="input-label">New password</label>
-              <input
-                className="input-field"
-                type={pwReveal ? 'text' : 'password'}
+              <PasswordInput
                 value={password}
-                onChange={e => setPassword(e.target.value)}
-                onMouseEnter={() => setPwReveal(true)}
-                onMouseLeave={() => setPwReveal(false)}
-                onBlur={() => setPwReveal(false)}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="New password (min 8)"
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
             <div className="input-wrap">
               <label className="input-label">Confirm password</label>
-              <input
-                className="input-field"
-                type={pw2Reveal ? 'text' : 'password'}
+              <PasswordInput
                 value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                onMouseEnter={() => setPw2Reveal(true)}
-                onMouseLeave={() => setPw2Reveal(false)}
-                onBlur={() => setPw2Reveal(false)}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Confirm password"
                 minLength={8}
+                autoComplete="new-password"
               />
             </div>
             <button className="btn btn-primary" style={{ width: '100%', padding: 13, marginTop: 6 }} disabled={saving} onClick={updatePassword}>

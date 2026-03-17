@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -11,7 +12,6 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
-  const [pwReveal, setPwReveal] = useState(false)
   const { signIn, signUp } = useAuth()
 
   async function handleSubmit(e) {
@@ -112,17 +112,13 @@ export default function Login() {
             </div>
             <div className="input-wrap">
               <label className="input-label">Password</label>
-              <input
-                className="input-field"
-                type={pwReveal ? 'text' : 'password'}
-                placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
+              <PasswordInput
                 value={password}
-                onChange={e => setPassword(e.target.value)}
-                onMouseEnter={() => setPwReveal(true)}
-                onMouseLeave={() => setPwReveal(false)}
-                onBlur={() => setPwReveal(false)}
-                required
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
                 minLength={8}
+                required
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               />
             </div>
 

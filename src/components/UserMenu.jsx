@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import PasswordInput from './PasswordInput.jsx'
 
 export default function UserMenu({ profile }) {
   const [open, setOpen] = useState(false)
   const [pw1, setPw1] = useState('')
   const [pw2, setPw2] = useState('')
-  const [pw1Reveal, setPw1Reveal] = useState(false)
-  const [pw2Reveal, setPw2Reveal] = useState(false)
   const [status, setStatus] = useState({ kind: '', msg: '' }) // '' | 'ok' | 'err'
   const wrapRef = useRef(null)
 
@@ -75,27 +74,19 @@ export default function UserMenu({ profile }) {
 
           <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>Change password</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <input
-              className="input-field"
-              type={pw1Reveal ? 'text' : 'password'}
-              placeholder="New password (min 8)"
+            <PasswordInput
               value={pw1}
               onChange={(e) => setPw1(e.target.value)}
-              onMouseEnter={() => setPw1Reveal(true)}
-              onMouseLeave={() => setPw1Reveal(false)}
-              onBlur={() => setPw1Reveal(false)}
+              placeholder="New password (min 8)"
               minLength={8}
+              autoComplete="new-password"
             />
-            <input
-              className="input-field"
-              type={pw2Reveal ? 'text' : 'password'}
-              placeholder="Confirm new password"
+            <PasswordInput
               value={pw2}
               onChange={(e) => setPw2(e.target.value)}
-              onMouseEnter={() => setPw2Reveal(true)}
-              onMouseLeave={() => setPw2Reveal(false)}
-              onBlur={() => setPw2Reveal(false)}
+              placeholder="Confirm new password"
               minLength={8}
+              autoComplete="new-password"
             />
             <button className="btn btn-primary" type="button" onClick={updatePassword} style={{ width: '100%' }}>
               Update password
