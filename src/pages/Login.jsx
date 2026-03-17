@@ -62,7 +62,7 @@ export default function Login() {
                 The Agora Project
               </div>
               <div className="login-subtitle">
-                A modern SAT prep dashboard — built for speed, focus, and results.
+                Built for speed, focus, and results.
               </div>
             </div>
           </div>
