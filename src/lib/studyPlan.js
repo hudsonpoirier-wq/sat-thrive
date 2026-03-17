@@ -1,3 +1,5 @@
+import { CHAPTERS } from '../data/testData.js'
+
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function lsKeyTestDate(userId) {
@@ -36,7 +38,6 @@ export function loadSatTestDate(userId) {
     const raw = localStorage.getItem(lsKeyTestDate(userId))
     if (!raw) return ''
     const s = String(raw || '').trim()
-    // stored as yyyy-mm-dd
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return ''
     return s
   } catch {
@@ -47,9 +48,49 @@ export function loadSatTestDate(userId) {
 export function saveSatTestDate(userId, yyyyMmDd) {
   try {
     const s = String(yyyyMmDd || '').trim()
-    if (!s) { localStorage.removeItem(lsKeyTestDate(userId)); return }
+    if (!s) {
+      localStorage.removeItem(lsKeyTestDate(userId))
+      return
+    }
     localStorage.setItem(lsKeyTestDate(userId), s)
   } catch {}
+}
+
+export function normalizeWeakTopics(input) {
+  try {
+    // 1) Array form: [{ ch, count, name, ... }, ...]
+    if (Array.isArray(input)) {
+      return input
+        .map((t) => {
+          const chRaw = t?.ch ?? t?.chapter_id ?? t?.chapter ?? t?.id
+          const ch = chRaw == null ? null : String(chRaw)
+          const countRaw = t?.count ?? t?.missed ?? t?.wrong ?? t?.n
+          const count = Number.isFinite(Number(countRaw)) ? Number(countRaw) : 0
+          if (!ch || count <= 0) return null
+          const meta = CHAPTERS?.[ch] || {}
+          return { ...(meta || {}), ...(t || {}), ch, count }
+        })
+        .filter(Boolean)
+        .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
+    }
+
+    // 2) Object form: { "12": 3, "7": 1, ... } or { counts: {...} }
+    const obj = input && typeof input === 'object' ? input : null
+    const counts = obj?.counts && typeof obj.counts === 'object' ? obj.counts : obj
+    if (!counts || typeof counts !== 'object') return []
+
+    return Object.entries(counts)
+      .map(([ch, c]) => {
+        const count = Number.isFinite(Number(c)) ? Number(c) : 0
+        if (!ch || count <= 0) return null
+        const meta = CHAPTERS?.[String(ch)] || {}
+        return { ...(meta || {}), ch: String(ch), count }
+      })
+      .filter(Boolean)
+      .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
+  } catch {
+    return []
+  }
 }
 
 function fmtDate(d) {
@@ -78,10 +119,12 @@ function parseYyyyMmDd(s) {
   if (!s) return null
   const m = String(s).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!m) return null
-  const y = Number(m[1]); const mo = Number(m[2]); const da = Number(m[3])
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const da = Number(m[3])
   if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(da)) return null
   const d = new Date(y, mo - 1, da)
-  if (d.getFullYear() !== y || d.getMonth() !== (mo - 1) || d.getDate() !== da) return null
+  if (d.getFullYear() !== y || d.getMonth() !== mo - 1 || d.getDate() !== da) return null
   return toDateOnly(d)
 }
 
@@ -96,15 +139,10 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
   const activeDays = days.filter((d) => p.days[weekdayIndex(d)])
   const sessions = Math.max(3, Math.min(7, activeDays.length || 5))
 
-  const topics = (Array.isArray(weakTopics) ? weakTopics : [])
-    .filter(t => t && t.ch)
-    .slice()
-    .sort((a, b) => (b.count || 0) - (a.count || 0))
-
+  const topics = normalizeWeakTopics(weakTopics)
   const top = topics.slice(0, 6)
   const totalWeight = top.reduce((sum, t) => sum + (t.count || 1), 0) || 1
 
-  // Allocate one focus topic per session (weighted).
   const focus = []
   for (let i = 0; i < sessions; i++) {
     const target = (i + 0.5) / sessions
@@ -112,7 +150,10 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
     let chosen = top[top.length - 1] || null
     for (const t of top) {
       acc += (t.count || 1) / totalWeight
-      if (acc >= target) { chosen = t; break }
+      if (acc >= target) {
+        chosen = t
+        break
+      }
     }
     focus.push(chosen)
   }
@@ -128,14 +169,14 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
     return lines.join('\n')
   }
 
-  lines.push('🔴 THIS WEEK\'S PRIORITIES')
+  lines.push("🔴 THIS WEEK'S PRIORITIES")
   top.slice(0, 3).forEach((t, i) => {
     lines.push(`${i + 1}) Chapter ${t.ch} — ${t.name || 'Topic'} (${t.count || 0} missed)`)
   })
   lines.push('')
 
   lines.push('✅ HOW TO DO EACH SESSION')
-  lines.push('1) 8 min: Review due items (Review Queue)')
+  lines.push('1) 8 min: Review missed questions (Mistake Notebook)')
   lines.push('2) 22 min: Study the focus chapter (read + examples)')
   lines.push('3) 15 min: Practice (aim for 25/25 mastery in Study Guide)')
   lines.push('')
@@ -162,7 +203,6 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   const target = parseYyyyMmDd(testDate)
   if (!target) return buildWeeklyStudyPlan({ scores, weakTopics, prefs: p })
 
-  // End 3 days before the test.
   const end = toDateOnly(new Date(target))
   end.setDate(end.getDate() - 3)
   const horizonDays = daysBetween(start, end)
@@ -170,7 +210,6 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
     return buildWeeklyStudyPlan({ scores, weakTopics, prefs: p })
   }
 
-  // Build all session dates up to end (respecting selected days-of-week).
   const sessionDates = []
   for (let i = 0; i <= horizonDays; i++) {
     const d = new Date(start)
@@ -179,15 +218,10 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   }
   const sessions = Math.max(3, Math.min(120, sessionDates.length))
 
-  const topics = (Array.isArray(weakTopics) ? weakTopics : [])
-    .filter(t => t && t.ch)
-    .slice()
-    .sort((a, b) => (b.count || 0) - (a.count || 0))
-
+  const topics = normalizeWeakTopics(weakTopics)
   const top = topics.slice(0, 8)
   const totalWeight = top.reduce((sum, t) => sum + (t.count || 1), 0) || 1
 
-  // Allocate a focus topic per session (weighted) across the full horizon.
   const focus = []
   for (let i = 0; i < sessions; i++) {
     const targetP = (i + 0.5) / sessions
@@ -195,7 +229,10 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
     let chosen = top[top.length - 1] || null
     for (const t of top) {
       acc += (t.count || 1) / totalWeight
-      if (acc >= targetP) { chosen = t; break }
+      if (acc >= targetP) {
+        chosen = t
+        break
+      }
     }
     focus.push(chosen)
   }
@@ -208,7 +245,7 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   lines.push('')
 
   if (!top.length) {
-    lines.push('No weak topics detected yet. Do 2 timed sets/week + review every mistake + keep mastery streak in the Study Guide.')
+    lines.push('No weak topics detected yet. Take a test, then review your mistakes and start the Study Guide mastery sets.')
     return lines.join('\n')
   }
 
@@ -219,7 +256,7 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   lines.push('')
 
   lines.push('✅ SESSION TEMPLATE')
-  lines.push('1) 10 min: Mistake Notebook (redo + write your explanation)')
+  lines.push('1) 10 min: Mistake Notebook (redo + optional explanation)')
   lines.push('2) 20 min: Study the focus chapter (guide + examples)')
   lines.push('3) 15 min: Practice (aim 25/25 mastery in Study Guide)')
   lines.push('')
@@ -245,7 +282,7 @@ export function buildPlanFromAttempt(attempt, userId) {
   const testDate = loadSatTestDate(userId)
   return buildStudyPlanToTestDate({
     scores: attempt?.scores || {},
-    weakTopics: attempt?.weak_topics || [],
+    weakTopics: normalizeWeakTopics(attempt?.weak_topics || []),
     prefs,
     testDate,
   })
@@ -254,3 +291,4 @@ export function buildPlanFromAttempt(attempt, userId) {
 export function dayLabels() {
   return DAYS.slice()
 }
+

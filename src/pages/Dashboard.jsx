@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs } from '../lib/studyPlan.js'
+import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -235,6 +236,41 @@ export default function Dashboard() {
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
   })()
+
+  // If the latest attempt doesn't have a stored plan, generate one locally from mistakes/weak-topics.
+  useEffect(() => {
+    if (!hasTakenPretest) return
+    if (!latestCompleted?.id) return
+    if (String(planText || '').trim()) return
+    try {
+      const prefs = studyPrefs
+      const weakTopics = deriveWeakTopicsForAttempt(latestCompleted)
+      const txt = buildStudyPlanToTestDate({
+        scores: latestCompleted?.scores || {},
+        weakTopics,
+        prefs,
+        testDate: satDate,
+      })
+      setPlanText(txt)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTakenPretest, latestCompleted?.id, satDate, studyPrefs, mistakes])
+
+  function deriveWeakTopicsForAttempt(attempt) {
+    const normalized = normalizeWeakTopics(attempt?.weak_topics || [])
+    if (normalized.length) return normalized
+    const list = (mistakes || [])
+      .filter((m) => String(m.attempt_id || '') === String(attempt?.id || '') && m.chapter_id)
+    const counts = {}
+    for (const m of list) {
+      const ch = String(m.chapter_id)
+      counts[ch] = (counts[ch] || 0) + 1
+    }
+    return Object.entries(counts)
+      .map(([ch, count]) => ({ ...(CHAPTERS?.[ch] || {}), ch, count }))
+      .filter((t) => t.ch && Number(t.count) > 0)
+      .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
+  }
 
   const trendAttempts = completed
     .map(a => ({ a, scores: a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {}) }))
@@ -487,7 +523,7 @@ export default function Dashboard() {
                           const prefs = studyPrefs
                           const txt = buildStudyPlanToTestDate({
                             scores: latestCompleted?.scores || {},
-                            weakTopics: latestCompleted?.weak_topics || [],
+                            weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
                             prefs,
                             testDate: v,
                           })
@@ -528,7 +564,7 @@ export default function Dashboard() {
                         try {
                           const txt = buildStudyPlanToTestDate({
                             scores: latestCompleted?.scores || {},
-                            weakTopics: latestCompleted?.weak_topics || [],
+                            weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
                             prefs: next,
                             testDate: satDate,
                           })
@@ -574,7 +610,7 @@ export default function Dashboard() {
                         const prefs = studyPrefs
                         const txt = buildStudyPlanToTestDate({
                           scores: latestCompleted?.scores || {},
-                          weakTopics: latestCompleted?.weak_topics || [],
+                          weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
                           prefs,
                           testDate: satDate,
                         })
