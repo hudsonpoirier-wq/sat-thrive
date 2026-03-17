@@ -1069,11 +1069,11 @@ export default function Admin() {
 		                      </div>
 		                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
 		                        {t.akUrl && (
-		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key PDF">
+		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key">
 		                            Open AK →
 		                          </a>
 		                        )}
-		                        {builtIn && storedCount && storedCount !== builtInCount && t.id !== 'pre_test' && (
+		                        {builtIn && storedCount > 0 && storedCount !== builtInCount && (
 		                          <button
 		                            className="btn btn-outline"
 		                            disabled={testKeyStatus.loading}
@@ -1125,17 +1125,16 @@ export default function Admin() {
 	                            Import bundled AK
 	                          </button>
 	                        )}
-		                        {t.id !== 'pre_test' && (
-		                          <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-		                            Upload AK PDF…
-	                            <input
-	                              type="file"
-	                              accept="application/pdf"
-	                              style={{ display: 'none' }}
-	                              onChange={async (e) => {
-	                              const file = e.target.files?.[0]
-	                              if (!file) return
-	                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
+		                        <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
+		                          Upload AK PDF…
+		                          <input
+		                            type="file"
+		                            accept="application/pdf"
+		                            style={{ display: 'none' }}
+		                            onChange={async (e) => {
+		                              const file = e.target.files?.[0]
+		                              if (!file) return
+		                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
 		                              try {
 		                                const buf = new Uint8Array(await file.arrayBuffer())
 		                                const parsed = await extractAnswerKeyFromPdf(buf)
@@ -1156,10 +1155,9 @@ export default function Admin() {
 		                              } finally {
 		                                e.target.value = ''
 		                              }
-	                              }}
-	                            />
-	                          </label>
-	                        )}
+		                            }}
+		                          />
+		                        </label>
 		                        <a className="btn btn-outline" href={t.pdfUrl} target="_blank" rel="noreferrer">Open PDF →</a>
 		                      </div>
 		                    </div>

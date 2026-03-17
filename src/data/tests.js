@@ -3,6 +3,7 @@ export const TESTS = [
     id: 'pre_test',
     label: 'Pre Test',
     pdfUrl: '/practice-test-11.pdf',
+    akUrl: '/pretest-answer-key.html',
     kind: 'official',
   },
   {
