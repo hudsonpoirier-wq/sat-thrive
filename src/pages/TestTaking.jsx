@@ -138,6 +138,9 @@ export default function TestTaking() {
   const [pdfOffsetsByTest, setPdfOffsetsByTest] = useState({}) // { [testId]: { rw_m1: 0, ... } } (0-based page offsets)
   const [pdfOverridesByTest, setPdfOverridesByTest] = useState({}) // { [testId]: { rw_m1: { [qNum]: pageIndex }, ... } }
   const saveTimer = useRef(null)
+  const lastSaveAt = useRef(0)
+  const pendingSave = useRef(null)
+  const saveInFlight = useRef(false)
 
   useEffect(() => {
     try {
@@ -303,18 +306,63 @@ export default function TestTaking() {
   }, [attempt?.test_id])
 
   const saveProgress = useCallback(async (updatedAnswers, mod, timeRemaining) => {
-    if (!attemptId) return
-    await supabase.from('test_attempts').update({
-      current_section: mod,
-      answers: updatedAnswers,
-      module_time_remaining: timeRemaining,
-    }).eq('id', attemptId)
-  }, [attemptId])
+    if (!attemptId || !supabase || !user?.id) return
+    await supabase
+      .from('test_attempts')
+      .update({
+        current_section: mod,
+        answers: updatedAnswers,
+        module_time_remaining: timeRemaining,
+      })
+      .eq('id', attemptId)
+      .eq('user_id', user.id)
+  }, [attemptId, user?.id])
 
-  // Debounced auto-save
-  function triggerSave(updatedAnswers, mod, timeRem) {
+  function writeLocalDraft(updatedAnswers, mod, timeRemaining) {
+    try {
+      const key = `agora_attempt_draft_v1:${attemptId}`
+      localStorage.setItem(key, JSON.stringify({
+        attemptId,
+        current_section: mod,
+        answers: updatedAnswers,
+        module_time_remaining: timeRemaining,
+        updated_at: new Date().toISOString(),
+      }))
+    } catch {}
+  }
+
+  async function flushSave() {
+    if (!pendingSave.current || saveInFlight.current) return
+    const payload = pendingSave.current
+    pendingSave.current = null
+    saveInFlight.current = true
+    try {
+      await saveProgress(payload.answers, payload.mod, payload.timeRemaining)
+      lastSaveAt.current = Date.now()
+    } catch {
+      pendingSave.current = payload
+    } finally {
+      saveInFlight.current = false
+      if (pendingSave.current) scheduleSave()
+    }
+  }
+
+  function scheduleSave() {
+    const minIntervalMs = 8000
     clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => saveProgress(updatedAnswers, mod, timeRem), 2000)
+    const sinceLast = Date.now() - (lastSaveAt.current || 0)
+    const wait = Math.max(500, minIntervalMs - sinceLast)
+    saveTimer.current = setTimeout(() => flushSave(), wait)
+  }
+
+  function triggerSave(updatedAnswers, mod) {
+    const timeRemaining = {
+      ...(moduleTimeLeft || {}),
+      [mod]: (timerLeft ?? moduleTimeLeft?.[mod]),
+    }
+    pendingSave.current = { answers: updatedAnswers, mod, timeRemaining }
+    writeLocalDraft(updatedAnswers, mod, timeRemaining)
+    scheduleSave()
   }
 
   function setAnswer(qNum, value) {
@@ -323,8 +371,15 @@ export default function TestTaking() {
       [currentModule]: { ...(answers[currentModule] || {}), [qNum]: value }
     }
     setAnswers(updated)
-    triggerSave(updated, currentModule, moduleTimeLeft)
+    triggerSave(updated, currentModule)
   }
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimer.current)
+      flushSave()
+    }
+  }, [])
 
   function toggleMark(qNum) {
     setMarkedForReview(prev => {
