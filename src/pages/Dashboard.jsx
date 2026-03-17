@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { buildWeeklyStudyPlan, loadStudyPrefs } from '../lib/studyPlan.js'
+import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs } from '../lib/studyPlan.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -76,6 +76,9 @@ export default function Dashboard() {
   const [mistakes, setMistakes] = useState([])
   const [planText, setPlanText] = useState('')
   const [rebalancing, setRebalancing] = useState(false)
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(user?.id))
+
+  useEffect(() => { setSatDate(loadSatTestDate(user?.id)) }, [user?.id])
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!user?.id || !attemptId) return false
@@ -335,7 +338,7 @@ export default function Dashboard() {
             <div>
               <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗺 Journey Tracker</h2>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                Work through these steps to be ready for the final test.
+                Work through these steps to be ready for the final test. <b>Click the tiles</b> to jump to each step.
               </div>
             </div>
             <div style={{ minWidth: 260 }}>
@@ -364,10 +367,13 @@ export default function Dashboard() {
                   },
                 },
                 {
-                  title: '2) Start Study Guide',
-                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
-                  desc: 'Open the Study Guide and start mastering chapters (25/25).',
-                  onClick: () => navigate('/guide'),
+                  title: '2) Study Plan',
+                  status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
+                  desc: 'Set your SAT date and use the plan for guidance (updates after each test).',
+                  onClick: () => {
+                    const el = document.getElementById('study-plan-card')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  },
                 },
                 {
                   title: '3) Review Results',
@@ -379,13 +385,10 @@ export default function Dashboard() {
                   },
                 },
                 {
-                  title: '4) Study Plan (Rebalances)',
-                  status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
-                  desc: 'Use your auto-generated weekly plan for guidance (updates after each test).',
-                  onClick: () => {
-                    const el = document.getElementById('study-plan-card')
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  },
+                  title: '4) Study Guide',
+                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
+                  desc: 'Master chapters (25/25) to mark them complete.',
+                  onClick: () => navigate('/guide'),
                 },
                 {
                   title: '5) Review Missed Questions',
@@ -394,12 +397,6 @@ export default function Dashboard() {
                     ? 'Take the Pre Test to generate your mistake list.'
                     : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
                   onClick: () => navigate('/mistakes'),
-                },
-                {
-                  title: '6) Progress Report',
-                  status: hasTakenPretest ? 'READY' : 'LOCKED',
-                  desc: 'View your charts, streak, missed-topic trends, and shareable report.',
-                  onClick: () => navigate('/report'),
                 },
               ]
 
@@ -441,10 +438,6 @@ export default function Dashboard() {
           </div>
 
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
-            <button className="btn btn-outline" onClick={() => navigate('/mistakes')} disabled={!hasTakenPretest}>
-              Mistake Notebook {dueReviews ? `(${dueReviews} due)` : ''} →
-            </button>
             <button className="btn btn-outline" onClick={() => navigate('/report')} disabled={!hasTakenPretest}>
               Progress Report →
             </button>
@@ -469,12 +462,42 @@ export default function Dashboard() {
           <div id="study-plan-card" className="card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               <div>
-                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Weekly Study Plan</h2>
+                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Study Plan</h2>
                 <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Auto-generated from your most recent test. Rebalance anytime.
+                  Add your SAT date to generate a plan from now until <b>3 days before</b> your test.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                  Test date:
+                  <input
+                    type="date"
+                    value={satDate || ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setSatDate(v)
+                      saveSatTestDate(user?.id, v)
+                      if (!latestCompleted) return
+                      try {
+                        const prefs = loadStudyPrefs(user?.id)
+                        const txt = buildStudyPlanToTestDate({
+                          scores: latestCompleted?.scores || {},
+                          weakTopics: latestCompleted?.weak_topics || [],
+                          prefs,
+                          testDate: v,
+                        })
+                        setPlanText(txt)
+                        supabase
+                          .from('test_attempts')
+                          .update({ study_plan: txt })
+                          .eq('id', latestCompleted.id)
+                          .eq('user_id', user.id)
+                          .catch(() => {})
+                      } catch {}
+                    }}
+                    style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 900, color: '#0f172a', background: 'white' }}
+                  />
+                </label>
                 <button
                   className="btn btn-outline"
                   disabled={!planText}
@@ -492,10 +515,11 @@ export default function Dashboard() {
                     setRebalancing(true)
                     try {
                       const prefs = loadStudyPrefs(user?.id)
-                      const txt = buildWeeklyStudyPlan({
+                      const txt = buildStudyPlanToTestDate({
                         scores: latestCompleted?.scores || {},
                         weakTopics: latestCompleted?.weak_topics || [],
                         prefs,
+                        testDate: satDate,
                       })
                       setPlanText(txt)
                       await supabase

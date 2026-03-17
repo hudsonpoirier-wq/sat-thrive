@@ -39,38 +39,6 @@ function pdfPageFor(testId, section, qNum) {
   return 0
 }
 
-function pageMapFor(testId, section) {
-  return (testId === 'pre_test')
-    ? (PDF_PAGE_MAP?.[section] || {})
-    : (EXTRA_PDF_PAGE_MAPS?.[testId]?.[section] || {})
-}
-
-function clamp01(n) {
-  if (!Number.isFinite(Number(n))) return 0
-  return Math.max(0, Math.min(1, Number(n)))
-}
-
-// Best-effort crop: split the current PDF page into vertical bands based on how many questions map to that page.
-// This avoids inaccurate “random crops” and usually contains the selected question.
-function cropForQuestion({ testId, section, qNum, pageIndex }) {
-  const map = pageMapFor(testId, section)
-  const samePageQs = Object.entries(map || {})
-    .map(([k, v]) => ({ q: Number(k), page: Number(v) }))
-    .filter(x => Number.isFinite(x.q) && Number.isFinite(x.page) && x.page === pageIndex)
-    .sort((a, b) => a.q - b.q)
-    .map(x => x.q)
-  if (samePageQs.length <= 1) {
-    return { x: 0.04, y: 0.06, w: 0.92, h: 0.86 }
-  }
-  const idx = Math.max(0, samePageQs.indexOf(Number(qNum)))
-  const center = (idx + 0.5) / samePageQs.length
-  const minH = 0.28
-  const bandH = Math.max(minH, Math.min(0.55, 1 / Math.min(4, samePageQs.length)))
-  const y = clamp01(center - bandH / 2 - 0.03)
-  const h = clamp01(bandH + 0.06)
-  return { x: 0.04, y, w: 0.92, h }
-}
-
 export default function Mistakes() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -84,7 +52,6 @@ export default function Mistakes() {
   const [redoText, setRedoText] = useState('')
   const [redoFeedback, setRedoFeedback] = useState(null)
   const [redoSaving, setRedoSaving] = useState(false)
-  const [cropOn, setCropOn] = useState(true)
 
   useEffect(() => {
     if (!user?.id) return
@@ -103,6 +70,11 @@ export default function Mistakes() {
   const filtered = useMemo(() => {
     const now = Date.now()
     const list = (items || []).slice()
+      // Hide validated items (once correct, it comes off the list).
+      .filter((m) => {
+        const k = `${m.test_id}:${m.section}:${m.q_num}`
+        return reviewItems?.[k]?.last_correct !== true
+      })
     if (!filterDue) return list
     return list.filter((m) => {
       const k = `${m.test_id}:${m.section}:${m.q_num}`
@@ -113,10 +85,6 @@ export default function Mistakes() {
 
   const selectedCfg = selected ? getTestConfig(selected.test_id) : null
   const selectedPdfPage = selected ? pdfPageFor(selected.test_id, selected.section, selected.q_num) : 0
-  const selectedCrop = useMemo(() => {
-    if (!selected) return null
-    return cropForQuestion({ testId: selected.test_id, section: selected.section, qNum: selected.q_num, pageIndex: selectedPdfPage })
-  }, [selected?.id, selectedPdfPage])
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
   const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
@@ -128,7 +96,6 @@ export default function Mistakes() {
     setRedoText('')
     setRedoFeedback(null)
     setRedoSaving(false)
-    setCropOn(true)
   }, [selectedItemKey])
 
   if (loading) {
@@ -138,6 +105,13 @@ export default function Mistakes() {
       </div>
     )
   }
+
+  const nextMistake = (() => {
+    if (!selected) return null
+    const idx = filtered.findIndex((m) => m.id === selected.id)
+    if (idx < 0) return filtered[0] || null
+    return filtered[idx + 1] || filtered[0] || null
+  })()
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
@@ -165,98 +139,87 @@ export default function Mistakes() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.1fr) minmax(360px, 1.3fr)', gap: 14, alignItems: 'start' }}>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: 14, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontWeight: 900, color: '#1a2744' }}>Mistakes ({filtered.length})</div>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>Click one to practice</div>
-              </div>
-              <div style={{ maxHeight: 660, overflow: 'auto' }}>
-                {filtered.map((m) => {
-                  const k = `${m.test_id}:${m.section}:${m.q_num}`
-                  const cfg = getTestConfig(m.test_id) || { label: m.test_id, pdfUrl: '/practice-test-11.pdf' }
-                  const secLabel = MODULES?.[m.section]?.label || m.section
-                  const dueAt = reviewItems?.[k]?.due_at
-                  const dueSoon = dueAt && new Date(dueAt).getTime() <= Date.now()
-                  const active = selected?.id === m.id
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelected(m)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: 14,
-                        border: 0,
-                        borderBottom: '1px solid #e2e8f0',
-                        background: active ? '#eef2ff' : 'transparent',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ fontWeight: 900, color: '#1a2744' }}>{cfg.label} · {secLabel} · Q{m.q_num}</div>
-                        <div style={{ fontSize: 12, fontWeight: 900, color: dueSoon ? '#ef4444' : '#94a3b8' }}>
-                          {dueSoon ? 'DUE' : '—'}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
-                        {m.chapter_id ? `Study Guide: Ch ${m.chapter_id}` : 'Study Guide: —'} · Your answer: <b>{String(m.given || '').trim() || 'Unanswered'}</b>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="card">
-              {!selected ? (
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.7 }}>
-                  Select a mistake on the left to view the PDF page and add your explanation.
+          <>
+            {!selected ? (
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: 14, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 900, color: '#1a2744' }}>Mistakes ({filtered.length})</div>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>Click one to practice</div>
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-                    <div style={{ fontWeight: 900, color: '#1a2744' }}>
-                      {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · Q{selected.q_num}
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                      Tip: Use Crop + Zoom to focus on the exact question.
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setCropOn(v => !v)}>
-                        {cropOn ? 'Cropped view' : 'Full page'}
+                <div style={{ maxHeight: 720, overflow: 'auto' }}>
+                  {filtered.map((m) => {
+                    const k = `${m.test_id}:${m.section}:${m.q_num}`
+                    const cfg = getTestConfig(m.test_id) || { label: m.test_id, pdfUrl: '/practice-test-11.pdf' }
+                    const secLabel = MODULES?.[m.section]?.label || m.section
+                    const dueAt = reviewItems?.[k]?.due_at
+                    const dueSoon = dueAt && new Date(dueAt).getTime() <= Date.now()
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setSelected(m)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: 14,
+                          border: 0,
+                          borderBottom: '1px solid #e2e8f0',
+                          background: 'transparent',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                          <div style={{ fontWeight: 900, color: '#1a2744' }}>{cfg.label} · {secLabel} · Q{m.q_num}</div>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: dueSoon ? '#ef4444' : '#94a3b8' }}>
+                            {dueSoon ? 'DUE' : '—'}
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                          {m.chapter_id ? `Study Guide: Ch ${m.chapter_id}` : 'Study Guide: —'} · Your answer: <b>{String(m.given || '').trim() || 'Unanswered'}</b>
+                        </div>
                       </button>
-                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.2) * 10) / 10))}>− Zoom</button>
-                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, minWidth: 74, textAlign: 'center' }}>
-                        {Math.round(zoom * 100)}%
-                      </div>
-                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.min(2.2, Math.round((z + 0.2) * 10) / 10))}>+ Zoom</button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+                  <button className="btn btn-outline" onClick={() => setSelected(null)}>← Back to list</button>
+                  <div style={{ fontWeight: 900, color: '#1a2744' }}>
+                    {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · Q{selected.q_num}
+                  </div>
+                  <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                    Use zoom if the page is hard to read.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.25) * 100) / 100))}>− Zoom</button>
+                    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, minWidth: 74, textAlign: 'center' }}>
+                      {Math.round(zoom * 100)}%
+                    </div>
+                    <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.min(3.0, Math.round((z + 0.25) * 100) / 100))}>+ Zoom</button>
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white', marginBottom: 14 }}>
+                  <PDFPage
+                    pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
+                    pageIndex={selectedPdfPage}
+                    zoom={zoom}
+                    maxScale={6}
+                  />
+                </div>
+
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 900, color: '#1a2744' }}>Quick redo (answer here)</div>
+                    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                      {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
                     </div>
                   </div>
-
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
-                    <PDFPage
-                      pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
-                      pageIndex={selectedPdfPage}
-                      zoom={zoom}
-                      maxScale={3.2}
-                      crop={cropOn ? selectedCrop : null}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <div style={{ fontWeight: 900, color: '#1a2744' }}>Quick redo (answer here)</div>
-                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                        {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
-                      </div>
-                    </div>
 
                     {selectedCorrect == null ? (
                       <div style={{ marginTop: 10, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
@@ -315,7 +278,7 @@ export default function Mistakes() {
                                 ? (String(redoChoice || '').toUpperCase() === right.toUpperCase())
                                 : freeResponseMatches(redoText, right)
 
-                              setRedoFeedback(ok ? { ok: true, msg: '✅ Correct — validated and scheduled for spaced review.' } : { ok: false, msg: '❌ Not quite — try again.' })
+                              setRedoFeedback(ok ? { ok: true, msg: '✅ Correct — nice work!' } : { ok: false, msg: '❌ Not quite — try again.' })
                               if (!ok) return
 
                               setRedoSaving(true)
@@ -324,6 +287,8 @@ export default function Mistakes() {
                                 const next = applyReviewResult(currentItem, true)
                                 await saveReviewItem(user.id, selectedItemKey, next)
                                 setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
+                                // Remove from list immediately.
+                                setItems(prev => (prev || []).filter(m => m.id !== selected.id))
                               } finally {
                                 setRedoSaving(false)
                               }
@@ -337,6 +302,21 @@ export default function Mistakes() {
                             </div>
                           )}
                         </div>
+
+                        {redoFeedback?.ok && (
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                            <button className="btn btn-outline" onClick={() => setSelected(null)}>Back to list</button>
+                            <button
+                              className="btn btn-primary"
+                              disabled={!nextMistake || nextMistake?.id === selected.id}
+                              onClick={() => {
+                                if (nextMistake) setSelected(nextMistake)
+                              }}
+                            >
+                              Next question →
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -379,10 +359,9 @@ export default function Mistakes() {
                       </button>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
