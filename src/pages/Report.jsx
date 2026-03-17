@@ -155,8 +155,20 @@ export default function Report() {
 
   const shareUrl = useMemo(() => {
     if (!report) return null
-    const encoded = encodeReportToQuery(report)
-    return `${window.location.origin}/share?r=${encoded}`
+    // Keep share links short and reliable (iMessage can truncate long URLs).
+    const sharePayload = {
+      generated_at: report.generated_at,
+      student: { name: report.student?.name || null },
+      summary: report.summary,
+      series: report.series,
+      weekly: report.weekly,
+    }
+    try {
+      const encoded = encodeReportToQuery(sharePayload)
+      return `${window.location.origin}/share?r=${encoded}`
+    } catch {
+      return null
+    }
   }, [report])
 
   const trendData = useMemo(() => {

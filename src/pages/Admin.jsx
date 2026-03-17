@@ -114,6 +114,14 @@ export default function Admin() {
           if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
             throw st.error
           }
+          const ms = await supabase.from('mistakes').delete().eq('user_id', userId)
+          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) {
+            throw ms.error
+          }
+          const rv = await supabase.from('review_items').delete().eq('user_id', userId)
+          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) {
+            throw rv.error
+          }
         } else {
           throw rpc.error
         }
@@ -128,6 +136,35 @@ export default function Admin() {
       setPostScores(p.data || [])
     } catch (e) {
       setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setResettingUserId(null)
+    }
+  }
+
+  async function deleteStudentAccount(userId, email) {
+    if (!supabase || !isAdmin) return
+    const ok = window.confirm(
+      `Delete this student's account permanently?\n\nThis will remove their login and delete all their data:\n${email || userId}\n\nThis cannot be undone.`
+    )
+    if (!ok) return
+    setResettingUserId(userId)
+    setResetMsg('')
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) throw new Error('Missing session token')
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: userId }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error || 'Delete failed')
+      setResetMsg('✅ Student deleted.')
+      const p = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
+      setStudents(p.data || [])
+    } catch (e) {
+      setResetMsg(`⚠️ Delete failed: ${e?.message || 'Unknown error'}`)
     } finally {
       setResettingUserId(null)
     }
@@ -151,6 +188,14 @@ export default function Admin() {
           const st = await supabase.from('studied_topics').delete().eq('user_id', profile.id)
           if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
             throw st.error
+          }
+          const ms = await supabase.from('mistakes').delete().eq('user_id', profile.id)
+          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) {
+            throw ms.error
+          }
+          const rv = await supabase.from('review_items').delete().eq('user_id', profile.id)
+          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) {
+            throw rv.error
           }
         } else {
           throw rpc.error
@@ -360,6 +405,7 @@ export default function Admin() {
                 {students.map(s => {
                   const userAttempts = computed.attemptsByUser.get(s.id) || []
                   const best = computed.bestPreByUser.get(s.id) || null
+                  const isSelf = s.id === profile?.id
                   return (
                     <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px', fontWeight: 700 }}>{s.full_name || '—'}</td>
@@ -373,15 +419,31 @@ export default function Admin() {
                       <td style={{ padding: '12px' }}>{userAttempts.length}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }}>{best || '—'}</td>
                       <td style={{ padding: '12px' }}>
-                        <button
-                          className="btn btn-outline"
-                          style={{ padding: '6px 10px', fontSize: 12, opacity: resettingUserId === s.id ? 0.6 : 1 }}
-                          disabled={resettingUserId === s.id}
-                          onClick={() => resetStudentData(s.id, s.email)}
-                          title="Delete this student's tests, scores, and study progress"
-                        >
-                          {resettingUserId === s.id ? 'Resetting…' : 'Reset'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            className="btn btn-outline"
+                            style={{ padding: '6px 10px', fontSize: 12, opacity: resettingUserId === s.id ? 0.6 : 1 }}
+                            disabled={resettingUserId === s.id}
+                            onClick={() => resetStudentData(s.id, s.email)}
+                            title="Delete this student's tests, scores, and study progress"
+                          >
+                            {resettingUserId === s.id ? 'Resetting…' : 'Reset'}
+                          </button>
+                          <Link className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} to={`/report?user=${encodeURIComponent(s.id)}`}>
+                            Report →
+                          </Link>
+                          {!isSelf && (
+                            <button
+                              className="btn btn-outline"
+                              style={{ padding: '6px 10px', fontSize: 12, borderColor: '#fecaca', color: '#b91c1c' }}
+                              disabled={resettingUserId === s.id}
+                              onClick={() => deleteStudentAccount(s.id, s.email)}
+                              title="Permanently delete this user (requires server key on Vercel)"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

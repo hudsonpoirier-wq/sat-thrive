@@ -148,7 +148,7 @@ export default function Mistakes() {
                         </div>
                       </div>
                       <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
-                        {m.chapter_id ? `Study Guide: Ch ${m.chapter_id}` : 'Study Guide: —'} · Your answer: <b>{String(m.given || '').trim() || '—'}</b>
+                        {m.chapter_id ? `Study Guide: Ch ${m.chapter_id}` : 'Study Guide: —'} · Your answer: <b>{String(m.given || '').trim() || 'Unanswered'}</b>
                       </div>
                     </button>
                   )
@@ -226,4 +226,3 @@ export default function Mistakes() {
     </div>
   )
 }
-

@@ -387,20 +387,24 @@ export default function TestTaking() {
     try {
       const testId = attempt?.test_id || testConfig?.id || 'pre_test'
       const mistakes = []
+      let attemptedTotal = 0
+      let totalQuestions = 0
       for (const section of MODULE_ORDER) {
         const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
         const total = MODULES[section]?.questions || 0
+        totalQuestions += total
         const sectionAnswers = answers?.[section] || {}
         for (let q = 1; q <= total; q++) {
           const right = key?.[q]
           if (right == null) continue
           const given = sectionAnswers?.[q]
           const attempted = String(given ?? '').trim().length > 0
-          if (!attempted) continue
+          if (attempted) attemptedTotal += 1
           const ok = isChoiceLetter(right)
             ? String(given).toUpperCase() === String(right).toUpperCase()
             : freeResponseMatches(given, right)
           if (ok) continue
+          if (!attempted) continue
           mistakes.push({
             test_id: testId,
             attempt_id: attemptId,
@@ -412,9 +416,36 @@ export default function TestTaking() {
           })
         }
       }
-      if (mistakes.length && user?.id) {
-        const saved = await saveMistakes(user.id, mistakes)
-        await ensureReviewItems(user.id, saved.items || mistakes)
+      const includeUnanswered = attemptedTotal < Math.max(10, Math.round(totalQuestions * 0.25))
+      if (includeUnanswered) {
+        for (const section of MODULE_ORDER) {
+          const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
+          const total = MODULES[section]?.questions || 0
+          const sectionAnswers = answers?.[section] || {}
+          for (let q = 1; q <= total; q++) {
+            const right = key?.[q]
+            if (right == null) continue
+            const given = sectionAnswers?.[q]
+            const attempted = String(given ?? '').trim().length > 0
+            if (attempted) continue
+            mistakes.push({
+              test_id: testId,
+              attempt_id: attemptId,
+              section,
+              q_num: q,
+              given: '',
+              correct: String(right ?? ''),
+              chapter_id: QUESTION_CHAPTER_MAP?.[section]?.[q] || null,
+              note: 'Unanswered',
+            })
+          }
+        }
+      }
+
+      const capped = mistakes.slice(0, 200)
+      if (capped.length && user?.id) {
+        const saved = await saveMistakes(user.id, capped)
+        await ensureReviewItems(user.id, saved.items || capped)
       }
     } catch {}
 
