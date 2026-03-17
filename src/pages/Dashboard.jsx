@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs } from '../lib/studyPlan.js'
+import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs } from '../lib/studyPlan.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -77,8 +77,12 @@ export default function Dashboard() {
   const [planText, setPlanText] = useState('')
   const [rebalancing, setRebalancing] = useState(false)
   const [satDate, setSatDate] = useState(() => loadSatTestDate(user?.id))
+  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(user?.id))
 
-  useEffect(() => { setSatDate(loadSatTestDate(user?.id)) }, [user?.id])
+  useEffect(() => {
+    setSatDate(loadSatTestDate(user?.id))
+    setStudyPrefs(loadStudyPrefs(user?.id))
+  }, [user?.id])
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!user?.id || !attemptId) return false
@@ -369,7 +373,7 @@ export default function Dashboard() {
                 {
                   title: '2) Study Plan',
                   status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
-                  desc: 'Set your SAT date and use the plan for guidance (updates after each test).',
+                  desc: 'Set your SAT date (or best estimate) and use the plan for guidance (updates after each test).',
                   onClick: () => {
                     const el = document.getElementById('study-plan-card')
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -385,18 +389,18 @@ export default function Dashboard() {
                   },
                 },
                 {
-                  title: '4) Study Guide',
-                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
-                  desc: 'Master chapters (25/25) to mark them complete.',
-                  onClick: () => navigate('/guide'),
-                },
-                {
-                  title: '5) Review Missed Questions',
+                  title: '4) Review Missed Questions',
                   status: !hasTakenPretest ? 'LOCKED' : reviewJourneyStatus,
                   desc: !hasTakenPretest
                     ? 'Take the Pre Test to generate your mistake list.'
                     : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
                   onClick: () => navigate('/mistakes'),
+                },
+                {
+                  title: '5) Study Guide',
+                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
+                  desc: 'Master chapters (25/25) to mark them complete.',
+                  onClick: () => navigate('/guide'),
                 },
               ]
 
@@ -460,12 +464,12 @@ export default function Dashboard() {
         {/* Study Plan + optional extra practice (side-by-side on desktop, stacked on mobile) */}
         {hasTakenPretest && (
           <div className="dashboard-plan-practice">
-            <div id="study-plan-card" className="card">
+            <div id="study-plan-card" className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
                   <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Study Plan</h2>
                   <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                    Add your SAT date to generate a plan from now until <b>3 days before</b> your test.
+                    Add your SAT date (or your best estimate) to generate a plan from now until <b>3 days before</b> test day.
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -480,7 +484,7 @@ export default function Dashboard() {
                         saveSatTestDate(user?.id, v)
                         if (!latestCompleted) return
                         try {
-                          const prefs = loadStudyPrefs(user?.id)
+                          const prefs = studyPrefs
                           const txt = buildStudyPlanToTestDate({
                             scores: latestCompleted?.scores || {},
                             weakTopics: latestCompleted?.weak_topics || [],
@@ -497,6 +501,48 @@ export default function Dashboard() {
                         } catch {}
                       }}
                       style={{
+                        padding: '7px 10px',
+                        borderRadius: 10,
+                        border: '1px solid #e2e8f0',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: '#0f172a',
+                        background: 'white',
+                      }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                    Min/day:
+                    <input
+                      type="number"
+                      min={20}
+                      max={180}
+                      value={studyPrefs?.minutesPerDay ?? 45}
+                      onChange={(e) => {
+                        const v = Number(String(e.target.value || '').trim())
+                        const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
+                        const next = { ...(studyPrefs || loadStudyPrefs(user?.id)), minutesPerDay }
+                        setStudyPrefs(next)
+                        try { saveStudyPrefs(user?.id, next) } catch {}
+                        if (!latestCompleted) return
+                        try {
+                          const txt = buildStudyPlanToTestDate({
+                            scores: latestCompleted?.scores || {},
+                            weakTopics: latestCompleted?.weak_topics || [],
+                            prefs: next,
+                            testDate: satDate,
+                          })
+                          setPlanText(txt)
+                          supabase
+                            .from('test_attempts')
+                            .update({ study_plan: txt })
+                            .eq('id', latestCompleted.id)
+                            .eq('user_id', user.id)
+                            .catch(() => {})
+                        } catch {}
+                      }}
+                      style={{
+                        width: 86,
                         padding: '7px 10px',
                         borderRadius: 10,
                         border: '1px solid #e2e8f0',
@@ -525,7 +571,7 @@ export default function Dashboard() {
                       if (!latestCompleted) return
                       setRebalancing(true)
                       try {
-                        const prefs = loadStudyPrefs(user?.id)
+                        const prefs = studyPrefs
                         const txt = buildStudyPlanToTestDate({
                           scores: latestCompleted?.scores || {},
                           weakTopics: latestCompleted?.weak_topics || [],
@@ -549,21 +595,21 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14 }}>
+              <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14, flex: 1 }}>
                 {planText ? (
-                  <pre
+                  <div
                     style={{
                       margin: 0,
                       whiteSpace: 'pre-wrap',
                       overflowWrap: 'anywhere',
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace',
-                      fontSize: 12.5,
-                      lineHeight: 1.65,
+                      fontFamily: 'DM Sans, system-ui, sans-serif',
+                      fontSize: 13,
+                      lineHeight: 1.7,
                       color: '#0f172a',
                     }}
                   >
                     {planText}
-                  </pre>
+                  </div>
                 ) : (
                   <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                     Your study plan will appear here after you submit a test.
@@ -573,7 +619,7 @@ export default function Dashboard() {
             </div>
 
             {extraTests.length > 0 && (
-              <div className="card">
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
@@ -586,12 +632,12 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14, flex: 1, alignContent: 'start' }}>
                   {extraTests.map((t) => {
                     const done = completed.some((a) => a.test_id === t.id && (a.completed_at || a.scores?.total))
                     const prog = inProgress.find((a) => a.test_id === t.id)
                     return (
-                      <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', minWidth: 0 }}>
+                      <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, background: '#f8fafc', minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                           <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, overflowWrap: 'anywhere' }}>{t.label}</div>
                           <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>

@@ -185,15 +185,15 @@ export default function Mistakes() {
               <div className="card" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
                   <button className="btn btn-outline" onClick={() => setSelected(null)}>← Back to list</button>
-                  <div style={{ fontWeight: 900, color: '#1a2744' }}>
-                    {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · Q{selected.q_num}
+                  <div style={{ fontWeight: 900, color: '#1a2744', fontSize: 15 }}>
+                    <span style={{ fontWeight: 900 }}>Answering:</span> {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · <span style={{ fontWeight: 900 }}>Q{selected.q_num}</span>
                   </div>
                   <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                    Use zoom if the page is hard to read.
+                    Use zoom if the page is hard to read. <span style={{ color: '#1a2744', fontWeight: 900 }}>Scroll down</span> to answer and check.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.25) * 100) / 100))}>− Zoom</button>
@@ -204,7 +204,7 @@ export default function Mistakes() {
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white', marginBottom: 14 }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'auto', background: 'white', marginBottom: 14 }}>
                   <PDFPage
                     pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
                     pageIndex={selectedPdfPage}
@@ -215,7 +215,7 @@ export default function Mistakes() {
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 900, color: '#1a2744' }}>Quick redo (answer here)</div>
+                    <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
                     <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
                       {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
                     </div>

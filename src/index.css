@@ -158,7 +158,7 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
   display: grid;
   grid-template-columns: minmax(520px, 1.5fr) minmax(340px, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 24px;
 }
 .dashboard-plan-practice > * { min-width: 0; }

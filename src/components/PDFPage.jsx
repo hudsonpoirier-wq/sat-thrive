@@ -83,8 +83,9 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
       if (!hasCrop) {
         canvas.width = Math.floor(renderViewport.width)
         canvas.height = Math.floor(renderViewport.height)
-        canvas.style.width = '100%'
+        canvas.style.width = `${Math.round(cssViewport.width)}px`
         canvas.style.height = `${Math.round(cssViewport.height)}px`
+        canvas.style.maxWidth = 'none'
         renderTask.current = page.render({ canvasContext: ctx, viewport: renderViewport })
       } else {
         const off = document.createElement('canvas')
@@ -103,9 +104,10 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
 
         canvas.width = sw
         canvas.height = sh
-        canvas.style.width = '100%'
+        canvas.style.width = `${Math.round(containerWidth)}px`
         const displayHeight = Math.round((sh / Math.max(1, sw)) * containerWidth)
         canvas.style.height = `${Math.max(180, displayHeight)}px`
+        canvas.style.maxWidth = 'none'
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(off, sx, sy, sw, sh, 0, 0, sw, sh)
         if (!cancelled) setStatus('done')
@@ -140,7 +142,7 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
   }, [pdfUrl, pageIndex, zoom, maxScale, crop, retryNonce])
 
   return (
-    <div className="pdf-canvas-wrap" style={{ position: 'relative', width: '100%' }}>
+    <div className="pdf-canvas-wrap" style={{ position: 'relative', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       {status === 'loading' && (
         <div style={{ position: 'absolute', inset: 0, minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', zIndex: 1 }}>
           <div style={{ textAlign: 'center', color: '#94a3b8' }}>
@@ -170,7 +172,7 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
           </div>
         </div>
       )}
-      <canvas ref={canvasRef} style={{ display: status === 'done' ? 'block' : 'none', width: '100%' }} />
+      <canvas ref={canvasRef} style={{ display: status === 'done' ? 'block' : 'none' }} />
     </div>
   )
 }
