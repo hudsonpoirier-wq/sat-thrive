@@ -137,6 +137,13 @@ export default function Results() {
         if (!data) { navigate('/dashboard'); return }
         if (!data.completed_at) { navigate(`/test/${attemptId}`); return }
         setAttempt(data)
+        try {
+          const key = `agora_viewed_results_v1:${user.id}`
+          const raw = localStorage.getItem(key)
+          const obj = raw ? JSON.parse(raw) : {}
+          obj[String(attemptId)] = new Date().toISOString()
+          localStorage.setItem(key, JSON.stringify(obj))
+        } catch {}
         if (data.study_plan) setPlan(data.study_plan)
         else {
           const txt = buildPlanFromAttempt(data, user.id)

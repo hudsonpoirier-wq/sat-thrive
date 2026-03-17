@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { MODULES, PDF_PAGE_MAP } from '../data/testData.js'
+import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import PDFPage from '../components/PDFPage.jsx'
-import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote } from '../lib/mistakesStore.js'
+import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
 
 function Navbar() {
   return (
@@ -47,6 +48,11 @@ export default function Mistakes() {
   const [selected, setSelected] = useState(null)
   const [filterDue, setFilterDue] = useState(false)
   const [savingId, setSavingId] = useState(null)
+  const [zoom, setZoom] = useState(1)
+  const [redoChoice, setRedoChoice] = useState(null)
+  const [redoText, setRedoText] = useState('')
+  const [redoFeedback, setRedoFeedback] = useState(null)
+  const [redoSaving, setRedoSaving] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -75,6 +81,18 @@ export default function Mistakes() {
 
   const selectedCfg = selected ? getTestConfig(selected.test_id) : null
   const selectedPdfPage = selected ? pdfPageFor(selected.test_id, selected.section, selected.q_num) : 0
+  const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
+  const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
+  const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
+  const selectedIsMC = selected ? ['A', 'B', 'C', 'D'].includes(String(selectedCorrect || '').trim().toUpperCase()) : false
+
+  useEffect(() => {
+    setZoom(1)
+    setRedoChoice(null)
+    setRedoText('')
+    setRedoFeedback(null)
+    setRedoSaving(false)
+  }, [selectedItemKey])
 
   if (loading) {
     return (
@@ -175,8 +193,112 @@ export default function Mistakes() {
                     </div>
                   </div>
 
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                      Tip: Use the zoom controls to focus on the exact question.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.2) * 10) / 10))}>− Zoom</button>
+                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, minWidth: 74, textAlign: 'center' }}>
+                        {Math.round(zoom * 100)}%
+                      </div>
+                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.min(2.2, Math.round((z + 0.2) * 10) / 10))}>+ Zoom</button>
+                    </div>
+                  </div>
+
                   <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
-                    <PDFPage pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} pageIndex={selectedPdfPage} />
+                    <PDFPage pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} pageIndex={selectedPdfPage} zoom={zoom} maxScale={3.2} />
+                  </div>
+
+                  <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 900, color: '#1a2744' }}>Quick redo (answer here)</div>
+                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                        {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
+                      </div>
+                    </div>
+
+                    {selectedCorrect == null ? (
+                      <div style={{ marginTop: 10, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                        This question can’t be validated yet because the answer key isn’t loaded.
+                      </div>
+                    ) : (
+                      <>
+                        {selectedIsMC ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 }}>
+                            {['A', 'B', 'C', 'D'].map((c) => (
+                              <button
+                                key={c}
+                                className="btn btn-outline"
+                                style={{
+                                  padding: '10px 12px',
+                                  fontWeight: 900,
+                                  borderColor: redoChoice === c ? '#1a2744' : '#e2e8f0',
+                                  background: redoChoice === c ? 'rgba(26,39,68,.08)' : 'white',
+                                }}
+                                onClick={() => {
+                                  setRedoChoice(c)
+                                  setRedoFeedback(null)
+                                }}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 12 }}>
+                            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                              Open response: enter only the value/expression. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
+                            </div>
+                            <input
+                              type="text"
+                              className="free-response-input"
+                              placeholder="Your answer"
+                              value={redoText}
+                              onChange={(e) => {
+                                setRedoText(e.target.value)
+                                setRedoFeedback(null)
+                              }}
+                              autoComplete="off"
+                            />
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+                          <button
+                            className="btn btn-primary"
+                            disabled={redoSaving || (selectedIsMC ? !redoChoice : !redoText.trim())}
+                            onClick={async () => {
+                              if (!selectedItemKey) return
+                              const right = String(selectedCorrect || '').trim()
+                              const ok = selectedIsMC
+                                ? (String(redoChoice || '').toUpperCase() === right.toUpperCase())
+                                : freeResponseMatches(redoText, right)
+
+                              setRedoFeedback(ok ? { ok: true, msg: '✅ Correct — validated and scheduled for spaced review.' } : { ok: false, msg: '❌ Not quite — try again.' })
+                              if (!ok) return
+
+                              setRedoSaving(true)
+                              try {
+                                const currentItem = reviewItems?.[selectedItemKey] || { due_at: new Date().toISOString() }
+                                const next = applyReviewResult(currentItem, true)
+                                await saveReviewItem(user.id, selectedItemKey, next)
+                                setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
+                              } finally {
+                                setRedoSaving(false)
+                              }
+                            }}
+                          >
+                            {redoSaving ? 'Saving…' : 'Check →'}
+                          </button>
+                          {redoFeedback && (
+                            <div style={{ fontSize: 12, fontWeight: 900, color: redoFeedback.ok ? '#10b981' : '#ef4444' }}>
+                              {redoFeedback.msg}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div style={{ marginTop: 12 }}>

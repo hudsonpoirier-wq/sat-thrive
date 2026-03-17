@@ -108,10 +108,12 @@ export default function Review() {
   // PDF alignment controls (same storage as TestTaking)
   const [pdfOffsetsByTest, setPdfOffsetsByTest] = useState({})
   const [pdfOverridesByTest, setPdfOverridesByTest] = useState({})
+  const [pdfZoom, setPdfZoom] = useState(1)
   useEffect(() => {
     try { setPdfOffsetsByTest(JSON.parse(localStorage.getItem('agora_pdf_offsets_v2') || '{}') || {}) } catch {}
     try { setPdfOverridesByTest(JSON.parse(localStorage.getItem('agora_pdf_overrides_v2') || '{}') || {}) } catch {}
   }, [])
+  useEffect(() => { setPdfZoom(1) }, [current?.itemKey])
   useEffect(() => {
     try { localStorage.setItem('agora_pdf_offsets_v2', JSON.stringify(pdfOffsetsByTest || {})) } catch {}
   }, [pdfOffsetsByTest])
@@ -220,10 +222,20 @@ export default function Review() {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1.3fr) minmax(320px, 1fr)', gap: 14, alignItems: 'start' }}>
             <div className="card" style={{ padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                  PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+                    PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, padding: '2px 10px', borderRadius: 999, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                    {mod?.label || current.section} · Q{current.q_num}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setPdfZoom(z => Math.max(0.8, Math.round((z - 0.2) * 10) / 10))}>− Zoom</button>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, minWidth: 64, textAlign: 'center' }}>
+                    {Math.round(pdfZoom * 100)}%
+                  </div>
+                  <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setPdfZoom(z => Math.min(2.2, Math.round((z + 0.2) * 10) / 10))}>+ Zoom</button>
                   <button
                     className="btn btn-outline"
                     style={{ padding: '6px 10px', fontSize: 12 }}
@@ -257,12 +269,15 @@ export default function Review() {
                 </div>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
-                <PDFPage pdfUrl={current.cfg?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />
+                <PDFPage pdfUrl={current.cfg?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} zoom={pdfZoom} maxScale={3.2} />
               </div>
             </div>
 
             <div className="card" style={{ padding: 14 }}>
               <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 8 }}>Answer</div>
+              <div style={{ marginTop: -2, marginBottom: 10, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                You are working on: <span style={{ color: '#0f172a' }}>{current.cfg?.label || current.test_id}</span> · <span style={{ color: '#0f172a' }}>{mod?.label || current.section}</span> · <span style={{ color: '#0f172a' }}>Q{current.q_num}</span>
+              </div>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
                 {isFR
                   ? <>Enter your answer as a number or simple expression (examples: <code>1/2</code>, <code>0.5</code>, <code>pi</code>, <code>3*pi/2</code>). Don’t include units or extra words.</>
@@ -377,4 +392,3 @@ export default function Review() {
     </div>
   )
 }
-

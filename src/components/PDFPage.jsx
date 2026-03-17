@@ -6,9 +6,21 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const pdfCache = {}
 
-export default function PDFPage({ pdfUrl, pageIndex }) {
+function fileLabel(url) {
+  try {
+    const u = String(url || '')
+    const clean = u.split('?')[0].split('#')[0]
+    const last = clean.split('/').filter(Boolean).pop()
+    return last || clean || 'PDF'
+  } catch {
+    return 'PDF'
+  }
+}
+
+export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2 }) {
   const canvasRef = useRef(null)
   const [status, setStatus] = useState('loading')
+  const [retryNonce, setRetryNonce] = useState(0)
   const renderTask = useRef(null)
 
   useEffect(() => {
@@ -18,10 +30,17 @@ export default function PDFPage({ pdfUrl, pageIndex }) {
     async function render() {
       if (cancelled) return
 
-      if (!pdfCache[pdfUrl]) {
-        pdfCache[pdfUrl] = pdfjsLib.getDocument(pdfUrl).promise
+      const url = String(pdfUrl || '').trim()
+      if (!url) throw new Error('Missing PDF URL')
+
+      if (!pdfCache[url]) {
+        const task = pdfjsLib.getDocument(url)
+        pdfCache[url] = task.promise.catch((e) => {
+          delete pdfCache[url]
+          throw e
+        })
       }
-      const pdf = await pdfCache[pdfUrl]
+      const pdf = await pdfCache[url]
       if (cancelled) return
 
       const pageNum = Math.min(Math.max(1, pageIndex + 1), pdf.numPages)
@@ -33,7 +52,10 @@ export default function PDFPage({ pdfUrl, pageIndex }) {
 
       const containerWidth = canvas.parentElement?.clientWidth || 700
       const viewport = page.getViewport({ scale: 1 })
-      const scale = Math.min(containerWidth / viewport.width, 2)
+      const base = containerWidth / viewport.width
+      const z = Number.isFinite(Number(zoom)) ? Math.max(0.5, Math.min(3, Number(zoom))) : 1
+      const cap = Number.isFinite(Number(maxScale)) ? Math.max(1, Number(maxScale)) : 2
+      const scale = Math.min(base * z, cap)
       const scaledViewport = page.getViewport({ scale })
 
       canvas.width = scaledViewport.width
@@ -59,7 +81,7 @@ export default function PDFPage({ pdfUrl, pageIndex }) {
       cancelled = true
       if (renderTask.current) renderTask.current.cancel()
     }
-  }, [pdfUrl, pageIndex])
+  }, [pdfUrl, pageIndex, zoom, maxScale, retryNonce])
 
   return (
     <div className="pdf-canvas-wrap" style={{ position: 'relative', width: '100%' }}>
@@ -77,8 +99,18 @@ export default function PDFPage({ pdfUrl, pageIndex }) {
             <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>PDF not loaded</div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
-              Place <code>practice-test-11.pdf</code> in the <code>/public</code> folder
+              Couldn’t load <code>{fileLabel(pdfUrl)}</code>. Try again (this can happen on spotty connections).
             </div>
+            <button
+              className="btn btn-outline"
+              style={{ marginTop: 12, padding: '8px 14px', fontSize: 13, borderColor: '#fecaca', background: 'rgba(255,255,255,.8)' }}
+              onClick={() => {
+                try { delete pdfCache[String(pdfUrl || '').trim()] } catch {}
+                setRetryNonce((n) => n + 1)
+              }}
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}

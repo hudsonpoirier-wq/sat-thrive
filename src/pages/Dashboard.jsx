@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
-import { loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
+import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
 import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
@@ -73,6 +73,19 @@ export default function Dashboard() {
   const [postInput, setPostInput] = useState('')
   const [confirmStart, setConfirmStart] = useState(false)
   const [reviewItems, setReviewItems] = useState({})
+  const [mistakes, setMistakes] = useState([])
+
+  function hasViewedResultsForAttempt(attemptId) {
+    if (!user?.id || !attemptId) return false
+    try {
+      const key = `agora_viewed_results_v1:${user.id}`
+      const raw = localStorage.getItem(key)
+      const obj = raw ? JSON.parse(raw) : {}
+      return Boolean(obj?.[String(attemptId)])
+    } catch {
+      return false
+    }
+  }
 
   function computeScoresFromAnswers(attempt) {
     try {
@@ -122,6 +135,7 @@ export default function Dashboard() {
         setStudied(map || {})
         setStudiedRows(stRows || [])
         loadReviewItems(user.id).then((r) => setReviewItems(r.items || {})).catch(() => {})
+        loadMistakes(user.id).then((m) => setMistakes(m.items || [])).catch(() => {})
         setLoading(false)
       })
 
@@ -175,6 +189,7 @@ export default function Dashboard() {
 
   const completed = attempts.filter(a => a.completed_at || a.scores?.total)
   const inProgress = attempts.filter(a => !a.completed_at)
+  const latestCompleted = completed.length ? completed[0] : null
   const completedPre = completed.filter(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
   const preInProgress = inProgress.find(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
   const preTotals = completedPre.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
@@ -188,6 +203,20 @@ export default function Dashboard() {
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
   const hasTakenPretest = completedPre.length > 0
   const dueReviews = computeDueCount(reviewItems)
+  const viewedLatestResults = latestCompleted ? hasViewedResultsForAttempt(latestCompleted.id) : false
+  const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
+  const latestValidated = latestMistakes.filter((m) => {
+    const k = `${m.test_id}:${m.section}:${m.q_num}`
+    return reviewItems?.[k]?.last_correct === true
+  }).length
+  const reviewJourneyStatus = (() => {
+    const total = latestMistakes.length
+    if (!hasTakenPretest) return 'LOCKED'
+    if (total === 0) return 'DONE'
+    if (latestValidated === 0) return 'NOT STARTED'
+    if (latestValidated < total) return 'IN PROGRESS'
+    return 'DONE'
+  })()
 
   const activityKeys = (() => {
     const set = new Set()
@@ -272,7 +301,7 @@ export default function Dashboard() {
             <div>
               <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>⚡ Momentum</h2>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                Keep the streak, hit your weekly goal, and clear your review queue.
+                Keep the streak and clear your review queue.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -374,14 +403,21 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
             {[
               { title: '1) Take the Pretest', done: hasTakenPretest, desc: 'Complete the Pre Test.' },
-              { title: '2) Review Results', done: hasTakenPretest, desc: 'Use your results to find weak topics.' },
+              { title: '2) Review Results', done: hasTakenPretest && viewedLatestResults, desc: 'Open your results and identify the weak topics.' },
               { title: '3) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
               { title: '4) Complete Study Guide', done: studiedCount >= 34, desc: 'Work through all chapters and get every question correct to mark it complete.' },
+              { title: '5) Review Missed Questions', done: reviewJourneyStatus === 'DONE', status: reviewJourneyStatus, desc: `Redo missed questions from your most recent test. Validated: ${latestValidated}/${latestMistakes.length}.` },
             ].map((s) => (
               <div key={s.title} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
-                  <div style={{ fontSize: 12, fontWeight: 900, color: s.done ? '#10b981' : '#94a3b8' }}>{s.done ? 'DONE' : 'TODO'}</div>
+                  {s.status ? (
+                    <div style={{ fontSize: 12, fontWeight: 900, color: s.status === 'DONE' ? '#10b981' : s.status === 'IN PROGRESS' ? '#f59e0b' : s.status === 'NOT STARTED' ? '#ef4444' : '#94a3b8' }}>
+                      {s.status}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, fontWeight: 900, color: s.done ? '#10b981' : '#94a3b8' }}>{s.done ? 'DONE' : 'TODO'}</div>
+                  )}
                 </div>
                 <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
               </div>
@@ -390,6 +426,12 @@ export default function Dashboard() {
 
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
+            <button className="btn btn-outline" onClick={() => navigate('/mistakes')} disabled={!hasTakenPretest}>
+              Mistake Notebook →
+            </button>
+            <button className="btn btn-outline" onClick={() => navigate('/review')} disabled={!hasTakenPretest}>
+              Spaced Review {dueReviews ? `(${dueReviews})` : ''} →
+            </button>
             <button
               className="btn"
               onClick={() => startNewTest('final_test')}
