@@ -7,16 +7,25 @@ import { getTestConfig } from '../data/tests.js'
 const FINAL_TEST_ID = 'final_test'
 
 function Navbar() {
+  const navigate = useNavigate()
   return (
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
+        <button
+          className="btn btn-outline"
+          onClick={() => navigate(-1)}
+          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
+          title="Go back"
+        >
+          ← Back
+        </button>
         <Link
           to="/dashboard"
           className="btn btn-outline"
           style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
         >
-          ← Dashboard
+          Dashboard
         </Link>
       </div>
     </nav>
@@ -115,4 +124,3 @@ export default function FinalTest() {
     </div>
   )
 }
-

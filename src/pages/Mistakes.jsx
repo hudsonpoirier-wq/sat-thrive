@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
@@ -9,12 +9,21 @@ import PDFPage from '../components/PDFPage.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
 
 function Navbar() {
+  const navigate = useNavigate()
   return (
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
+        <button
+          className="btn btn-outline"
+          onClick={() => navigate(-1)}
+          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
+          title="Go back"
+        >
+          ← Back
+        </button>
         <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          ← Dashboard
+          Dashboard
         </Link>
       </div>
     </nav>
@@ -121,7 +130,7 @@ export default function Mistakes() {
           <div>
             <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>🧾 Mistake Notebook</h1>
             <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Your missed questions auto-save here. Add your own explanation so you don’t repeat the same mistake.
+              Your missed questions auto-save here. Adding an explanation is <b>optional</b>, but it helps you avoid repeating the same mistake.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -322,7 +331,7 @@ export default function Mistakes() {
                   </div>
 
                   <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: '#64748b', marginBottom: 6 }}>Your explanation (save what you learned)</div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#64748b', marginBottom: 6 }}>Optional explanation (save what you learned)</div>
                     <textarea
                       value={selected.note || ''}
                       onChange={(e) => setSelected(prev => ({ ...prev, note: e.target.value }))}
