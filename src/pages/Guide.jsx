@@ -51,11 +51,14 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                     border: selectedId === ch.id ? '2px solid #f59e0b' : `1.5px solid ${statusBorder}`,
                     background: hasGuide ? statusBg : 'white',
                     cursor: 'pointer',
+                    overflow: 'hidden',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontWeight: 800, color: '#1a2744' }}>Ch {ch.id}: {ch.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ fontWeight: 900, color: '#1a2744', flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.25 }}>
+                      Ch {ch.id}: {ch.name}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       {hasGuide && (
                         <span style={{
                           fontSize: 11,
@@ -70,7 +73,7 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                           {status}
                         </span>
                       )}
-                      <div style={{ fontSize: 12 }}>
+                      <div style={{ fontSize: 12, lineHeight: 1 }}>
                         {done ? '✅' : inProgress ? '🟡' : hasGuide ? '🔴' : '⏳'}
                       </div>
                     </div>

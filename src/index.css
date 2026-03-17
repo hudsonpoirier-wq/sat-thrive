@@ -452,7 +452,7 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .login-footnote { margin-top: 18px; font-size: 12px; color: rgba(255,255,255,.40); }
 
 .login-auth-col {
-  flex: 0 1 430px;
+  flex: 0 1 520px;
   padding: 16px;
   display: flex;
   align-items: center;
@@ -461,15 +461,15 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 
 .login-card {
   width: 100%;
-  max-width: 410px;
+  max-width: 520px;
   background: rgba(255,255,255,.92);
   border-radius: 22px;
-  padding: 34px 28px;
+  padding: 40px 34px;
   border: 1px solid rgba(15,23,42,.08);
   box-shadow: 0 18px 55px rgba(0,0,0,.22);
 }
 
-.login-card-title { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 800; color: #1a2744; margin-bottom: 4px; }
+.login-card-title { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 900; color: #1a2744; margin-bottom: 6px; }
 .login-card-subtitle { font-size: 13px; color: #64748b; margin-bottom: 28px; }
 .login-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
 .login-switch-btn { background: none; border: none; color: #1a2744; font-weight: 700; cursor: pointer; font-size: 13px; }
