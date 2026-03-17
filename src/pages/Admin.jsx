@@ -1047,6 +1047,7 @@ export default function Admin() {
 		              {TESTS.map((t) => {
 		                const builtIn = getAnswerKeyBySection(t.id)
 		                const stored = keysByTest?.[t.id] || null
+                    const bundledPdf = (!builtIn && !stored && t.akUrl) ? 'Bundled AK PDF (auto)' : null
 		                const builtInCount = countKey(builtIn)
 		                const storedCount = countKey(stored)
 		                const showCount = builtIn ? builtInCount : storedCount
@@ -1058,7 +1059,7 @@ export default function Admin() {
 		                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
 		                          Answer key: {builtIn
 		                            ? `Built-in (${builtInCount} answers)`
-		                            : (stored ? `Loaded (${storedCount} answers)` : 'Not set')}
+		                            : (stored ? `Loaded (${storedCount} answers)` : (bundledPdf || 'Not set'))}
 		                          {stored && builtIn && storedCount !== builtInCount && (
 		                            <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 800 }}>
 		                              (DB has {storedCount})

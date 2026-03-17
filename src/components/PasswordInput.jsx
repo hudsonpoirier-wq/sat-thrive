@@ -18,45 +18,33 @@ export default function PasswordInput({
   }, [value, reveal, placeholder])
 
   const isEmpty = !String(value || '').length
-  const length = String(value || '').length
-
-  function setCaretFromClientX(clientX, targetEl) {
-    const input = inputRef.current
-    if (!input) return
-    const rect = (targetEl || input).getBoundingClientRect()
-    const x = Math.min(Math.max(0, clientX - rect.left), rect.width)
-    const ratio = rect.width ? (x / rect.width) : 1
-    const idx = Math.min(length, Math.max(0, Math.round(ratio * length)))
-    input.focus()
-    // Defer until after focus so selection applies reliably.
-    requestAnimationFrame(() => {
-      try { input.setSelectionRange(idx, idx) } catch {}
-    })
-  }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div
+      style={{ position: 'relative' }}
+      onMouseLeave={() => setReveal(false)}
+    >
       <input
         ref={inputRef}
         className="input-field"
-        type="password"
+        type={reveal ? 'text' : 'password'}
         value={value}
         onChange={onChange}
         minLength={minLength}
         required={required}
         autoComplete={autoComplete}
         spellCheck={false}
-        // Hide the native dots so our overlay can control the reveal area precisely.
-        style={{ color: 'transparent', caretColor: '#0f172a' }}
+        // When hidden we mask via overlay; keep caret visible for editing.
+        style={{ color: reveal ? '#0f172a' : 'transparent', caretColor: '#0f172a' }}
       />
 
       <span
         onMouseEnter={() => setReveal(true)}
-        onMouseLeave={() => setReveal(false)}
-        onMouseDown={(e) => {
-          // Allow precise click-to-place-caret while keeping hover-to-reveal on the dots only.
+        onPointerDown={(e) => {
+          // Focus the real input on click/tap without revealing when the user clicks outside the dots.
+          // If they're clicking the dots area, revealing is already true via hover (desktop).
           e.preventDefault()
-          setCaretFromClientX(e.clientX, e.currentTarget)
+          inputRef.current?.focus()
         }}
         style={{
           position: 'absolute',
@@ -65,7 +53,7 @@ export default function PasswordInput({
           top: '50%',
           transform: 'translateY(-50%)',
           display: 'block',
-          pointerEvents: 'auto',
+          pointerEvents: reveal ? 'none' : 'auto',
           userSelect: 'none',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -74,6 +62,7 @@ export default function PasswordInput({
           fontSize: 14,
           color: isEmpty ? '#94a3b8' : '#1a2744',
           cursor: 'text',
+          opacity: reveal ? 0 : 1,
         }}
         title={reveal && !isEmpty ? 'Password (revealed while hovering dots)' : undefined}
       >
