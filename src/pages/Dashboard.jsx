@@ -457,151 +457,175 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Study plan guidance (auto-rebalances) */}
+        {/* Study Plan + optional extra practice (side-by-side on desktop, stacked on mobile) */}
         {hasTakenPretest && (
-          <div id="study-plan-card" className="card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              <div>
-                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Study Plan</h2>
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Add your SAT date to generate a plan from now until <b>3 days before</b> your test.
+          <div className="dashboard-plan-practice">
+            <div id="study-plan-card" className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Study Plan</h2>
+                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                    Add your SAT date to generate a plan from now until <b>3 days before</b> your test.
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                  Test date:
-                  <input
-                    type="date"
-                    value={satDate || ''}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setSatDate(v)
-                      saveSatTestDate(user?.id, v)
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                    Test date:
+                    <input
+                      type="date"
+                      value={satDate || ''}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setSatDate(v)
+                        saveSatTestDate(user?.id, v)
+                        if (!latestCompleted) return
+                        try {
+                          const prefs = loadStudyPrefs(user?.id)
+                          const txt = buildStudyPlanToTestDate({
+                            scores: latestCompleted?.scores || {},
+                            weakTopics: latestCompleted?.weak_topics || [],
+                            prefs,
+                            testDate: v,
+                          })
+                          setPlanText(txt)
+                          supabase
+                            .from('test_attempts')
+                            .update({ study_plan: txt })
+                            .eq('id', latestCompleted.id)
+                            .eq('user_id', user.id)
+                            .catch(() => {})
+                        } catch {}
+                      }}
+                      style={{
+                        padding: '7px 10px',
+                        borderRadius: 10,
+                        border: '1px solid #e2e8f0',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: '#0f172a',
+                        background: 'white',
+                      }}
+                    />
+                  </label>
+                  <button
+                    className="btn btn-outline"
+                    disabled={!planText}
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(String(planText || ''))
+                      } catch {}
+                    }}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    disabled={rebalancing || !latestCompleted}
+                    onClick={async () => {
                       if (!latestCompleted) return
+                      setRebalancing(true)
                       try {
                         const prefs = loadStudyPrefs(user?.id)
                         const txt = buildStudyPlanToTestDate({
                           scores: latestCompleted?.scores || {},
                           weakTopics: latestCompleted?.weak_topics || [],
                           prefs,
-                          testDate: v,
+                          testDate: satDate,
                         })
                         setPlanText(txt)
-                        supabase
+                        await supabase
                           .from('test_attempts')
                           .update({ study_plan: txt })
                           .eq('id', latestCompleted.id)
                           .eq('user_id', user.id)
-                          .catch(() => {})
-                      } catch {}
+                      } catch {
+                        // no-op
+                      }
+                      setRebalancing(false)
                     }}
-                    style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 900, color: '#0f172a', background: 'white' }}
-                  />
-                </label>
-                <button
-                  className="btn btn-outline"
-                  disabled={!planText}
-                  onClick={async () => {
-                    try { await navigator.clipboard.writeText(String(planText || '')) } catch {}
-                  }}
-                >
-                  Copy
-                </button>
-                <button
-                  className="btn btn-primary"
-                  disabled={rebalancing || !latestCompleted}
-                  onClick={async () => {
-                    if (!latestCompleted) return
-                    setRebalancing(true)
-                    try {
-                      const prefs = loadStudyPrefs(user?.id)
-                      const txt = buildStudyPlanToTestDate({
-                        scores: latestCompleted?.scores || {},
-                        weakTopics: latestCompleted?.weak_topics || [],
-                        prefs,
-                        testDate: satDate,
-                      })
-                      setPlanText(txt)
-                      await supabase
-                        .from('test_attempts')
-                        .update({ study_plan: txt })
-                        .eq('id', latestCompleted.id)
-                        .eq('user_id', user.id)
-                    } catch {
-                      // no-op
-                    }
-                    setRebalancing(false)
-                  }}
-                >
-                  {rebalancing ? 'Rebalancing…' : 'Rebalance now'}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14 }}>
-              {planText ? (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 12.5, lineHeight: 1.65, color: '#0f172a' }}>
-                  {planText}
-                </pre>
-              ) : (
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Your study plan will appear here after you submit a test.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Optional extra practice tests (hidden until pretest is taken) */}
-        {hasTakenPretest && extraTests.length > 0 && (
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              <div>
-                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  These tests are optional skill builders. They’re not required, but they help reinforce your weak topics and track improvement.
+                  >
+                    {rebalancing ? 'Rebalancing…' : 'Rebalance now'}
+                  </button>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Completed: {completedExtra.length}/{extraTests.length}
+
+              <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14 }}>
+                {planText ? (
+                  <pre
+                    style={{
+                      margin: 0,
+                      whiteSpace: 'pre-wrap',
+                      overflowWrap: 'anywhere',
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace',
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                      color: '#0f172a',
+                    }}
+                  >
+                    {planText}
+                  </pre>
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                    Your study plan will appear here after you submit a test.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 14 }}>
-              {extraTests.map(t => {
-                const done = completed.some(a => a.test_id === t.id && (a.completed_at || a.scores?.total))
-                const prog = inProgress.find(a => a.test_id === t.id)
-                return (
-                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
-                      <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8' }}>
-                        {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      {prog ? (
-                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
-                          Resume →
-                        </button>
-                      ) : (
-                        <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => startNewTest(t.id)}>
-                          Start →
-                        </button>
-                      )}
-                      {done && (
-                        <button className="btn btn-outline" onClick={() => {
-                          const last = completed.find(a => a.test_id === t.id)
-                          if (last) navigate(`/results/${last.id}`)
-                        }}>
-                          View Results →
-                        </button>
-                      )}
+            {extraTests.length > 0 && (
+              <div className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
+                    <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                      Optional skill builders to reinforce weak topics and track improvement.
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                    Completed: {completedExtra.length}/{extraTests.length}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14 }}>
+                  {extraTests.map((t) => {
+                    const done = completed.some((a) => a.test_id === t.id && (a.completed_at || a.scores?.total))
+                    const prog = inProgress.find((a) => a.test_id === t.id)
+                    return (
+                      <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                          <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, overflowWrap: 'anywhere' }}>{t.label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>
+                            {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          {prog ? (
+                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
+                              Resume →
+                            </button>
+                          ) : (
+                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => startNewTest(t.id)}>
+                              Start →
+                            </button>
+                          )}
+                          {done && (
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => {
+                                const last = completed.find((a) => a.test_id === t.id)
+                                if (last) navigate(`/results/${last.id}`)
+                              }}
+                            >
+                              View Results →
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

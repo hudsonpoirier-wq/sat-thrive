@@ -153,6 +153,20 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .stat-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
 .stat-box.dark .stat-sub { color: rgba(255,255,255,.4); }
 
+/* Dashboard layout helpers */
+.dashboard-plan-practice {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.5fr) minmax(340px, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+.dashboard-plan-practice > * { min-width: 0; }
+
+@media (max-width: 980px) {
+  .dashboard-plan-practice { grid-template-columns: 1fr; }
+}
+
 /* SAT-style test UI */
 .test-layout {
   display: flex;

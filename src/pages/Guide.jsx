@@ -451,14 +451,14 @@ export default function Guide() {
               <>
                 <div className="card" style={{ marginBottom: 16 }}>
                   <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 900, marginBottom: 10, color: '#1a2744' }}>Guide</div>
-                  <div style={{ color: '#334155', lineHeight: 1.75, fontSize: 14, whiteSpace: 'pre-line' }}>
+                  <div style={{ color: '#334155', lineHeight: 1.9, fontSize: 15, whiteSpace: 'pre-line', fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>
                     {content.intro}
                   </div>
                   <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
                     {(content.concepts || []).map((c, i) => (
                       <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }}>
                         <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>{c.title}</div>
-                        <div style={{ color: '#334155', lineHeight: 1.65, fontSize: 13 }}>{c.body}</div>
+                        <div style={{ color: '#334155', lineHeight: 1.85, fontSize: 14, fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>{c.body}</div>
                       </div>
                     ))}
                   </div>
