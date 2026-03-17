@@ -322,19 +322,19 @@ export default function Dashboard() {
 
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
-            <Link
-              to="/final"
+            <button
               className="btn"
+              onClick={() => startNewTest('final_test')}
+              disabled={!(studiedCount >= 34 && hasTakenPretest)}
               style={{
                 background: studiedCount >= 34 && hasTakenPretest ? '#10b981' : '#e2e8f0',
                 color: studiedCount >= 34 && hasTakenPretest ? 'white' : '#64748b',
-                pointerEvents: studiedCount >= 34 && hasTakenPretest ? 'auto' : 'none',
                 fontWeight: 900,
               }}
               title={studiedCount >= 34 && hasTakenPretest ? 'Final test unlocked' : 'Complete the guide + pretest to unlock'}
             >
               🏁 Final Test
-            </Link>
+            </button>
           </div>
         </div>
 

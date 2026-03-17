@@ -7,6 +7,7 @@ import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -16,6 +17,17 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const FINAL_TEST_ID = 'final_test'
+
+function countKey(key) {
+  if (!key || typeof key !== 'object') return 0
+  if (key.rw_m1) {
+    return Object.keys(key.rw_m1 || {}).length
+      + Object.keys(key.rw_m2 || {}).length
+      + Object.keys(key.math_m1 || {}).length
+      + Object.keys(key.math_m2 || {}).length
+  }
+  return Object.keys(key).length
+}
 
 function pairedTTest(pairs) {
   if (pairs.length < 2) return null
@@ -582,40 +594,74 @@ export default function Admin() {
 	              Manage your test PDFs and answer keys. Skill Builder keys can be imported directly from the scoring guide PDFs.
 	            </div>
 
-	            <div style={{ display: 'grid', gap: 12 }}>
-	              {[
-	                ...TESTS,
-	                { id: FINAL_TEST_ID, label: 'Final Test', pdfUrl: '/final-test-questions.pdf' }
-	              ].map((t) => {
-	                const key = t.id === 'pre_test' ? ANSWER_KEY : (keysByTest?.[t.id] || null)
-	                const count = key && typeof key === 'object'
-	                  ? (key.rw_m1 ? (Object.keys(key.rw_m1 || {}).length + Object.keys(key.rw_m2 || {}).length + Object.keys(key.math_m1 || {}).length + Object.keys(key.math_m2 || {}).length) : Object.keys(key).length)
-	                  : 0
-	                return (
-	                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-	                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-	                      <div>
-	                        <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
-	                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-	                          Answer key: {t.id === 'pre_test' ? `Built-in (${count} answers)` : (key ? `Loaded (${count} answers)` : 'Not set')}
-	                        </div>
-	                      </div>
-	                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-	                        {t.akUrl && (
-	                          <button
-	                            className="btn btn-outline"
-	                            disabled={testKeyStatus.loading}
+		            <div style={{ display: 'grid', gap: 12 }}>
+		              {TESTS.map((t) => {
+		                const builtIn = getAnswerKeyBySection(t.id)
+		                const stored = keysByTest?.[t.id] || null
+		                const builtInCount = countKey(builtIn)
+		                const storedCount = countKey(stored)
+		                const showCount = builtIn ? builtInCount : storedCount
+		                return (
+		                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+		                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+		                      <div>
+		                        <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
+		                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+		                          Answer key: {builtIn
+		                            ? `Built-in (${builtInCount} answers)`
+		                            : (stored ? `Loaded (${storedCount} answers)` : 'Not set')}
+		                          {stored && builtIn && storedCount !== builtInCount && (
+		                            <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 800 }}>
+		                              (DB has {storedCount})
+		                            </span>
+		                          )}
+		                        </div>
+		                      </div>
+		                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+		                        {t.akUrl && (
+		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key PDF">
+		                            Open AK →
+		                          </a>
+		                        )}
+		                        {builtIn && storedCount && storedCount !== builtInCount && t.id !== 'pre_test' && (
+		                          <button
+		                            className="btn btn-outline"
+		                            disabled={testKeyStatus.loading}
+		                            onClick={async () => {
+		                              setTestKeyStatus({ loading: true, msg: `Fixing ${t.label} answer key to ${builtInCount}…` })
+		                              try {
+		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: builtIn, updated_at: new Date().toISOString() })
+		                                if (up.error) throw up.error
+		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: builtIn }))
+		                                setTestKeyStatus({ loading: false, msg: `✅ Fixed ${t.label} (${builtInCount} answers)` })
+		                              } catch (e) {
+		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${e?.message || 'Could not fix key'}` })
+		                              }
+		                            }}
+		                            title="Your database has an older/incomplete key. This overwrites it with the built-in full key."
+		                          >
+		                            Fix to {builtInCount}
+		                          </button>
+		                        )}
+		                        {t.akUrl && (
+		                          <button
+		                            className="btn btn-outline"
+		                            disabled={testKeyStatus.loading}
 		                            onClick={async () => {
 		                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key…` })
 		                              try {
-		                                const res = await fetch(t.akUrl)
-		                                if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
-		                                const buf = new Uint8Array(await res.arrayBuffer())
-		                                const parsed = await extractAnswerKeyFromPdf(buf)
-		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+		                                // Prefer the app's bundled built-in key when available (avoids partial PDF parsing).
+		                                const fromBuiltIn = getAnswerKeyBySection(t.id)
+		                                const toSave = fromBuiltIn || (await (async () => {
+		                                  const res = await fetch(t.akUrl)
+		                                  if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
+		                                  const buf = new Uint8Array(await res.arrayBuffer())
+		                                  return await extractAnswerKeyFromPdf(buf)
+		                                })())
+		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: toSave, updated_at: new Date().toISOString() })
 		                                if (up.error) throw up.error
-		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
-		                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length} answers)` })
+		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: toSave }))
+		                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${countKey(toSave)} answers)` })
 		                              } catch (e) {
 		                                const msg = String(e?.message || 'Import failed')
 		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
@@ -629,9 +675,9 @@ export default function Admin() {
 	                            Import bundled AK
 	                          </button>
 	                        )}
-	                        {t.id !== 'pre_test' && (
-	                          <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-	                            Upload AK PDF…
+		                        {t.id !== 'pre_test' && (
+		                          <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
+		                            Upload AK PDF…
 	                            <input
 	                              type="file"
 	                              accept="application/pdf"
@@ -642,27 +688,7 @@ export default function Admin() {
 	                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
 		                              try {
 		                                const buf = new Uint8Array(await file.arrayBuffer())
-		                                let parsed
-		                                if (t.id === FINAL_TEST_ID) {
-	                                  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
-	                                  let text = ''
-	                                  for (let p = 1; p <= pdf.numPages; p++) {
-	                                    const page = await pdf.getPage(p)
-	                                    const tc = await page.getTextContent()
-	                                    text += ' ' + tc.items.map(i => i.str).join(' ')
-	                                  }
-	                                  const map = {}
-	                                  const re = /(^|\\s)(\\d{1,3})\\s*([A-D])(?=\\s|$)/g
-	                                  let m
-	                                  while ((m = re.exec(text)) !== null) {
-	                                    const n = parseInt(m[2], 10)
-	                                    if (!Number.isFinite(n)) continue
-	                                    map[n] = m[3].toUpperCase()
-	                                  }
-		                                  parsed = map
-		                                } else {
-		                                  parsed = await extractAnswerKeyFromPdf(buf)
-		                                }
+		                                const parsed = await extractAnswerKeyFromPdf(buf)
 		                                const parsedCount = parsed?.rw_m1
 		                                  ? (Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length)
 		                                  : Object.keys(parsed || {}).length
@@ -684,13 +710,13 @@ export default function Admin() {
 	                            />
 	                          </label>
 	                        )}
-	                        <a className="btn btn-outline" href={t.pdfUrl} target="_blank" rel="noreferrer">Open PDF →</a>
-	                      </div>
-	                    </div>
-	                  </div>
-	                )
-	              })}
-	            </div>
+		                        <a className="btn btn-outline" href={t.pdfUrl} target="_blank" rel="noreferrer">Open PDF →</a>
+		                      </div>
+		                    </div>
+		                  </div>
+		                )
+		              })}
+		            </div>
 
 	            {testKeyStatus.msg && (
 	              <div style={{ marginTop: 12, fontSize: 12, color: testKeyStatus.msg.startsWith('✅') ? '#10b981' : '#ef4444', fontWeight: 900 }}>
@@ -698,11 +724,11 @@ export default function Admin() {
 	              </div>
 	            )}
 
-	            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-	              Final Test page: <Link to="/final" style={{ color: '#1a2744', fontWeight: 800 }}>Open →</Link>
-	            </div>
-	          </div>
-	        )}
+		            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+		              Final Test page: <Link to="/final" style={{ color: '#1a2744', fontWeight: 800 }}>Open →</Link>
+		            </div>
+		          </div>
+		        )}
       </div>
     </div>
   )

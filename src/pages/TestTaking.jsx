@@ -118,7 +118,7 @@ function BreakScreen({ nextModule, onContinue }) {
 
 export default function TestTaking() {
   const { attemptId } = useParams()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
 
   const [attempt, setAttempt] = useState(null)
@@ -587,7 +587,29 @@ export default function TestTaking() {
 	                  {Number.isFinite(Number(overridePage)) ? ' · (override)' : ` · offset ${pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}`}
 	                </span>
 	              </div>
-	              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+	              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <a
+                    className="btn btn-outline"
+                    style={{ padding: '6px 10px', fontSize: 12 }}
+                    href={testConfig?.pdfUrl || '/practice-test-11.pdf'}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open the full test PDF in a new tab"
+                  >
+                    Open PDF →
+                  </a>
+                  {profile?.role === 'admin' && testConfig?.akUrl && (
+                    <a
+                      className="btn btn-outline"
+                      style={{ padding: '6px 10px', fontSize: 12 }}
+                      href={testConfig.akUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Admin-only: open the answer key PDF in a new tab"
+                    >
+                      Open AK →
+                    </a>
+                  )}
 	                <button
 	                  className="btn btn-outline"
 	                  style={{ padding: '6px 10px', fontSize: 12 }}

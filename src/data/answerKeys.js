@@ -4,6 +4,13 @@ import { EXTRA_ANSWER_KEYS } from './extraAnswerKeys.js'
 export function getAnswerKeyBySection(testId) {
   const id = String(testId || '')
   if (id === 'pre_test' || id === 'practice_test_11' || !id) return ANSWER_KEY
-  return EXTRA_ANSWER_KEYS?.[id] || null
+  if (EXTRA_ANSWER_KEYS?.[id]) return EXTRA_ANSWER_KEYS[id]
+  // For tests like `final_test`, the key can be parsed at runtime and cached in localStorage.
+  try {
+    const raw = localStorage.getItem('agora_answer_keys_cache_v1')
+    const obj = raw ? JSON.parse(raw) : {}
+    return obj?.[id] || null
+  } catch {
+    return null
+  }
 }
-
