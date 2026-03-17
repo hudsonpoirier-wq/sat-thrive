@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 
 export default function Login() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,10 +22,17 @@ export default function Login() {
       else setSuccess('Reset link sent. Check your email to set a new password.')
     } else if (mode === 'signup') {
       if (!fullName.trim()) { setError('Please enter your full name'); setLoading(false); return }
-      const { error } = await signUp(email, password, fullName)
+      const { data, error } = await signUp(email, password, fullName)
       if (error) setError(error.message)
       else {
-        setSuccess('Account created! Check your email to confirm, then sign in.')
+        // If "Confirm email" is OFF in Supabase, signUp returns a session immediately.
+        if (data?.session) {
+          setSuccess('Account created! Signing you in…')
+          setLoading(false)
+          navigate('/dashboard', { replace: true })
+          return
+        }
+        setSuccess('Account created! You can sign in now.')
         // Most users expect to sign in next; keep their email filled.
         setMode('signin')
         setPassword('')
