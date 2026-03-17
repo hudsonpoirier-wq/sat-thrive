@@ -6,7 +6,7 @@ import { clearAdminTestingData } from '../lib/studyProgress.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
-import { ANSWER_KEY } from '../data/testData.js'
+import { ANSWER_KEY, MODULES, freeResponseMatches, rawToScaled } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
@@ -392,21 +392,67 @@ export default function Admin() {
     const activeUsers7 = new Set()
     const activeUsers30 = new Set()
 
+    const isChoiceLetter = (v) => {
+      const s = String(v || '').trim().toUpperCase()
+      return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+    }
+
+    const computeScaledFromAnswers = (attempt) => {
+      try {
+        const tid = normalizeTestId(attempt?.test_id)
+        const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
+        if (!keyBySection) return null
+        const answers = attempt?.answers || {}
+        const scoreSection = (section) => {
+          const key = keyBySection?.[section] || {}
+          const sectionAnswers = answers?.[section] || {}
+          const totalQ = MODULES?.[section]?.questions || 0
+          let correct = 0
+          for (let q = 1; q <= totalQ; q++) {
+            const right = key?.[q]
+            if (right == null) continue
+            const given = sectionAnswers?.[q]
+            const ok = isChoiceLetter(right)
+              ? String(given || '').toUpperCase() === String(right).toUpperCase()
+              : freeResponseMatches(given, right)
+            if (ok) correct++
+          }
+          return correct
+        }
+        const rawRW = scoreSection('rw_m1') + scoreSection('rw_m2')
+        const rawMath = scoreSection('math_m1') + scoreSection('math_m2')
+        const scaled = rawToScaled(rawRW, rawMath)
+        return scaled?.total ? scaled : null
+      } catch {
+        return null
+      }
+    }
+
     for (const a of allAttempts) {
       const tid = normalizeTestId(a.test_id)
       const sc = a.scores || {}
-      const total = Number(sc.total || 0)
-      const rw = Number(sc.rw || 0)
-      const math = Number(sc.math || 0)
+      let total = Number(sc.total || 0)
+      let rw = Number(sc.rw || 0)
+      let math = Number(sc.math || 0)
       const started = new Date(a.started_at || a.completed_at || 0).getTime()
+
+      // Some older rows only stored `total` (or lost section splits). Recompute from answers when possible.
+      if (total && (!rw || !math) && a.answers && Object.keys(a.answers || {}).length) {
+        const computed = computeScaledFromAnswers(a)
+        if (computed) {
+          if (!rw) rw = Number(computed.rw || 0)
+          if (!math) math = Number(computed.math || 0)
+          if (!total) total = Number(computed.total || 0)
+        }
+      }
 
       if (started && started >= recent7) activeUsers7.add(a.user_id)
       if (started && started >= recent30) activeUsers30.add(a.user_id)
 
       if (total) {
         totals.push(total)
-        sectionRW.push(rw || 0)
-        sectionMath.push(math || 0)
+        if (rw) sectionRW.push(rw)
+        if (math) sectionMath.push(math)
         if (isPreTestId(tid)) totalsPre.push(total)
         else if (tid === FINAL_TEST_ID) totalsFinal.push(total)
         else totalsExtra.push(total)
@@ -414,8 +460,8 @@ export default function Admin() {
         const row = byTest.get(tid) || { count: 0, totals: [], rw: [], math: [] }
         row.count += 1
         row.totals.push(total)
-        row.rw.push(rw || 0)
-        row.math.push(math || 0)
+        if (rw) row.rw.push(rw)
+        if (math) row.math.push(math)
         byTest.set(tid, row)
       }
 
@@ -528,21 +574,21 @@ export default function Admin() {
       datasets: [
         {
           label: 'Avg Total',
-          data: testRows.map(r => Math.round(r.avgTotal || 0)),
+          data: testRows.map(r => (Number.isFinite(Number(r.avgTotal)) ? Math.round(r.avgTotal) : null)),
           backgroundColor: '#1a2744',
           borderRadius: 6,
           borderSkipped: false,
         },
         {
           label: 'Avg R&W',
-          data: testRows.map(r => Math.round(r.avgRW || 0)),
+          data: testRows.map(r => (Number.isFinite(Number(r.avgRW)) ? Math.round(r.avgRW) : null)),
           backgroundColor: '#0ea5e9',
           borderRadius: 6,
           borderSkipped: false,
         },
         {
           label: 'Avg Math',
-          data: testRows.map(r => Math.round(r.avgMath || 0)),
+          data: testRows.map(r => (Number.isFinite(Number(r.avgMath)) ? Math.round(r.avgMath) : null)),
           backgroundColor: '#f59e0b',
           borderRadius: 6,
           borderSkipped: false,
