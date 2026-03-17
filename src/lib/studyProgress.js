@@ -72,6 +72,24 @@ export async function setChapterGuidePractice(userId, chapterId, guideMap, exist
     })
 }
 
+export async function markChapterGuideStarted(userId, chapterId, existingPractice) {
+  if (!userId || !chapterId) return
+  const nowIso = new Date().toISOString()
+  const base = (existingPractice && typeof existingPractice === 'object') ? existingPractice : {}
+  const meta = (base.meta && typeof base.meta === 'object') ? base.meta : {}
+  if (meta.guide_started_at) return
+  const nextPractice = { ...base, meta: { ...meta, guide_started_at: nowIso } }
+  if (!supabase) return
+  await supabase
+    .from('studied_topics')
+    .upsert({
+      user_id: userId,
+      chapter_id: chapterId,
+      practice: nextPractice,
+      updated_at: nowIso,
+    })
+}
+
 export async function clearAdminTestingData(userId) {
   if (!userId || !supabase) return
   // Best-effort cleanup; safe even if some columns/tables aren't migrated yet.

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
-import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice } from '../lib/studyProgress.js'
+import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapterGuideStarted } from '../lib/studyProgress.js'
 
 function Navbar() {
   return (
@@ -33,9 +33,11 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
             {chs.map(ch => {
               const hasGuide = Boolean(GUIDE_CONTENT[ch.id])
               const done = Boolean(completedMap[ch.id])
-              const guideMap = extractGuideMap(practiceByChapter?.[ch.id] || {})
+              const practice = practiceByChapter?.[ch.id] || {}
+              const guideMap = extractGuideMap(practice)
               const correctCount = Object.values(guideMap || {}).filter(Boolean).length
-              const inProgress = !done && correctCount > 0
+              const started = Boolean(practice?.meta?.guide_started_at) || Object.keys(guideMap || {}).length > 0
+              const inProgress = !done && started
               const status = done ? 'Completed' : inProgress ? 'In progress' : 'Not started'
               const statusColor = done ? '#10b981' : inProgress ? '#f59e0b' : '#ef4444'
               const statusBg = done ? 'rgba(16,185,129,.10)' : inProgress ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.10)'
@@ -138,8 +140,12 @@ function buildHintLadder(concepts, seed, isMC) {
 function extractGuideMap(practice) {
   if (!practice || typeof practice !== 'object') return {}
   if (practice.guide && typeof practice.guide === 'object') return practice.guide
-  // Legacy format: practice stored directly as { [idx]: true }
-  return practice
+  // Legacy format: practice stored directly as { [idx]: true } (numeric keys).
+  const keys = Object.keys(practice || {})
+  const looksLikeLegacy = keys.length > 0 && keys.every(k => /^\d+$/.test(String(k)))
+  if (looksLikeLegacy) return practice
+  // If the row only has test metadata (ex: practice.test.correct/total), that does NOT mean the guide is in progress.
+  return {}
 }
 
 function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
@@ -327,6 +333,19 @@ export default function Guide() {
       setPracticeByChapter(practiceByChapter || {})
     })
   }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id || !selectedId) return
+    const existingPractice = practiceByChapter?.[selectedId] || {}
+    if (existingPractice?.meta?.guide_started_at) return
+    // Mark the chapter as "started" so the dashboard list reflects In progress only after opening it.
+    markChapterGuideStarted(user.id, selectedId, existingPractice).catch(() => {})
+    setPracticeByChapter(prev => {
+      const base = prev?.[selectedId] && typeof prev[selectedId] === 'object' ? prev[selectedId] : {}
+      const meta = base.meta && typeof base.meta === 'object' ? base.meta : {}
+      return { ...(prev || {}), [selectedId]: { ...base, meta: { ...meta, guide_started_at: new Date().toISOString() } } }
+    })
+  }, [user?.id, selectedId])
 
   const domains = useMemo(() => {
     const grouped = {}

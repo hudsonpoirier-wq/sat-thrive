@@ -17,15 +17,17 @@ function fileLabel(url) {
   }
 }
 
-export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2 }) {
+export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, crop = null }) {
   const canvasRef = useRef(null)
   const [status, setStatus] = useState('loading')
   const [retryNonce, setRetryNonce] = useState(0)
   const renderTask = useRef(null)
+  const autoRetriedRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
     setStatus('loading')
+    autoRetriedRef.current = false
 
     async function render() {
       if (cancelled) return
@@ -56,17 +58,59 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2 }) {
       const z = Number.isFinite(Number(zoom)) ? Math.max(0.5, Math.min(3, Number(zoom))) : 1
       const cap = Number.isFinite(Number(maxScale)) ? Math.max(1, Number(maxScale)) : 2
       const scale = Math.min(base * z, cap)
-      const scaledViewport = page.getViewport({ scale })
-
-      canvas.width = scaledViewport.width
-      canvas.height = scaledViewport.height
+      const cssViewport = page.getViewport({ scale })
+      const outputScale = (typeof window !== 'undefined' && window?.devicePixelRatio) ? Math.min(2.5, Math.max(1, window.devicePixelRatio)) : 1
+      const renderViewport = page.getViewport({ scale: scale * outputScale })
 
       if (renderTask.current) {
         renderTask.current.cancel()
       }
 
       const ctx = canvas.getContext('2d')
-      renderTask.current = page.render({ canvasContext: ctx, viewport: scaledViewport })
+      if (!ctx) return
+
+      const norm = (v, fallback) => {
+        const n = Number(v)
+        if (!Number.isFinite(n)) return fallback
+        return Math.max(0, Math.min(1, n))
+      }
+      const hasCrop = crop && typeof crop === 'object'
+      const cx = hasCrop ? norm(crop.x, 0) : 0
+      const cy = hasCrop ? norm(crop.y, 0) : 0
+      const cw = hasCrop ? Math.max(0.05, norm(crop.w, 1)) : 1
+      const ch = hasCrop ? Math.max(0.05, norm(crop.h, 1)) : 1
+
+      if (!hasCrop) {
+        canvas.width = Math.floor(renderViewport.width)
+        canvas.height = Math.floor(renderViewport.height)
+        canvas.style.width = '100%'
+        canvas.style.height = `${Math.round(cssViewport.height)}px`
+        renderTask.current = page.render({ canvasContext: ctx, viewport: renderViewport })
+      } else {
+        const off = document.createElement('canvas')
+        off.width = Math.floor(renderViewport.width)
+        off.height = Math.floor(renderViewport.height)
+        const offCtx = off.getContext('2d')
+        if (!offCtx) return
+        renderTask.current = page.render({ canvasContext: offCtx, viewport: renderViewport })
+        await renderTask.current.promise
+        if (cancelled) return
+
+        const sx = Math.floor(cx * off.width)
+        const sy = Math.floor(cy * off.height)
+        const sw = Math.max(1, Math.floor(cw * off.width))
+        const sh = Math.max(1, Math.floor(ch * off.height))
+
+        canvas.width = sw
+        canvas.height = sh
+        canvas.style.width = '100%'
+        const displayHeight = Math.round((sh / Math.max(1, sw)) * containerWidth)
+        canvas.style.height = `${Math.max(180, displayHeight)}px`
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(off, sx, sy, sw, sh, 0, 0, sw, sh)
+        if (!cancelled) setStatus('done')
+        return
+      }
       try {
         await renderTask.current.promise
         if (!cancelled) setStatus('done')
@@ -75,13 +119,25 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2 }) {
       }
     }
 
-    render().catch(() => { if (!cancelled) setStatus('error') })
+    render().catch(() => {
+      if (cancelled) return
+      setStatus('error')
+      // Auto-retry once on transient failures (prevents “refresh fixes it” glitches).
+      if (!autoRetriedRef.current) {
+        autoRetriedRef.current = true
+        setTimeout(() => {
+          if (cancelled) return
+          try { delete pdfCache[String(pdfUrl || '').trim()] } catch {}
+          setRetryNonce((n) => n + 1)
+        }, 600)
+      }
+    })
 
     return () => {
       cancelled = true
       if (renderTask.current) renderTask.current.cancel()
     }
-  }, [pdfUrl, pageIndex, zoom, maxScale, retryNonce])
+  }, [pdfUrl, pageIndex, zoom, maxScale, crop, retryNonce])
 
   return (
     <div className="pdf-canvas-wrap" style={{ position: 'relative', width: '100%' }}>

@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
+import { buildWeeklyStudyPlan, loadStudyPrefs } from '../lib/studyPlan.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -74,6 +74,8 @@ export default function Dashboard() {
   const [confirmStart, setConfirmStart] = useState(false)
   const [reviewItems, setReviewItems] = useState({})
   const [mistakes, setMistakes] = useState([])
+  const [planText, setPlanText] = useState('')
+  const [rebalancing, setRebalancing] = useState(false)
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!user?.id || !attemptId) return false
@@ -131,6 +133,10 @@ export default function Dashboard() {
       const rows = a.data || []
       setAttempts(rows)
       setPostScores(p.data || [])
+      try {
+        const firstCompleted = (rows || []).find(r => r.completed_at || r.scores?.total) || null
+        setPlanText(firstCompleted?.study_plan || '')
+      } catch {}
       getStudiedTopics(user.id).then(({ map, rows: stRows }) => {
         setStudied(map || {})
         setStudiedRows(stRows || [])
@@ -198,6 +204,11 @@ export default function Dashboard() {
   const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
   const studiedCount = Object.values(studied).filter(Boolean).length
   const studiedPct = Math.round((studiedCount / 34) * 100)
+  const hasStartedGuide = (studiedRows || []).some((r) => {
+    const g = r?.practice?.guide
+    if (r?.practice?.meta?.guide_started_at) return true
+    return g && typeof g === 'object' && Object.values(g).some(Boolean)
+  })
   const hasStudyPlan = completed.some(a => a.study_plan)
   const extraTests = TESTS.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
@@ -217,28 +228,6 @@ export default function Dashboard() {
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
   })()
-
-  const activityKeys = (() => {
-    const set = new Set()
-    attempts.forEach((a) => {
-      const k1 = toLocalDateKey(a.started_at)
-      const k2 = toLocalDateKey(a.completed_at)
-      if (k1) set.add(k1)
-      if (k2) set.add(k2)
-    })
-    studiedRows.forEach((r) => {
-      const k1 = toLocalDateKey(r.updated_at)
-      const k2 = toLocalDateKey(r.completed_at)
-      if (k1) set.add(k1)
-      if (k2) set.add(k2)
-    })
-    Object.values(reviewItems || {}).forEach((it) => {
-      const k = toLocalDateKey(it?.last_reviewed_at)
-      if (k) set.add(k)
-    })
-    return set
-  })()
-  const streak = computeStreak(activityKeys)
 
   const trendAttempts = completed
     .map(a => ({ a, scores: a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {}) }))
@@ -293,45 +282,6 @@ export default function Dashboard() {
               <div className="stat-sub">{s.sub}</div>
             </div>
           ))}
-        </div>
-
-        {/* Momentum */}
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div>
-              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>⚡ Momentum</h2>
-              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                Keep the streak and clear your review queue.
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button className="btn btn-outline" onClick={() => navigate('/mistakes')}>Mistake Notebook →</button>
-              <button className="btn btn-primary" onClick={() => navigate('/review')}>
-                Review Due {dueReviews ? `(${dueReviews})` : ''}
-              </button>
-              <button className="btn btn-outline" onClick={() => navigate('/report')}>Progress Report →</button>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 14 }}>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Streak</div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
-                {streak.current} day{streak.current === 1 ? '' : 's'}
-              </div>
-              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>Best: {streak.best} days</div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Review Queue</div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
-                {dueReviews} due
-              </div>
-              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>
-                Clear this to lock in weak topics.
-              </div>
-            </div>
-          </div>
         </div>
 
 	        {/* Pre Test CTA (hidden after completion) */}
@@ -401,36 +351,102 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
-            {[
-              { title: '1) Take the Pretest', done: hasTakenPretest, desc: 'Complete the Pre Test.' },
-              { title: '2) Review Results', done: hasTakenPretest && viewedLatestResults, desc: 'Open your results and identify the weak topics.' },
-              { title: '3) Create a Study Plan', done: hasStudyPlan, desc: 'Generate and follow your 8-week plan.' },
-              { title: '4) Complete Study Guide', done: studiedCount >= 34, desc: 'Work through all chapters and get every question correct to mark it complete.' },
-              { title: '5) Review Missed Questions', done: reviewJourneyStatus === 'DONE', status: reviewJourneyStatus, desc: `Redo missed questions from your most recent test. Validated: ${latestValidated}/${latestMistakes.length}.` },
-            ].map((s) => (
-              <div key={s.title} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                  <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
-                  {s.status ? (
-                    <div style={{ fontSize: 12, fontWeight: 900, color: s.status === 'DONE' ? '#10b981' : s.status === 'IN PROGRESS' ? '#f59e0b' : s.status === 'NOT STARTED' ? '#ef4444' : '#94a3b8' }}>
-                      {s.status}
+            {(() => {
+              const toReview = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
+              const steps = [
+                {
+                  title: '1) Take the Pretest',
+                  status: hasTakenPretest ? 'DONE' : (preInProgress ? 'IN PROGRESS' : 'TODO'),
+                  desc: 'Take the full timed Pre Test to set your baseline.',
+                  onClick: () => {
+                    if (preInProgress?.id) navigate(`/test/${preInProgress.id}`)
+                    else startNewTest('pre_test')
+                  },
+                },
+                {
+                  title: '2) Start Study Guide',
+                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
+                  desc: 'Open the Study Guide and start mastering chapters (25/25).',
+                  onClick: () => navigate('/guide'),
+                },
+                {
+                  title: '3) Review Results',
+                  status: !hasTakenPretest ? 'LOCKED' : (viewedLatestResults ? 'DONE' : 'TODO'),
+                  desc: latestCompleted?.id ? 'Open your most recent results and identify weak topics.' : 'Complete a test to unlock results.',
+                  onClick: () => {
+                    if (!latestCompleted?.id) return
+                    navigate(`/results/${latestCompleted.id}`)
+                  },
+                },
+                {
+                  title: '4) Study Plan (Rebalances)',
+                  status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
+                  desc: 'Use your auto-generated weekly plan for guidance (updates after each test).',
+                  onClick: () => {
+                    const el = document.getElementById('study-plan-card')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  },
+                },
+                {
+                  title: '5) Review Missed Questions',
+                  status: !hasTakenPretest ? 'LOCKED' : reviewJourneyStatus,
+                  desc: !hasTakenPretest
+                    ? 'Take the Pre Test to generate your mistake list.'
+                    : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
+                  onClick: () => navigate('/mistakes'),
+                },
+                {
+                  title: '6) Progress Report',
+                  status: hasTakenPretest ? 'READY' : 'LOCKED',
+                  desc: 'View your charts, streak, missed-topic trends, and shareable report.',
+                  onClick: () => navigate('/report'),
+                },
+              ]
+
+              const statusColor = (st) => (
+                st === 'DONE' ? '#10b981'
+                  : st === 'IN PROGRESS' ? '#f59e0b'
+                    : st === 'NOT STARTED' ? '#ef4444'
+                      : st === 'READY' ? '#1a2744'
+                        : st === 'LOCKED' ? '#94a3b8'
+                          : '#94a3b8'
+              )
+
+              return steps.map((s) => {
+                const disabled = s.status === 'LOCKED'
+                return (
+                  <button
+                    key={s.title}
+                    onClick={s.onClick}
+                    disabled={disabled}
+                    style={{
+                      textAlign: 'left',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 14,
+                      padding: 14,
+                      background: disabled ? '#f1f5f9' : '#f8fafc',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      opacity: disabled ? 0.7 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
+                      <div style={{ fontSize: 12, fontWeight: 900, color: statusColor(s.status) }}>{s.status}</div>
                     </div>
-                  ) : (
-                    <div style={{ fontSize: 12, fontWeight: 900, color: s.done ? '#10b981' : '#94a3b8' }}>{s.done ? 'DONE' : 'TODO'}</div>
-                  )}
-                </div>
-                <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
-              </div>
-            ))}
+                    <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
+                  </button>
+                )
+              })
+            })()}
           </div>
 
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link to="/guide" className="btn btn-outline">Open Study Guide →</Link>
             <button className="btn btn-outline" onClick={() => navigate('/mistakes')} disabled={!hasTakenPretest}>
-              Mistake Notebook →
+              Mistake Notebook {dueReviews ? `(${dueReviews} due)` : ''} →
             </button>
-            <button className="btn btn-outline" onClick={() => navigate('/review')} disabled={!hasTakenPretest}>
-              Spaced Review {dueReviews ? `(${dueReviews})` : ''} →
+            <button className="btn btn-outline" onClick={() => navigate('/report')} disabled={!hasTakenPretest}>
+              Progress Report →
             </button>
             <button
               className="btn"
@@ -447,6 +463,70 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Study plan guidance (auto-rebalances) */}
+        {hasTakenPretest && (
+          <div id="study-plan-card" className="card" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Weekly Study Plan</h2>
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  Auto-generated from your most recent test. Rebalance anytime.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-outline"
+                  disabled={!planText}
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(String(planText || '')) } catch {}
+                  }}
+                >
+                  Copy
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={rebalancing || !latestCompleted}
+                  onClick={async () => {
+                    if (!latestCompleted) return
+                    setRebalancing(true)
+                    try {
+                      const prefs = loadStudyPrefs(user?.id)
+                      const txt = buildWeeklyStudyPlan({
+                        scores: latestCompleted?.scores || {},
+                        weakTopics: latestCompleted?.weak_topics || [],
+                        prefs,
+                      })
+                      setPlanText(txt)
+                      await supabase
+                        .from('test_attempts')
+                        .update({ study_plan: txt })
+                        .eq('id', latestCompleted.id)
+                        .eq('user_id', user.id)
+                    } catch {
+                      // no-op
+                    }
+                    setRebalancing(false)
+                  }}
+                >
+                  {rebalancing ? 'Rebalancing…' : 'Rebalance now'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14 }}>
+              {planText ? (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace', fontSize: 12.5, lineHeight: 1.65, color: '#0f172a' }}>
+                  {planText}
+                </pre>
+              ) : (
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  Your study plan will appear here after you submit a test.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Optional extra practice tests (hidden until pretest is taken) */}
         {hasTakenPretest && extraTests.length > 0 && (

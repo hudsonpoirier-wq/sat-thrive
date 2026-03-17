@@ -10,7 +10,6 @@ const Admin = lazy(() => import('./pages/Admin.jsx'))
 const Guide = lazy(() => import('./pages/Guide.jsx'))
 const FinalTest = lazy(() => import('./pages/FinalTest.jsx'))
 const Mistakes = lazy(() => import('./pages/Mistakes.jsx'))
-const Review = lazy(() => import('./pages/Review.jsx'))
 const Report = lazy(() => import('./pages/Report.jsx'))
 const Share = lazy(() => import('./pages/Share.jsx'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback.jsx'))
@@ -54,7 +53,6 @@ export default function App() {
             <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
             <Route path="/final" element={<ProtectedRoute><FinalTest /></ProtectedRoute>} />
             <Route path="/mistakes" element={<ProtectedRoute><Mistakes /></ProtectedRoute>} />
-            <Route path="/review" element={<ProtectedRoute><Review /></ProtectedRoute>} />
             <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
             <Route path="/share" element={<Share />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

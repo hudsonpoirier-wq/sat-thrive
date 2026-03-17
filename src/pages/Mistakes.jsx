@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
@@ -39,9 +39,40 @@ function pdfPageFor(testId, section, qNum) {
   return 0
 }
 
+function pageMapFor(testId, section) {
+  return (testId === 'pre_test')
+    ? (PDF_PAGE_MAP?.[section] || {})
+    : (EXTRA_PDF_PAGE_MAPS?.[testId]?.[section] || {})
+}
+
+function clamp01(n) {
+  if (!Number.isFinite(Number(n))) return 0
+  return Math.max(0, Math.min(1, Number(n)))
+}
+
+// Best-effort crop: split the current PDF page into vertical bands based on how many questions map to that page.
+// This avoids inaccurate “random crops” and usually contains the selected question.
+function cropForQuestion({ testId, section, qNum, pageIndex }) {
+  const map = pageMapFor(testId, section)
+  const samePageQs = Object.entries(map || {})
+    .map(([k, v]) => ({ q: Number(k), page: Number(v) }))
+    .filter(x => Number.isFinite(x.q) && Number.isFinite(x.page) && x.page === pageIndex)
+    .sort((a, b) => a.q - b.q)
+    .map(x => x.q)
+  if (samePageQs.length <= 1) {
+    return { x: 0.04, y: 0.06, w: 0.92, h: 0.86 }
+  }
+  const idx = Math.max(0, samePageQs.indexOf(Number(qNum)))
+  const center = (idx + 0.5) / samePageQs.length
+  const minH = 0.28
+  const bandH = Math.max(minH, Math.min(0.55, 1 / Math.min(4, samePageQs.length)))
+  const y = clamp01(center - bandH / 2 - 0.03)
+  const h = clamp01(bandH + 0.06)
+  return { x: 0.04, y, w: 0.92, h }
+}
+
 export default function Mistakes() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState([])
   const [reviewItems, setReviewItems] = useState({})
@@ -53,6 +84,7 @@ export default function Mistakes() {
   const [redoText, setRedoText] = useState('')
   const [redoFeedback, setRedoFeedback] = useState(null)
   const [redoSaving, setRedoSaving] = useState(false)
+  const [cropOn, setCropOn] = useState(true)
 
   useEffect(() => {
     if (!user?.id) return
@@ -81,6 +113,10 @@ export default function Mistakes() {
 
   const selectedCfg = selected ? getTestConfig(selected.test_id) : null
   const selectedPdfPage = selected ? pdfPageFor(selected.test_id, selected.section, selected.q_num) : 0
+  const selectedCrop = useMemo(() => {
+    if (!selected) return null
+    return cropForQuestion({ testId: selected.test_id, section: selected.section, qNum: selected.q_num, pageIndex: selectedPdfPage })
+  }, [selected?.id, selectedPdfPage])
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
   const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
@@ -92,6 +128,7 @@ export default function Mistakes() {
     setRedoText('')
     setRedoFeedback(null)
     setRedoSaving(false)
+    setCropOn(true)
   }, [selectedItemKey])
 
   if (loading) {
@@ -116,9 +153,6 @@ export default function Mistakes() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="btn btn-outline" onClick={() => setFilterDue(v => !v)}>
               {filterDue ? 'Showing: Due now' : `Filter: Due now (${dueCount})`}
-            </button>
-            <button className="btn btn-primary" onClick={() => navigate('/review')}>
-              Review Due →
             </button>
           </div>
         </div>
@@ -187,17 +221,17 @@ export default function Mistakes() {
                     </div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
-                      <button className="btn btn-primary" onClick={() => navigate(`/review?item=${encodeURIComponent(`${selected.test_id}:${selected.section}:${selected.q_num}`)}`)}>
-                        Review this →
-                      </button>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                     <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                      Tip: Use the zoom controls to focus on the exact question.
+                      Tip: Use Crop + Zoom to focus on the exact question.
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setCropOn(v => !v)}>
+                        {cropOn ? 'Cropped view' : 'Full page'}
+                      </button>
                       <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.2) * 10) / 10))}>− Zoom</button>
                       <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, minWidth: 74, textAlign: 'center' }}>
                         {Math.round(zoom * 100)}%
@@ -207,7 +241,13 @@ export default function Mistakes() {
                   </div>
 
                   <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
-                    <PDFPage pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} pageIndex={selectedPdfPage} zoom={zoom} maxScale={3.2} />
+                    <PDFPage
+                      pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
+                      pageIndex={selectedPdfPage}
+                      zoom={zoom}
+                      maxScale={3.2}
+                      crop={cropOn ? selectedCrop : null}
+                    />
                   </div>
 
                   <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
