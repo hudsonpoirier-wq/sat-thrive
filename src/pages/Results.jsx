@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import { buildPlanFromAttempt, loadStudyPrefs, saveStudyPrefs, dayLabels } from '../lib/studyPlan.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -127,7 +128,7 @@ export default function Results() {
   const [loading, setLoading] = useState(true)
   const [plan, setPlan] = useState('')
   const [generatingPlan, setGeneratingPlan] = useState(false)
-  const [planSaved, setPlanSaved] = useState(false)
+  const [prefs, setPrefs] = useState(() => loadStudyPrefs(user?.id))
 
   useEffect(() => {
     if (!supabase || !user?.id) return
@@ -137,6 +138,11 @@ export default function Results() {
         if (!data.completed_at) { navigate(`/test/${attemptId}`); return }
         setAttempt(data)
         if (data.study_plan) setPlan(data.study_plan)
+        else {
+          const txt = buildPlanFromAttempt(data, user.id)
+          setPlan(txt)
+          supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', user.id).catch(() => {})
+        }
         setLoading(false)
       })
   }, [attemptId, user?.id, navigate])
@@ -144,53 +150,13 @@ export default function Results() {
   async function generatePlan() {
     setGeneratingPlan(true)
     try {
-      const txt = buildStudyPlan(attempt)
+      const txt = buildPlanFromAttempt(attempt, user.id)
       setPlan(txt)
       await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', user.id)
-      setPlanSaved(true)
     } catch (e) {
       setPlan('Error generating plan. Please try again.')
     }
     setGeneratingPlan(false)
-  }
-
-  function buildStudyPlan(a) {
-    const scores = a.scores || {}
-    const weakTopics = Array.isArray(a.weak_topics) ? a.weak_topics.slice() : []
-    weakTopics.sort((x, y) => (y.count || 0) - (x.count || 0))
-    const top = weakTopics.slice(0, 3)
-
-    const lines = []
-    lines.push('▶ SCORE ASSESSMENT')
-    lines.push(`Current score: ${scores.total || '—'} (R&W: ${scores.rw || '—'}, Math: ${scores.math || '—'}).`)
-    lines.push('This 8-week plan targets your highest-missed Playbook areas first, then builds speed + accuracy with mixed sets.')
-    lines.push('')
-
-    lines.push('🔴 TOP 3 PRIORITIES')
-    if (top.length) {
-      top.forEach((t, i) => {
-        const ch = t.ch ? `Ch ${t.ch}` : 'Ch ?'
-        const pg = t.page ? `p.${t.page}` : 'p.?'
-        const misses = t.count ? `${t.count} missed` : 'missed'
-        lines.push(`${i + 1}) ${t.name || 'Topic'} — ${ch}, ${pg} — ${misses}`)
-      })
-    } else {
-      lines.push('1) No weak topics identified — focus on timed mixed practice + an error log.')
-    }
-    lines.push('')
-
-    lines.push('📅 8-WEEK ROADMAP')
-    lines.push(`Weeks 1–2: Fix top weakness (${top[0]?.name || 'highest-missed area'}). 3 drills/week + 1 timed mini-set; review every mistake.`)
-    lines.push(`Weeks 3–4: Fix #2 weakness (${top[1]?.name || 'next priority'}). Add 2 mixed-topic sets/week to keep earlier skills fresh.`)
-    lines.push(`Weeks 5–6: Fix #3 weakness (${top[2]?.name || 'third priority'}). Increase timing pressure; practice skipping + returning.`)
-    lines.push('Weeks 7–8: Full SAT simulation: 1 full test/week + deep review. Re-drill recurring error types from your log.')
-    lines.push('')
-
-    lines.push('📌 TUTOR NOTES')
-    lines.push('• Track every miss: why it happened + the rule to prevent it next time.')
-    lines.push('• 30–45 minutes/day beats weekend cram sessions.')
-    lines.push('• After each timed set: redo missed questions untimed until you can explain the logic.')
-    return lines.join('\n')
   }
 
   if (loading) return (
@@ -316,21 +282,65 @@ export default function Results() {
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16 }}>
             <div>
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 2 }}>📚 Your 8-Week Study Plan</h3>
-              <p style={{ fontSize: 13, color: '#64748b' }}>AI-generated plan mapped to exact Playbook chapters</p>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>🧭 Weekly Study Plan</h3>
+              <p style={{ fontSize: 13, color: '#64748b' }}>Auto-built from your missed topics and your available days.</p>
             </div>
             <button className="btn btn-primary" onClick={generatePlan} disabled={generatingPlan} style={{ flexShrink: 0 }}>
-              {generatingPlan ? <><span className="spinner" /> Generating…</> : plan ? '🔄 Regenerate' : '🤖 Generate Plan'}
+              {generatingPlan ? <><span className="spinner" /> Updating…</> : plan ? '🔄 Rebalance' : '🤖 Build Plan'}
             </button>
           </div>
+
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 10 }}>
+              Availability
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {dayLabels().map((d, i) => (
+                <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#1a2744', fontWeight: 900 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!prefs?.days?.[i]}
+                    onChange={(e) => {
+                      const next = { ...(prefs || loadStudyPrefs(user.id)) }
+                      next.days = (next.days || Array(7).fill(false)).map(Boolean)
+                      next.days[i] = e.target.checked
+                      setPrefs(next)
+                      try { saveStudyPrefs(user.id, next) } catch {}
+                    }}
+                  />
+                  {d}
+                </label>
+              ))}
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Minutes/day</div>
+                <input
+                  type="number"
+                  min={20}
+                  max={180}
+                  value={prefs?.minutesPerDay || 45}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    const next = { ...(prefs || loadStudyPrefs(user.id)), minutesPerDay: v }
+                    setPrefs(next)
+                    try { saveStudyPrefs(user.id, next) } catch {}
+                  }}
+                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, background: 'white' }}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+              Update your days/minutes, then tap “Rebalance”.
+            </div>
+          </div>
+
           {plan ? (
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8, color: '#374151', background: '#f8fafc', borderRadius: 12, padding: 20, borderLeft: '4px solid #f59e0b' }}>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8, color: '#374151', background: '#ffffff', borderRadius: 12, padding: 18, border: '1px solid #e2e8f0' }}>
               {plan}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 24px', color: '#94a3b8' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
-              <div>Click "Generate Plan" to get your personalized 8-week roadmap</div>
+              <div>Tap “Build Plan” to create your weekly schedule.</div>
             </div>
           )}
         </div>

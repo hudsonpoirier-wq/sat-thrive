@@ -12,6 +12,7 @@ import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { saveMistakes, ensureReviewItems } from '../lib/mistakesStore.js'
+import { buildWeeklyStudyPlan, loadStudyPrefs } from '../lib/studyPlan.js'
 
 function isChoiceLetter(v) {
   const s = String(v || '').trim().toUpperCase()
@@ -142,6 +143,33 @@ export default function TestTaking() {
   const pendingSave = useRef(null)
   const saveInFlight = useRef(false)
 
+  function readDraft() {
+    try {
+      const key = `agora_attempt_draft_v1:${attemptId}`
+      const raw = localStorage.getItem(key)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }
+
+  function writeLastOpen(next) {
+    try {
+      const key = `agora_last_open_v1:${attemptId}`
+      localStorage.setItem(key, JSON.stringify({ attemptId, ...next, updated_at: new Date().toISOString() }))
+    } catch {}
+  }
+
+  function readLastOpen() {
+    try {
+      const key = `agora_last_open_v1:${attemptId}`
+      const raw = localStorage.getItem(key)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     try {
       const rawV2 = localStorage.getItem('agora_pdf_offsets_v2')
@@ -208,13 +236,39 @@ export default function TestTaking() {
   useEffect(() => {
     if (!supabase || !user?.id) return
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (!data) { navigate('/dashboard'); return }
+      .then(({ data, error }) => {
+        if (error || !data) {
+          // Offline fallback: open the locally saved draft (answers + timing), but disable submit.
+          const draft = readDraft()
+          if (!draft) { navigate('/dashboard'); return }
+          const cfg = getTestConfig(draft.test_id) || getTestConfig('pre_test')
+          setAttempt({
+            id: attemptId,
+            user_id: user.id,
+            test_id: draft.test_id || cfg?.id || 'pre_test',
+            current_section: draft.current_section || 'rw_m1',
+            answers: draft.answers || {},
+            module_time_remaining: draft.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 },
+            completed_at: null,
+          })
+          setTestConfig(cfg)
+          const last = readLastOpen()
+          const mod = last?.current_section || draft.current_section || 'rw_m1'
+          setCurrentModule(mod)
+          setCurrentQ(Number(last?.current_q) || 1)
+          setAnswers(draft.answers || {})
+          setModuleTimeLeft(draft.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 })
+          setLoading(false)
+          return
+        }
         if (data.completed_at) { navigate(`/results/${attemptId}`); return }
         setAttempt(data)
         const cfg = getTestConfig(data.test_id) || getTestConfig('pre_test')
         setTestConfig(cfg)
-        setCurrentModule(data.current_section || 'rw_m1')
+        const last = readLastOpen()
+        const mod = last?.current_section || data.current_section || 'rw_m1'
+        setCurrentModule(mod)
+        setCurrentQ(Number(last?.current_q) || 1)
         setAnswers(data.answers || {})
         setModuleTimeLeft(data.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 })
         setLoading(false)
@@ -323,6 +377,7 @@ export default function TestTaking() {
       const key = `agora_attempt_draft_v1:${attemptId}`
       localStorage.setItem(key, JSON.stringify({
         attemptId,
+        test_id: attempt?.test_id || testConfig?.id || 'pre_test',
         current_section: mod,
         answers: updatedAnswers,
         module_time_remaining: timeRemaining,
@@ -375,6 +430,10 @@ export default function TestTaking() {
   }
 
   useEffect(() => {
+    writeLastOpen({ current_section: currentModule, current_q: currentQ })
+  }, [currentModule, currentQ])
+
+  useEffect(() => {
     return () => {
       clearTimeout(saveTimer.current)
       flushSave()
@@ -415,6 +474,10 @@ export default function TestTaking() {
   }
 
   async function submitTest() {
+    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+      alert('You appear to be offline. Reconnect to submit your test. Your answers are saved on this device.')
+      return
+    }
     setSubmitting(true)
     const rwM1 = scoreFromKey('rw_m1', answers.rw_m1, keyBySection?.rw_m1)
     const rwM2 = scoreFromKey('rw_m2', answers.rw_m2, keyBySection?.rw_m2)
@@ -437,6 +500,17 @@ export default function TestTaking() {
       setSubmitting(false)
       return
     }
+
+    // Adaptive weekly study plan (auto-updates after each test).
+    try {
+      const prefs = loadStudyPrefs(user?.id)
+      const txt = buildWeeklyStudyPlan({ scores, weakTopics: weakTopics.slice(0, 250), prefs })
+      await supabase
+        .from('test_attempts')
+        .update({ study_plan: txt })
+        .eq('id', attemptId)
+        .eq('user_id', user.id)
+    } catch {}
 
     // Mistake notebook + spaced repetition queue (auto-save missed questions).
     try {
