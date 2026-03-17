@@ -47,98 +47,54 @@ export default function Login() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      padding: '18px 12px',
-      background: 'radial-gradient(1200px 700px at 30% 20%, rgba(14,165,233,.18), transparent 60%), radial-gradient(900px 500px at 80% 40%, rgba(99,102,241,.18), transparent 55%), linear-gradient(135deg, #0b1220 0%, #172554 48%, #0b1220 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: 1320,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 18,
-        borderRadius: 28,
-        padding: 18,
-        border: '1px solid rgba(255,255,255,.10)',
-        background: 'linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))',
-        boxShadow: '0 30px 90px rgba(0,0,0,.45)'
-      }}>
+    <div className="login-shell">
+      <div className="login-wrap">
         {/* Branding */}
-        <div style={{
-          flex: '1 1 520px',
-          padding: '26px 26px 22px',
-          color: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 18 }}>
+        <div className="login-brand">
+          <div className="login-brand-row">
             <img
               src="/logo.png"
               alt="The Agora Project"
-              style={{
-                width: 150,
-                height: 150,
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 16px 30px rgba(0,0,0,.45)) drop-shadow(0 0 18px rgba(14,165,233,.22))'
-              }}
+              className="login-logo"
             />
-            <div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 44, fontWeight: 900, lineHeight: 1.05 }}>
+            <div className="login-brand-text">
+              <div className="login-title">
                 The Agora Project
               </div>
-              <div style={{ fontSize: 16, fontWeight: 650, color: 'rgba(255,255,255,.72)', marginTop: 8 }}>
+              <div className="login-subtitle">
                 A modern SAT prep dashboard — built for speed, focus, and results.
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: 10, marginTop: 10, maxWidth: 520 }}>
+          <div className="login-points">
             {[
               { k: 'Timed Tests', v: 'Realistic modules with pace tracking and clean review.' },
               { k: 'Study Guide', v: 'Chapter practice that locks in mastery (25/25 to complete).' },
               { k: 'Progress', v: 'Charts + optional skill builders that show improvement over time.' },
             ].map(({ k, v }) => (
-              <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <div style={{ width: 10, height: 10, borderRadius: 999, marginTop: 7, background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }} />
-                <div>
-                  <div style={{ fontWeight: 850, letterSpacing: .2 }}>{k}</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,.70)' }}>{v}</div>
+              <div key={k} className="login-point">
+                <div className="login-dot" />
+                <div className="login-point-text">
+                  <div className="login-point-title">{k}</div>
+                  <div className="login-point-sub">{v}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{ marginTop: 18, fontSize: 12, color: 'rgba(255,255,255,.40)' }}>
+          <div className="login-footnote">
             Based on official SAT structure and scoring conventions.
           </div>
         </div>
 
         {/* Auth card */}
-        <div style={{
-          flex: '0 1 430px',
-          padding: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: 410,
-            background: 'rgba(255,255,255,.92)',
-            borderRadius: 22,
-            padding: '34px 28px',
-            border: '1px solid rgba(15,23,42,.08)',
-            boxShadow: '0 18px 55px rgba(0,0,0,.22)'
-          }}>
-          <div style={{fontFamily:'Sora,sans-serif', fontSize:22, fontWeight:800, color:'#1a2744', marginBottom:4}}>
+        <div className="login-auth-col">
+          <div className="login-card">
+          <div className="login-card-title">
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}
           </div>
-          <div style={{fontSize:13, color:'#64748b', marginBottom:28}}>
+          <div className="login-card-subtitle">
             {mode === 'signin' ? 'Sign in to continue' : 'Create an account to begin'}
           </div>
 
@@ -166,10 +122,10 @@ export default function Login() {
             </button>
           </form>
 
-          <div style={{textAlign:'center', marginTop:20, fontSize:13, color:'#64748b'}}>
+          <div className="login-switch">
             {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
             <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
-              style={{background:'none', border:'none', color:'#1a2744', fontWeight:700, cursor:'pointer', fontSize:13}}>
+              className="login-switch-btn">
               {mode === 'signin' ? 'Create one' : 'Sign in'}
             </button>
           </div>
