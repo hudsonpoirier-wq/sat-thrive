@@ -10,6 +10,9 @@ function Navbar() {
     <nav className="nav">
       <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
       <div className="nav-actions">
+        <Link to="/guide" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
+          Study Guide
+        </Link>
         <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           ← Dashboard
         </Link>
@@ -379,7 +382,7 @@ export default function Guide() {
         ) : (
           <div>
             <button onClick={() => setSelectedId(null)} className="btn btn-outline" style={{ marginBottom: 14 }}>
-              ← Back to chapters
+              ← Back to Study Guide
             </button>
 
             <div className="card" style={{ marginBottom: 16 }}>
