@@ -8,15 +8,56 @@ import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
-import { Bar } from 'react-chartjs-2'
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
+import { Bar, Line } from 'react-chartjs-2'
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend)
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const FINAL_TEST_ID = 'final_test'
+
+function toDayKey(iso) {
+  try {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString().slice(0, 10)
+  } catch {
+    return null
+  }
+}
+
+function quantile(sorted, q) {
+  if (!sorted?.length) return null
+  const pos = (sorted.length - 1) * q
+  const base = Math.floor(pos)
+  const rest = pos - base
+  const a = sorted[base]
+  const b = sorted[Math.min(sorted.length - 1, base + 1)]
+  return a + rest * (b - a)
+}
+
+function clamp(v, lo, hi) {
+  return Math.min(hi, Math.max(lo, v))
+}
+
+function normalizeTestId(id) {
+  if (!id || id === 'practice_test_11') return 'pre_test'
+  return id
+}
+
+function testLabel(id) {
+  const norm = normalizeTestId(id)
+  const t = TESTS.find(x => x.id === norm) || TESTS.find(x => x.id === id)
+  return t?.label || (norm === 'pre_test' ? 'Pre Test' : (id || 'Test'))
+}
+
+function isPreTestId(id) {
+  const norm = normalizeTestId(id)
+  return norm === 'pre_test'
+}
 
 function countKey(key) {
   if (!key || typeof key !== 'object') return 0
@@ -322,9 +363,217 @@ export default function Admin() {
   const tabs = [
     { id: 'students', label: '👥 Students' },
     { id: 'results', label: '📋 Test Results' },
+    { id: 'analytics', label: '📈 Analytics' },
     { id: 'impact', label: '📊 Proof of Impact' },
     { id: 'tests', label: '🧩 Tests' },
   ]
+
+  const analytics = useMemo(() => {
+    const now = Date.now()
+    const daysAgo = (n) => now - n * 24 * 60 * 60 * 1000
+    const recent7 = daysAgo(7)
+    const recent30 = daysAgo(30)
+
+    const allAttempts = (attempts || []).slice()
+    const totals = []
+    const totalsPre = []
+    const totalsExtra = []
+    const totalsFinal = []
+    const sectionRW = []
+    const sectionMath = []
+
+    const byTest = new Map() // testId -> {count, totals[], rw[], math[]}
+    const attemptsByDay = new Map() // day -> count
+    const completesByDay = new Map()
+
+    const weakByDomain = new Map()
+    const weakByChapter = new Map()
+
+    const activeUsers7 = new Set()
+    const activeUsers30 = new Set()
+
+    for (const a of allAttempts) {
+      const tid = normalizeTestId(a.test_id)
+      const sc = a.scores || {}
+      const total = Number(sc.total || 0)
+      const rw = Number(sc.rw || 0)
+      const math = Number(sc.math || 0)
+      const started = new Date(a.started_at || a.completed_at || 0).getTime()
+
+      if (started && started >= recent7) activeUsers7.add(a.user_id)
+      if (started && started >= recent30) activeUsers30.add(a.user_id)
+
+      if (total) {
+        totals.push(total)
+        sectionRW.push(rw || 0)
+        sectionMath.push(math || 0)
+        if (isPreTestId(tid)) totalsPre.push(total)
+        else if (tid === FINAL_TEST_ID) totalsFinal.push(total)
+        else totalsExtra.push(total)
+
+        const row = byTest.get(tid) || { count: 0, totals: [], rw: [], math: [] }
+        row.count += 1
+        row.totals.push(total)
+        row.rw.push(rw || 0)
+        row.math.push(math || 0)
+        byTest.set(tid, row)
+      }
+
+      const dayStarted = toDayKey(a.started_at)
+      const dayCompleted = toDayKey(a.completed_at)
+      if (dayStarted) attemptsByDay.set(dayStarted, (attemptsByDay.get(dayStarted) || 0) + 1)
+      if (dayCompleted) completesByDay.set(dayCompleted, (completesByDay.get(dayCompleted) || 0) + 1)
+
+      const wt = Array.isArray(a.weak_topics) ? a.weak_topics : []
+      for (const t of wt) {
+        const domain = t?.domain || 'Other'
+        const ch = t?.ch || null
+        const c = Number(t?.count || 0)
+        if (c > 0) {
+          weakByDomain.set(domain, (weakByDomain.get(domain) || 0) + c)
+          if (ch) weakByChapter.set(ch, (weakByChapter.get(ch) || 0) + c)
+        }
+      }
+    }
+
+    const totalsSorted = totals.slice().sort((a, b) => a - b)
+    const avg = (arr) => arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length) : null
+
+    const summary = {
+      active7: activeUsers7.size,
+      active30: activeUsers30.size,
+      avgTotal: avg(totals),
+      avgRW: avg(sectionRW),
+      avgMath: avg(sectionMath),
+      median: quantile(totalsSorted, 0.5),
+      p25: quantile(totalsSorted, 0.25),
+      p75: quantile(totalsSorted, 0.75),
+      avgPre: avg(totalsPre),
+      avgExtra: avg(totalsExtra),
+      avgFinal: avg(totalsFinal),
+    }
+
+    const testRows = Array.from(byTest.entries()).map(([id, row]) => {
+      const totalsS = row.totals.slice().sort((a, b) => a - b)
+      return {
+        id,
+        label: testLabel(id),
+        count: row.count,
+        avgTotal: avg(row.totals),
+        avgRW: avg(row.rw),
+        avgMath: avg(row.math),
+        median: quantile(totalsS, 0.5),
+      }
+    }).sort((a, b) => (b.count - a.count) || String(a.label).localeCompare(String(b.label)))
+
+    const topDomains = Array.from(weakByDomain.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+
+    const topChapters = Array.from(weakByChapter.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+
+    const allDays = Array.from(new Set([...attemptsByDay.keys(), ...completesByDay.keys()])).sort()
+    const activitySeries = {
+      labels: allDays.map(d => d),
+      datasets: [
+        {
+          label: 'Attempts started',
+          data: allDays.map(d => attemptsByDay.get(d) || 0),
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14,165,233,.08)',
+          pointRadius: 2,
+          tension: 0.25,
+          fill: true,
+        },
+        {
+          label: 'Attempts completed',
+          data: allDays.map(d => completesByDay.get(d) || 0),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,.06)',
+          pointRadius: 2,
+          tension: 0.25,
+          fill: true,
+        },
+      ],
+    }
+
+    const histogram = (() => {
+      const bins = []
+      for (let x = 400; x <= 1600; x += 100) bins.push(x)
+      const counts = new Array(bins.length).fill(0)
+      for (const t of totals) {
+        const cl = clamp(t, 400, 1600)
+        const idx = Math.min(bins.length - 1, Math.floor((cl - 400) / 100))
+        counts[idx] += 1
+      }
+      return {
+        labels: bins.map((b, i) => {
+          const hi = Math.min(1600, b + 99)
+          return `${b}-${hi}`
+        }),
+        datasets: [{
+          label: 'Students',
+          data: counts,
+          backgroundColor: 'rgba(26,39,68,.85)',
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      }
+    })()
+
+    const byTestChart = {
+      labels: testRows.map(r => r.label),
+      datasets: [
+        {
+          label: 'Avg Total',
+          data: testRows.map(r => Math.round(r.avgTotal || 0)),
+          backgroundColor: '#1a2744',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+        {
+          label: 'Avg R&W',
+          data: testRows.map(r => Math.round(r.avgRW || 0)),
+          backgroundColor: '#0ea5e9',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+        {
+          label: 'Avg Math',
+          data: testRows.map(r => Math.round(r.avgMath || 0)),
+          backgroundColor: '#f59e0b',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+      ],
+    }
+
+    const domainsChart = {
+      labels: topDomains.map(([d]) => d),
+      datasets: [{
+        label: 'Misses',
+        data: topDomains.map(([, c]) => c),
+        backgroundColor: topDomains.map((_, i) => ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#64748b'][i % 8]),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    }
+
+    const chaptersChart = {
+      labels: topChapters.map(([ch]) => `Ch ${ch}`),
+      datasets: [{
+        label: 'Misses',
+        data: topChapters.map(([, c]) => c),
+        backgroundColor: '#ef4444',
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    }
+
+    return { summary, testRows, histogram, byTestChart, domainsChart, chaptersChart, activitySeries, topChapters, topDomains }
+  }, [attempts])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Loading…</div>
@@ -493,6 +742,144 @@ export default function Admin() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Analytics tab */}
+        {tab === 'analytics' && (
+          <div style={{ display: 'grid', gap: 18 }}>
+            <div className="card">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, marginBottom: 6 }}>📈 Program Analytics</h3>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                These metrics summarize all completed attempts loaded into the admin dashboard (latest 2,000).
+              </div>
+            </div>
+
+            {/* KPI grid */}
+            <div className="stats-grid" style={{ marginBottom: 0 }}>
+              {[
+                { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: '🔥' },
+                { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: '🗓' },
+                { label: 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: '📊' },
+                { label: 'Avg R&W', val: analytics.summary.avgRW ? Math.round(analytics.summary.avgRW) : '—', sub: 'Section average', icon: '📚' },
+                { label: 'Avg Math', val: analytics.summary.avgMath ? Math.round(analytics.summary.avgMath) : '—', sub: 'Section average', icon: '🧮' },
+                { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '—', sub: 'Total score', icon: '⚖️' },
+              ].map(s => (
+                <div key={s.label} className="stat-box" style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+                  <div style={{ fontSize: 24 }}>{s.icon}</div>
+                  <div>
+                    <div className="stat-label">{s.label}</div>
+                    <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
+                    <div className="stat-sub">{s.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Activity over time */}
+            <div className="card">
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📅 Activity Over Time</h3>
+              <div style={{ height: 220 }}>
+                <Line data={analytics.activitySeries} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
+                  scales: {
+                    x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                    y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
+                  }
+                }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+              {/* Score distribution */}
+              <div className="card">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📊 Score Distribution</h3>
+                <div style={{ height: 220 }}>
+                  <Bar data={analytics.histogram} options={{
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
+                    }
+                  }} />
+                </div>
+              </div>
+
+              {/* Averages by test */}
+              <div className="card">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>🏁 Averages by Test</h3>
+                <div style={{ height: 220 }}>
+                  <Bar data={analytics.byTestChart} options={{
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                      y: { min: 200, max: 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } } }
+                    }
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Weakness analytics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
+              <div className="card">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>🚩 Most Missed Domains</h3>
+                <div style={{ height: 240 }}>
+                  <Bar data={analytics.domainsChart} options={{
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
+                    }
+                  }} />
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📕 Most Missed Chapters</h3>
+                <div style={{ height: 240 }}>
+                  <Bar data={analytics.chaptersChart} options={{
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
+                    }
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Test summary table */}
+            <div className="card" style={{ overflowX: 'auto' }}>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📋 Test Summary</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    {['Test', 'Attempts', 'Avg Total', 'Median', 'Avg R&W', 'Avg Math'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics.testRows.map(r => (
+                    <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px', fontWeight: 900, color: '#1a2744' }}>{r.label}</td>
+                      <td style={{ padding: '12px' }}>{r.count}</td>
+                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 900 }}>{r.avgTotal ? Math.round(r.avgTotal) : '—'}</td>
+                      <td style={{ padding: '12px' }}>{r.median ? Math.round(r.median) : '—'}</td>
+                      <td style={{ padding: '12px' }}>{r.avgRW ? Math.round(r.avgRW) : '—'}</td>
+                      <td style={{ padding: '12px' }}>{r.avgMath ? Math.round(r.avgMath) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
