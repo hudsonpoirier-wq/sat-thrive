@@ -11,6 +11,8 @@ import Mistakes from './pages/Mistakes.jsx'
 import Review from './pages/Review.jsx'
 import Report from './pages/Report.jsx'
 import Share from './pages/Share.jsx'
+import AuthCallback from './pages/AuthCallback.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -32,6 +34,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/reset" element={<ResetPassword />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/test/:attemptId" element={<ProtectedRoute><TestTaking /></ProtectedRoute>} />
           <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />

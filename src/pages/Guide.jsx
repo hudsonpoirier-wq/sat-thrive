@@ -153,6 +153,9 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
         </div>
       </div>
       <div style={{ fontSize: 13, lineHeight: 1.65, color: '#0f172a', whiteSpace: 'pre-line' }}>{problem?.q}</div>
+      <div style={{ marginTop: 10, fontSize: 12, color: '#94a3b8' }}>
+        Pick your answer, then click <b>Check</b> to submit it.
+      </div>
       {isMC && (
         <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
           {(shuffledChoices?.mapped || []).map(({ label, text }) => (
@@ -203,7 +206,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
             if (ok) onAnswered(true)
           }}
         >
-          Check →
+          Check (submit) →
         </button>
         {show && !isCorrect && (
           <button

@@ -2,26 +2,36 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.jsx'
 
 export default function Login() {
-  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, requestPasswordReset, resendConfirmation } = useAuth()
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(''); setSuccess(''); setLoading(true)
-    if (mode === 'signup') {
+    if (mode === 'forgot') {
+      const { error } = await requestPasswordReset(email)
+      if (error) setError(error.message)
+      else setSuccess('Reset link sent. Check your email to set a new password.')
+    } else if (mode === 'signup') {
       if (!fullName.trim()) { setError('Please enter your full name'); setLoading(false); return }
       const { error } = await signUp(email, password, fullName)
       if (error) setError(error.message)
       else setSuccess('Account created! Check your email to confirm, then sign in.')
     } else {
       const { error } = await signIn(email, password)
-      if (error) setError(error.message)
+      if (error) {
+        const msg = String(error.message || 'Sign in failed')
+        setError(msg)
+        if (msg.toLowerCase().includes('email not confirmed')) {
+          setSuccess('Tip: confirm your email first. You can resend the confirmation email below.')
+        }
+      }
     }
     setLoading(false)
   }
@@ -116,10 +126,10 @@ export default function Login() {
             boxShadow: '0 18px 55px rgba(0,0,0,.22)'
           }}>
           <div style={{fontFamily:'Sora,sans-serif', fontSize:22, fontWeight:800, color:'#1a2744', marginBottom:4}}>
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+            {mode === 'signin' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
           </div>
           <div style={{fontSize:13, color:'#64748b', marginBottom:28}}>
-            {mode === 'signin' ? 'Sign in to continue' : 'Create an account to begin'}
+            {mode === 'signin' ? 'Sign in to continue' : mode === 'signup' ? 'Create an account to begin' : 'We’ll email you a reset link'}
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -133,21 +143,48 @@ export default function Login() {
               <label className="input-label">Email</label>
               <input className="input-field" type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
-            <div className="input-wrap">
-              <label className="input-label">Password</label>
-              <input className="input-field" type="password" placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
-            </div>
+            {mode !== 'forgot' && (
+              <div className="input-wrap">
+                <label className="input-label">Password</label>
+                <input className="input-field" type="password" placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+              </div>
+            )}
 
             {error && <div className="error-msg" style={{marginBottom:14}}>⚠ {error}</div>}
             {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>✅ {success}</div>}
 
             <button type="submit" className="btn btn-primary" style={{width:'100%', padding:'13px', marginTop:4}} disabled={loading}>
-              {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : 'Create Account →'}
+              {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : mode === 'signup' ? 'Create Account →' : 'Send Reset Link →'}
             </button>
           </form>
 
+          {mode === 'signin' && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: 13 }}>
+              <button
+                onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
+                style={{ background: 'none', border: 'none', color: '#1a2744', fontWeight: 750, cursor: 'pointer', padding: 0 }}
+              >
+                Forgot password?
+              </button>
+              <button
+                onClick={async () => {
+                  if (!email) { setError('Enter your email first.'); return }
+                  setError(''); setSuccess(''); setLoading(true)
+                  const { error } = await resendConfirmation(email)
+                  if (error) setError(error.message)
+                  else setSuccess('Confirmation email sent. Check your inbox.')
+                  setLoading(false)
+                }}
+                style={{ background: 'none', border: 'none', color: '#1a2744', fontWeight: 750, cursor: 'pointer', padding: 0 }}
+                title="If you didn’t get the signup confirmation, resend it."
+              >
+                Resend confirmation
+              </button>
+            </div>
+          )}
+
           <div style={{textAlign:'center', marginTop:20, fontSize:13, color:'#64748b'}}>
-            {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+            {mode === 'signin' ? "Don't have an account? " : mode === 'signup' ? 'Already have an account? ' : 'Remember your password? '}
             <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
               style={{background:'none', border:'none', color:'#1a2744', fontWeight:700, cursor:'pointer', fontSize:13}}>
               {mode === 'signin' ? 'Create one' : 'Sign in'}

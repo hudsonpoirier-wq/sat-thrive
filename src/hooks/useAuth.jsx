@@ -59,7 +59,10 @@ export function AuthProvider({ children }) {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
     const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName } }
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      }
     })
     return { data, error }
   }
@@ -75,10 +78,29 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
+  async function requestPasswordReset(email) {
+    if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset`,
+    })
+    return { data, error }
+  }
+
+  async function resendConfirmation(email) {
+    if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
+    // Supabase expects "signup" for confirmation emails.
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+    })
+    return { data, error }
+  }
+
   if (!supabase && !loading) return <SupabaseNotConfigured />
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, requestPasswordReset, resendConfirmation }}>
       {children}
     </AuthContext.Provider>
   )
