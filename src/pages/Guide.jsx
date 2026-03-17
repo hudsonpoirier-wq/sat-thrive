@@ -18,7 +18,7 @@ function Navbar() {
   )
 }
 
-function DomainList({ domains, selectedId, onSelect, completedMap }) {
+function DomainList({ domains, selectedId, onSelect, completedMap, practiceByChapter }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {Object.entries(domains).map(([domain, chs]) => (
@@ -30,6 +30,13 @@ function DomainList({ domains, selectedId, onSelect, completedMap }) {
             {chs.map(ch => {
               const hasGuide = Boolean(GUIDE_CONTENT[ch.id])
               const done = Boolean(completedMap[ch.id])
+              const guideMap = extractGuideMap(practiceByChapter?.[ch.id] || {})
+              const correctCount = Object.values(guideMap || {}).filter(Boolean).length
+              const inProgress = !done && correctCount > 0
+              const status = done ? 'Completed' : inProgress ? 'In progress' : 'Not started'
+              const statusColor = done ? '#10b981' : inProgress ? '#f59e0b' : '#ef4444'
+              const statusBg = done ? 'rgba(16,185,129,.10)' : inProgress ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.10)'
+              const statusBorder = done ? 'rgba(16,185,129,.25)' : inProgress ? 'rgba(245,158,11,.35)' : 'rgba(239,68,68,.25)'
               return (
                 <button
                   key={ch.id}
@@ -38,21 +45,42 @@ function DomainList({ domains, selectedId, onSelect, completedMap }) {
                     textAlign: 'left',
                     padding: '12px 14px',
                     borderRadius: 12,
-                    border: selectedId === ch.id ? '2px solid #f59e0b' : '1.5px solid #e2e8f0',
-                    background: 'white',
+                    border: selectedId === ch.id ? '2px solid #f59e0b' : `1.5px solid ${statusBorder}`,
+                    background: hasGuide ? statusBg : 'white',
                     cursor: 'pointer',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ fontWeight: 800, color: '#1a2744' }}>Ch {ch.id}: {ch.name}</div>
-                    <div style={{ fontSize: 12 }}>
-                      {done ? '✅' : hasGuide ? '📘' : '⏳'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {hasGuide && (
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 900,
+                          padding: '3px 10px',
+                          borderRadius: 999,
+                          background: 'rgba(255,255,255,.7)',
+                          border: `1px solid ${statusBorder}`,
+                          color: statusColor,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {status}
+                        </span>
+                      )}
+                      <div style={{ fontSize: 12 }}>
+                        {done ? '✅' : inProgress ? '🟡' : hasGuide ? '🔴' : '⏳'}
+                      </div>
                     </div>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{ch.domain} · Playbook p.{ch.page}</div>
                   <div style={{ marginTop: 8, fontSize: 11, color: hasGuide ? '#10b981' : '#94a3b8', fontWeight: 800 }}>
                     {hasGuide ? 'Full guide + practice' : 'Guide coming soon'}
                   </div>
+                  {hasGuide && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#64748b', fontWeight: 800 }}>
+                      Practice: {Math.min(25, correctCount)}/25 correct
+                    </div>
+                  )}
                 </button>
               )
             })}
@@ -347,7 +375,7 @@ export default function Guide() {
         </div>
 
         {!selectedId ? (
-          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} />
+          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} practiceByChapter={practiceByChapter} />
         ) : (
           <div>
             <button onClick={() => setSelectedId(null)} className="btn btn-outline" style={{ marginBottom: 14 }}>
