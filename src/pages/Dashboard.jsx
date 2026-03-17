@@ -73,6 +73,7 @@ export default function Dashboard() {
   const [addingPost, setAddingPost] = useState(null)
   const [postInput, setPostInput] = useState('')
   const [confirmStart, setConfirmStart] = useState(false)
+  const [confirmExtraTestId, setConfirmExtraTestId] = useState(null)
   const [reviewItems, setReviewItems] = useState({})
   const [mistakes, setMistakes] = useState([])
   const [planText, setPlanText] = useState('')
@@ -84,6 +85,10 @@ export default function Dashboard() {
     setSatDate(loadSatTestDate(user?.id))
     setStudyPrefs(loadStudyPrefs(user?.id))
   }, [user?.id])
+
+  useEffect(() => {
+    setConfirmExtraTestId(null)
+  }, [hasTakenPretest])
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!user?.id || !attemptId) return false
@@ -686,9 +691,38 @@ export default function Dashboard() {
                               Resume →
                             </button>
                           ) : (
-                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => startNewTest(t.id)}>
-                              Start →
-                            </button>
+                            <>
+                              <button
+                                className="btn"
+                                style={{ background: '#1a2744', color: 'white', fontWeight: 900 }}
+                                onClick={() => setConfirmExtraTestId((prev) => (prev === t.id ? null : t.id))}
+                              >
+                                Start →
+                              </button>
+                              {confirmExtraTestId === t.id && (
+                                <div style={{ marginTop: 10, width: '100%', background: 'rgba(255,255,255,.65)', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
+                                  <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>Start this optional test now?</div>
+                                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                                    This is optional, but it helps reinforce weak topics and track improvement.
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                                    <button className="btn btn-outline" style={{ padding: '8px 12px' }} onClick={() => setConfirmExtraTestId(null)}>
+                                      Cancel
+                                    </button>
+                                    <button
+                                      className="btn"
+                                      style={{ background: '#1a2744', color: 'white', fontWeight: 900, padding: '8px 12px' }}
+                                      onClick={() => {
+                                        setConfirmExtraTestId(null)
+                                        startNewTest(t.id)
+                                      }}
+                                    >
+                                      ✅ Yes — Start
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                           {done && (
                             <button
