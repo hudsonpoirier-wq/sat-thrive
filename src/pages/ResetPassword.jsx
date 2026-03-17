@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 
@@ -7,6 +7,12 @@ export default function ResetPassword() {
   const [status, setStatus] = useState({ loading: true, msg: 'Opening reset link…' })
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [pwVisible, setPwVisible] = useState(false)
+  const [pw2Visible, setPw2Visible] = useState(false)
+  const [pwPeek, setPwPeek] = useState('')
+  const [pw2Peek, setPw2Peek] = useState('')
+  const peek1Timer = useRef(null)
+  const peek2Timer = useRef(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -76,11 +82,51 @@ export default function ResetPassword() {
             </div>
             <div className="input-wrap">
               <label className="input-label">New password</label>
-              <input className="input-field" type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={8} />
+              <div className="pw-wrap">
+                <input
+                  className="input-field"
+                  type={pwVisible ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => {
+                    const next = e.target.value
+                    if (!pwVisible && next.length > password.length) {
+                      setPwPeek(next.slice(-1))
+                      clearTimeout(peek1Timer.current)
+                      peek1Timer.current = setTimeout(() => setPwPeek(''), 700)
+                    }
+                    setPassword(next)
+                  }}
+                  minLength={8}
+                />
+                {!!pwPeek && !pwVisible && <span className="pw-peek">{pwPeek}</span>}
+                <button type="button" className="pw-eye" aria-label={pwVisible ? 'Hide password' : 'Show password'} onClick={() => setPwVisible(v => !v)}>
+                  {pwVisible ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
             <div className="input-wrap">
               <label className="input-label">Confirm password</label>
-              <input className="input-field" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} minLength={8} />
+              <div className="pw-wrap">
+                <input
+                  className="input-field"
+                  type={pw2Visible ? 'text' : 'password'}
+                  value={confirm}
+                  onChange={e => {
+                    const next = e.target.value
+                    if (!pw2Visible && next.length > confirm.length) {
+                      setPw2Peek(next.slice(-1))
+                      clearTimeout(peek2Timer.current)
+                      peek2Timer.current = setTimeout(() => setPw2Peek(''), 700)
+                    }
+                    setConfirm(next)
+                  }}
+                  minLength={8}
+                />
+                {!!pw2Peek && !pw2Visible && <span className="pw-peek">{pw2Peek}</span>}
+                <button type="button" className="pw-eye" aria-label={pw2Visible ? 'Hide password' : 'Show password'} onClick={() => setPw2Visible(v => !v)}>
+                  {pw2Visible ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
             <button className="btn btn-primary" style={{ width: '100%', padding: 13, marginTop: 6 }} disabled={saving} onClick={updatePassword}>
               {saving ? 'Saving…' : 'Update password →'}
@@ -91,4 +137,3 @@ export default function ResetPassword() {
     </div>
   )
 }
-

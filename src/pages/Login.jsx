@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 
@@ -11,6 +11,9 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
+  const [pwVisible, setPwVisible] = useState(false)
+  const [pwPeek, setPwPeek] = useState('')
+  const pwPeekTimer = useRef(null)
   const { signIn, signUp } = useAuth()
 
   async function handleSubmit(e) {
@@ -111,7 +114,35 @@ export default function Login() {
             </div>
             <div className="input-wrap">
               <label className="input-label">Password</label>
-              <input className="input-field" type="password" placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+              <div className="pw-wrap">
+                <input
+                  className="input-field"
+                  type={pwVisible ? 'text' : 'password'}
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
+                  value={password}
+                  onChange={e => {
+                    const next = e.target.value
+                    if (!pwVisible && next.length > password.length) {
+                      const last = next.slice(-1)
+                      setPwPeek(last)
+                      clearTimeout(pwPeekTimer.current)
+                      pwPeekTimer.current = setTimeout(() => setPwPeek(''), 700)
+                    }
+                    setPassword(next)
+                  }}
+                  required
+                  minLength={8}
+                />
+                {!!pwPeek && !pwVisible && <span className="pw-peek">{pwPeek}</span>}
+                <button
+                  type="button"
+                  className="pw-eye"
+                  aria-label={pwVisible ? 'Hide password' : 'Show password'}
+                  onClick={() => setPwVisible(v => !v)}
+                >
+                  {pwVisible ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
 
             {error && <div className="error-msg" style={{marginBottom:14}}>⚠ {error}</div>}

@@ -5,6 +5,12 @@ export default function UserMenu({ profile }) {
   const [open, setOpen] = useState(false)
   const [pw1, setPw1] = useState('')
   const [pw2, setPw2] = useState('')
+  const [pw1Visible, setPw1Visible] = useState(false)
+  const [pw2Visible, setPw2Visible] = useState(false)
+  const [pw1Peek, setPw1Peek] = useState('')
+  const [pw2Peek, setPw2Peek] = useState('')
+  const peek1Timer = useRef(null)
+  const peek2Timer = useRef(null)
   const [status, setStatus] = useState({ kind: '', msg: '' }) // '' | 'ok' | 'err'
   const wrapRef = useRef(null)
 
@@ -73,22 +79,50 @@ export default function UserMenu({ profile }) {
 
           <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>Change password</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <input
-              className="input-field"
-              type="password"
-              placeholder="New password (min 8)"
-              value={pw1}
-              onChange={(e) => setPw1(e.target.value)}
-              minLength={8}
-            />
-            <input
-              className="input-field"
-              type="password"
-              placeholder="Confirm new password"
-              value={pw2}
-              onChange={(e) => setPw2(e.target.value)}
-              minLength={8}
-            />
+            <div className="pw-wrap">
+              <input
+                className="input-field"
+                type={pw1Visible ? 'text' : 'password'}
+                placeholder="New password (min 8)"
+                value={pw1}
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (!pw1Visible && next.length > pw1.length) {
+                    setPw1Peek(next.slice(-1))
+                    clearTimeout(peek1Timer.current)
+                    peek1Timer.current = setTimeout(() => setPw1Peek(''), 700)
+                  }
+                  setPw1(next)
+                }}
+                minLength={8}
+              />
+              {!!pw1Peek && !pw1Visible && <span className="pw-peek">{pw1Peek}</span>}
+              <button type="button" className="pw-eye" aria-label={pw1Visible ? 'Hide password' : 'Show password'} onClick={() => setPw1Visible(v => !v)}>
+                {pw1Visible ? '🙈' : '👁'}
+              </button>
+            </div>
+            <div className="pw-wrap">
+              <input
+                className="input-field"
+                type={pw2Visible ? 'text' : 'password'}
+                placeholder="Confirm new password"
+                value={pw2}
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (!pw2Visible && next.length > pw2.length) {
+                    setPw2Peek(next.slice(-1))
+                    clearTimeout(peek2Timer.current)
+                    peek2Timer.current = setTimeout(() => setPw2Peek(''), 700)
+                  }
+                  setPw2(next)
+                }}
+                minLength={8}
+              />
+              {!!pw2Peek && !pw2Visible && <span className="pw-peek">{pw2Peek}</span>}
+              <button type="button" className="pw-eye" aria-label={pw2Visible ? 'Hide password' : 'Show password'} onClick={() => setPw2Visible(v => !v)}>
+                {pw2Visible ? '🙈' : '👁'}
+              </button>
+            </div>
             <button className="btn btn-primary" type="button" onClick={updatePassword} style={{ width: '100%' }}>
               Update password
             </button>
@@ -106,4 +140,3 @@ export default function UserMenu({ profile }) {
     </div>
   )
 }
-
