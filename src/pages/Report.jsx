@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { TESTS } from '../data/tests.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { toLocalDateKey, computeStreak, computeWeeklyProgress, computeLevelAndBadges } from '../lib/progressMetrics.js'
+import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
@@ -103,18 +103,8 @@ export default function Report() {
     })()
 
     const streak = computeStreak(activityKeys)
-    const weekly = computeWeeklyProgress(activityKeys, 5)
     const extraTests = TESTS.filter(t => t.kind === 'extra')
     const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id)).length
-    const level = computeLevelAndBadges({
-      hasPretest: completedPre.length > 0,
-      studiedCount,
-      totalChapters: 34,
-      completedExtra,
-      streakCurrent: streak.current,
-      streakBest: streak.best,
-      dueReviews,
-    })
 
     const series = completed
       .filter(a => a.scores?.total)
@@ -136,9 +126,7 @@ export default function Report() {
         due_reviews: dueReviews,
         streak_current: streak.current,
         streak_best: streak.best,
-        level: level.level,
-        level_title: level.title,
-        badges: level.badges.filter(b => b.earned).map(b => b.label),
+        completed_extra: completedExtra,
       },
       series,
       mistakes: (mistakes || []).slice(0, 200).map(m => ({
@@ -149,7 +137,6 @@ export default function Report() {
         created_at: m.created_at,
         note: m.note || '',
       })),
-      weekly,
     }
   }, [attempts, postScores, studiedRows, mistakes, reviewItems, targetProfile?.full_name, targetProfile?.email])
 
@@ -161,7 +148,6 @@ export default function Report() {
       student: { name: report.student?.name || null },
       summary: report.summary,
       series: report.series,
-      weekly: report.weekly,
     }
     try {
       const encoded = encodeReportToQuery(sharePayload)
@@ -270,19 +256,10 @@ export default function Report() {
 
         <div className="card" style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ fontWeight: 900, color: '#1a2744' }}>Level & Badges</div>
+            <div style={{ fontWeight: 900, color: '#1a2744' }}>Summary</div>
             <div style={{ color: '#64748b', fontSize: 13 }}>
-              L{report.summary.level} · {report.summary.level_title} · Due reviews: {report.summary.due_reviews}
+              Due reviews: {report.summary.due_reviews} · Optional tests completed: {report.summary.completed_extra}
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {(report.summary.badges || []).length ? report.summary.badges.map((b) => (
-              <div key={b} style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(245,158,11,.16)', border: '1px solid rgba(245,158,11,.35)', fontSize: 12, fontWeight: 900, color: '#7c2d12' }}>
-                🏅 {b}
-              </div>
-            )) : (
-              <div style={{ color: '#64748b', fontSize: 13 }}>No badges yet.</div>
-            )}
           </div>
         </div>
 

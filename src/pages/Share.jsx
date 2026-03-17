@@ -82,18 +82,9 @@ export default function Share() {
         </div>
 
         <div style={{ marginTop: 14, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.16)', borderRadius: 18, padding: 14, color: 'white' }}>
-          <div style={{ fontWeight: 900, marginBottom: 8 }}>Level & Badges</div>
+          <div style={{ fontWeight: 900, marginBottom: 8 }}>Summary</div>
           <div style={{ opacity: .8, fontSize: 13, lineHeight: 1.6 }}>
-            L{report.summary.level} · {report.summary.level_title} · Due reviews: {report.summary.due_reviews}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {(report.summary.badges || []).length ? report.summary.badges.map((b) => (
-              <div key={b} style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(245,158,11,.16)', border: '1px solid rgba(245,158,11,.35)', fontSize: 12, fontWeight: 900, color: '#fde68a' }}>
-                🏅 {b}
-              </div>
-            )) : (
-              <div style={{ opacity: .7, fontSize: 13 }}>No badges yet.</div>
-            )}
+            Due reviews: {report.summary.due_reviews}
           </div>
         </div>
 
@@ -122,4 +113,3 @@ export default function Share() {
     </div>
   )
 }
-

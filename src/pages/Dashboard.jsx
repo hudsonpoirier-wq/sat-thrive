@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { toLocalDateKey, computeStreak, computeWeeklyProgress, computeLevelAndBadges } from '../lib/progressMetrics.js'
+import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -73,21 +73,6 @@ export default function Dashboard() {
   const [postInput, setPostInput] = useState('')
   const [confirmStart, setConfirmStart] = useState(false)
   const [reviewItems, setReviewItems] = useState({})
-  const [weeklyGoalDays, setWeeklyGoalDays] = useState(5)
-
-  useEffect(() => {
-    if (!user?.id) return
-    try {
-      const raw = localStorage.getItem(`agora_weekly_goal_days_v1:${user.id}`)
-      const n = Number(raw)
-      if (Number.isFinite(n) && n >= 2 && n <= 7) setWeeklyGoalDays(n)
-    } catch {}
-  }, [user?.id])
-
-  useEffect(() => {
-    if (!user?.id) return
-    try { localStorage.setItem(`agora_weekly_goal_days_v1:${user.id}`, String(weeklyGoalDays)) } catch {}
-  }, [user?.id, weeklyGoalDays])
 
   function computeScoresFromAnswers(attempt) {
     try {
@@ -225,16 +210,6 @@ export default function Dashboard() {
     return set
   })()
   const streak = computeStreak(activityKeys)
-  const weekly = computeWeeklyProgress(activityKeys, weeklyGoalDays)
-  const level = computeLevelAndBadges({
-    hasPretest: hasTakenPretest,
-    studiedCount,
-    totalChapters: 34,
-    completedExtra: completedExtra.length,
-    streakCurrent: streak.current,
-    streakBest: streak.best,
-    dueReviews,
-  })
 
   const trendAttempts = completed
     .map(a => ({ a, scores: a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {}) }))
@@ -319,40 +294,6 @@ export default function Dashboard() {
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Weekly Goal</div>
-                <select
-                  value={weeklyGoalDays}
-                  onChange={(e) => setWeeklyGoalDays(Number(e.target.value))}
-                  style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '6px 10px', fontWeight: 800, fontSize: 12, background: 'white' }}
-                  title="Days per week with any activity"
-                >
-                  {[2, 3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}/wk</option>)}
-                </select>
-              </div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
-                {weekly.doneDays}/{weekly.goalDays}
-              </div>
-              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginTop: 10 }}>
-                <div style={{ height: '100%', width: `${weekly.pct}%`, background: weekly.pct >= 100 ? '#10b981' : '#f59e0b', transition: 'width .6s ease' }} />
-              </div>
-              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>Week starts {weekly.weekStartKey}</div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Level</div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
-                L{level.level} · {level.title}
-              </div>
-              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>
-                XP {level.xp}/{level.nextXp} · Badges {level.earnedBadges}/{level.badges.length}
-              </div>
-              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginTop: 10 }}>
-                <div style={{ height: '100%', width: `${Math.min(100, Math.round((level.xp / level.nextXp) * 100))}%`, background: '#1a2744', transition: 'width .6s ease' }} />
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
               <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Review Queue</div>
               <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
                 {dueReviews} due
@@ -361,19 +302,6 @@ export default function Dashboard() {
                 Clear this to lock in weak topics.
               </div>
             </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {level.badges.filter(b => b.earned).slice(0, 6).map((b) => (
-              <div key={b.id} style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(245,158,11,.16)', border: '1px solid rgba(245,158,11,.35)', fontSize: 12, fontWeight: 900, color: '#7c2d12' }}>
-                🏅 {b.label}
-              </div>
-            ))}
-            {level.earnedBadges === 0 && (
-              <div style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(255,255,255,.6)', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 800, color: '#64748b' }}>
-                Earn badges by completing tests, chapters, and streaks.
-              </div>
-            )}
           </div>
         </div>
 
