@@ -161,7 +161,13 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
           {(shuffledChoices?.mapped || []).map(({ label, text }) => (
             <button
               key={label}
-              onClick={() => setChoice(label)}
+              onClick={() => {
+                setChoice(label)
+                // Require clicking "Check" to evaluate (changing the choice should clear prior feedback).
+                setShow(false)
+                setReveal(false)
+                setHintStep(0)
+              }}
               style={{
                 textAlign: 'left',
                 padding: '10px 12px',
@@ -188,7 +194,13 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
             className="free-response-input"
             placeholder="Your answer"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value)
+              // Require clicking "Check" to evaluate.
+              setShow(false)
+              setReveal(false)
+              setHintStep(0)
+            }}
             autoComplete="off"
           />
         </div>
