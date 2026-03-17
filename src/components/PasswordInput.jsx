@@ -18,6 +18,21 @@ export default function PasswordInput({
   }, [value, reveal, placeholder])
 
   const isEmpty = !String(value || '').length
+  const length = String(value || '').length
+
+  function setCaretFromClientX(clientX, targetEl) {
+    const input = inputRef.current
+    if (!input) return
+    const rect = (targetEl || input).getBoundingClientRect()
+    const x = Math.min(Math.max(0, clientX - rect.left), rect.width)
+    const ratio = rect.width ? (x / rect.width) : 1
+    const idx = Math.min(length, Math.max(0, Math.round(ratio * length)))
+    input.focus()
+    // Defer until after focus so selection applies reliably.
+    requestAnimationFrame(() => {
+      try { input.setSelectionRange(idx, idx) } catch {}
+    })
+  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -39,9 +54,9 @@ export default function PasswordInput({
         onMouseEnter={() => setReveal(true)}
         onMouseLeave={() => setReveal(false)}
         onMouseDown={(e) => {
-          // Focus the real input; avoid selecting overlay text.
+          // Allow precise click-to-place-caret while keeping hover-to-reveal on the dots only.
           e.preventDefault()
-          inputRef.current?.focus()
+          setCaretFromClientX(e.clientX, e.currentTarget)
         }}
         style={{
           position: 'absolute',
@@ -58,6 +73,7 @@ export default function PasswordInput({
           fontFamily: "'DM Sans', sans-serif",
           fontSize: 14,
           color: isEmpty ? '#94a3b8' : '#1a2744',
+          cursor: 'text',
         }}
         title={reveal && !isEmpty ? 'Password (revealed while hovering dots)' : undefined}
       >
@@ -66,4 +82,3 @@ export default function PasswordInput({
     </div>
   )
 }
-
