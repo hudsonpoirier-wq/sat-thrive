@@ -100,42 +100,6 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .input-field:focus { border-color: var(--sat-blue); }
 .input-field.error { border-color: var(--sat-red); }
 
-.pw-wrap { position: relative; }
-.pw-wrap .input-field { padding-right: 44px; }
-.pw-eye {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 1px solid rgba(15,23,42,.12);
-  background: rgba(255,255,255,.92);
-  border-radius: 10px;
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  color: #0f172a;
-}
-.pw-eye:hover { background: rgba(255,255,255,.98); }
-.pw-peek {
-  position: absolute;
-  right: 50px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-weight: 900;
-  font-size: 12px;
-  color: rgba(15,23,42,.75);
-  background: rgba(255,255,255,.92);
-  border: 1px solid rgba(15,23,42,.10);
-  border-radius: 999px;
-  padding: 2px 8px;
-  pointer-events: none;
-}
-
 .error-msg { color: var(--sat-red); font-size: 13px; margin-top: 6px; }
 
 .spinner {
