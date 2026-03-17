@@ -333,10 +333,27 @@ function parseFreeResponse(value) {
 
 export function freeResponseMatches(given, correct) {
   const g = parseFreeResponse(given)
-  const c = parseFreeResponse(correct)
-  if (g.kind === 'empty' || c.kind === 'empty') return false
-  if (g.kind === 'num' && c.kind === 'num') return Math.abs(g.value - c.value) < 1e-9
-  return g.raw === c.raw
+  const rawCorrect = String(correct ?? '').trim()
+  if (!rawCorrect) return false
+  if (g.kind === 'empty') return false
+
+  // Support multiple accepted answers like: "30; -30" or "1/2, 0.5"
+  const options = rawCorrect
+    .split(/[;,]/g)
+    .map(s => s.trim())
+    .filter(Boolean)
+  const list = options.length ? options : [rawCorrect]
+
+  for (const opt of list) {
+    const c = parseFreeResponse(opt)
+    if (c.kind === 'empty') continue
+    if (g.kind === 'num' && c.kind === 'num') {
+      if (Math.abs(g.value - c.value) < 1e-9) return true
+      continue
+    }
+    if (g.raw === c.raw) return true
+  }
+  return false
 }
 
 // Score individual section from answers

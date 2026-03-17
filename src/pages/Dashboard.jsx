@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { rawToScaled, scoreSection } from '../data/testData.js'
+import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
@@ -71,13 +72,33 @@ export default function Dashboard() {
 
   function computeScoresFromAnswers(attempt) {
     try {
+      const keyBySection = getAnswerKeyBySection(attempt?.test_id) || null
+      if (!keyBySection) return null
       const ans = attempt?.answers || {}
-      const rwM1 = scoreSection('rw_m1', ans.rw_m1)
-      const rwM2 = scoreSection('rw_m2', ans.rw_m2)
-      const mM1 = scoreSection('math_m1', ans.math_m1)
-      const mM2 = scoreSection('math_m2', ans.math_m2)
-      const rawRW = (rwM1?.correct || 0) + (rwM2?.correct || 0)
-      const rawMath = (mM1?.correct || 0) + (mM2?.correct || 0)
+      const isChoiceLetter = (v) => {
+        const s = String(v || '').trim().toUpperCase()
+        return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+      }
+      const scoreMod = (section, sectionAnswers) => {
+        const key = keyBySection?.[section] || {}
+        const total = Object.keys(key).length
+        let correct = 0
+        for (const [qStr, right] of Object.entries(key)) {
+          const given = sectionAnswers?.[qStr]
+          if (right == null) continue
+          const ok = isChoiceLetter(right)
+            ? String(given || '').toUpperCase() === String(right).toUpperCase()
+            : freeResponseMatches(given, right)
+          if (ok) correct++
+        }
+        return { correct, total }
+      }
+      const rwM1 = scoreMod('rw_m1', ans.rw_m1)
+      const rwM2 = scoreMod('rw_m2', ans.rw_m2)
+      const mM1 = scoreMod('math_m1', ans.math_m1)
+      const mM2 = scoreMod('math_m2', ans.math_m2)
+      const rawRW = (rwM1.correct || 0) + (rwM2.correct || 0)
+      const rawMath = (mM1.correct || 0) + (mM2.correct || 0)
       return rawToScaled(rawRW, rawMath)
     } catch {
       return null

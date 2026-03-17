@@ -2,14 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { CHAPTERS, ANSWER_KEY, QUESTION_CHAPTER_MAP, FREE_RESPONSE, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
+import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-function SectionBreakdown({ answers }) {
+function SectionBreakdown({ answers, keyBySection }) {
   const sections = [
     { key: 'rw_m1', label: 'R&W Module 1', total: 33 },
     { key: 'rw_m2', label: 'R&W Module 2', total: 33 },
@@ -20,15 +21,13 @@ function SectionBreakdown({ answers }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
       {sections.map(s => {
         const sAnswers = answers[s.key] || {}
-        const key = ANSWER_KEY[s.key]
-        const fr = FREE_RESPONSE[s.key] || []
+        const key = keyBySection?.[s.key] || {}
         let correct = 0
         Object.entries(sAnswers).forEach(([q, v]) => {
-          const right = key[q]
+          const right = key?.[q]
           if (!right) return
-          const ok = fr.includes(Number(q))
-            ? freeResponseMatches(v, right)
-            : String(v).toUpperCase() === String(right).toUpperCase()
+          const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
+          const ok = isFR ? freeResponseMatches(v, right) : String(v).toUpperCase() === String(right).toUpperCase()
           if (ok) correct++
         })
         const answered = Object.keys(sAnswers).length
@@ -48,7 +47,7 @@ function SectionBreakdown({ answers }) {
   )
 }
 
-function QuestionReview({ answers }) {
+function QuestionReview({ answers, keyBySection }) {
   const [expanded, setExpanded] = useState(null)
 
   return (
@@ -56,16 +55,16 @@ function QuestionReview({ answers }) {
       <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🔍 Question-by-Question Review</h3>
       {MODULE_ORDER.map(mod => {
         const modAnswers = answers[mod] || {}
-        const key = ANSWER_KEY[mod]
+        const key = keyBySection?.[mod] || {}
         const chMap = QUESTION_CHAPTER_MAP[mod]
-        const fr = FREE_RESPONSE[mod] || []
         const total = MODULES[mod].questions
         const wrongs = []
         for (let q = 1; q <= total; q++) {
           const given = modAnswers[q]
-          const right = key[q]
+          const right = key?.[q]
           if (!right) continue
-          const isCorrect = fr.includes(q)
+          const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
+          const isCorrect = isFR
             ? given && freeResponseMatches(given, right)
             : given && String(given).toUpperCase() === String(right).toUpperCase()
           if (!isCorrect) wrongs.push({ q, given, right, ch: chMap[q] })
@@ -203,6 +202,7 @@ export default function Results() {
   const scores = attempt.scores || {}
   const weakTopics = attempt.weak_topics || []
   const answers = attempt.answers || {}
+  const keyBySection = getAnswerKeyBySection(attempt?.test_id)
   const isPreTest = attempt?.test_id === 'pre_test' || attempt?.test_id === 'practice_test_11' || !attempt?.test_id
 
   // Domain summary for chart
@@ -259,11 +259,11 @@ export default function Results() {
         </div>
 
 	        {/* Section breakdown */}
-	        {isPreTest ? (
-	          <SectionBreakdown answers={answers} />
+	        {keyBySection ? (
+	          <SectionBreakdown answers={answers} keyBySection={keyBySection} />
 	        ) : (
 	          <div className="card" style={{ marginBottom: 24, color: '#64748b', lineHeight: 1.7 }}>
-	            Detailed module-by-module review is currently available for the Pre Test only.
+	            Detailed module-by-module review isn’t available for this test yet.
 	          </div>
 	        )}
 
@@ -336,7 +336,7 @@ export default function Results() {
         </div>
 
 	        {/* Q-by-Q review */}
-	        {isPreTest && <QuestionReview answers={answers} />}
+	        {keyBySection && <QuestionReview answers={answers} keyBySection={keyBySection} />}
 
         {/* CTA */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 40 }}>

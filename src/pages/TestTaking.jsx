@@ -9,6 +9,8 @@ import {
 } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
+import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 
 function isChoiceLetter(v) {
   const s = String(v || '').trim().toUpperCase()
@@ -218,8 +220,21 @@ export default function TestTaking() {
   useEffect(() => {
     if (!supabase || !attempt?.test_id) return
     const cfg = getTestConfig(attempt.test_id) || getTestConfig('pre_test')
-    if (cfg?.id === 'pre_test') {
-      setKeyBySection(ANSWER_KEY)
+    const builtIn = getAnswerKeyBySection(cfg?.id)
+    if (builtIn) {
+      // Sanity check: optional tests must have a full 120-question key.
+      if (cfg?.id && cfg.id !== 'pre_test' && builtIn?.rw_m1) {
+        const total = Object.keys(builtIn.rw_m1 || {}).length
+          + Object.keys(builtIn.rw_m2 || {}).length
+          + Object.keys(builtIn.math_m1 || {}).length
+          + Object.keys(builtIn.math_m2 || {}).length
+        if (total < 110) {
+          setKeyBySection(null)
+          setKeyStatus({ loading: false, msg: 'Answer key is incomplete for this test build. Please contact the admin.' })
+          return
+        }
+      }
+      setKeyBySection(builtIn)
       setKeyStatus({ loading: false, msg: '' })
       return
     }
@@ -476,8 +491,17 @@ export default function TestTaking() {
 
   const mod = MODULES[currentModule]
   const totalQ = mod.questions
-  const pageMap = PDF_PAGE_MAP[currentModule] || {}
-  const basePdfPage = pageMap[currentQ] ?? 0
+  const pageMap = (testConfig?.id === 'pre_test')
+    ? (PDF_PAGE_MAP[currentModule] || {})
+    : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {})
+  const basePdfPage = (() => {
+    if (Number.isFinite(Number(pageMap?.[currentQ]))) return pageMap[currentQ]
+    // Fallback: use the nearest previous mapped question page.
+    for (let q = currentQ - 1; q >= 1; q--) {
+      if (Number.isFinite(Number(pageMap?.[q]))) return pageMap[q]
+    }
+    return 0
+  })()
   const pdfOffset = Number(pdfOffsets?.[currentModule] || 0)
   const overridePage = pdfOverrides?.[currentModule]?.[currentQ]
   const pdfPage = Math.max(0, Number.isFinite(Number(overridePage)) ? Number(overridePage) : (basePdfPage + pdfOffset))

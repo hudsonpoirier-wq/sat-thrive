@@ -8,6 +8,13 @@ function isChoiceLetter(v) {
   return s === 'A' || s === 'B' || s === 'C' || s === 'D'
 }
 
+function looksLikeFreeResponse(v) {
+  const s = String(v || '').trim()
+  if (!s) return false
+  // Accept values like: 29, 8.6, .5061, 30; -30, 3331, 15/2, (3)^2, pi, π
+  return /[0-9π]/i.test(s) && /^[0-9.+/()^piπ\-\s;,]+$/i.test(s)
+}
+
 export async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
   // Returns { rw_m1:{}, rw_m2:{}, math_m1:{}, math_m2:{} }
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise
@@ -66,7 +73,7 @@ export async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
     }
 
     const keyBySection = { rw_m1: {}, rw_m2: {}, math_m1: {}, math_m2: {} }
-    // For each question token, pick the nearest choice letter on the same row to the right.
+    // For each question token, pick the nearest answer token on the same row to the right.
     for (const t of qTokens) {
       const col = colIndex(t.x)
       const sec = sections[col]
@@ -74,16 +81,19 @@ export async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
 
       const sameRow = items.filter(i => Math.abs(i.y - t.y) < 6)
       const candidates = sameRow
-        .filter(i => isChoiceLetter(i.s) && i.x > t.x)
+        .filter(i => (isChoiceLetter(i.s) || looksLikeFreeResponse(i.s)) && i.x > t.x)
         .sort((a, b) => a.x - b.x)
       const pick = candidates[0]?.s
       if (!pick) continue
 
-      if (t.q <= maxQ[sec]) keyBySection[sec][t.q] = String(pick).toUpperCase()
+      if (t.q <= maxQ[sec]) keyBySection[sec][t.q] = String(pick).trim().toUpperCase().replace('Π', 'PI')
     }
 
-    const total = Object.keys(keyBySection.rw_m1).length + Object.keys(keyBySection.rw_m2).length + Object.keys(keyBySection.math_m1).length + Object.keys(keyBySection.math_m2).length
-    if (total < 60) return null
+    const total = Object.keys(keyBySection.rw_m1).length
+      + Object.keys(keyBySection.rw_m2).length
+      + Object.keys(keyBySection.math_m1).length
+      + Object.keys(keyBySection.math_m2).length
+    if (total < 80) return null
     return keyBySection
   }
 
@@ -106,8 +116,8 @@ export async function extractSimpleAnswerKeyFromAnswerKeyPdf(buf) {
     const t = String(text || '').toLowerCase()
     const isRW = t.includes('reading') || t.includes('writing') || t.includes('r&w')
     const isMath = t.includes('math')
-    const m1 = t.includes('module 1') || t.includes('mod 1')
-    const m2 = t.includes('module 2') || t.includes('mod 2')
+    const m1 = /module\s*1/.test(t) || /mod\s*1/.test(t)
+    const m2 = /module\s*2/.test(t) || /mod\s*2/.test(t)
     if (isRW && m1) return 'rw_m1'
     if (isRW && m2) return 'rw_m2'
     if (isMath && m1) return 'math_m1'
@@ -145,4 +155,3 @@ export async function extractAnswerKeyFromPdf(buf) {
     return await extractSimpleAnswerKeyFromAnswerKeyPdf(buf)
   }
 }
-
