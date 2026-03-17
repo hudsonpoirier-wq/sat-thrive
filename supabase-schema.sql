@@ -55,6 +55,36 @@ create table if not exists public.test_answer_keys (
   updated_at timestamptz not null default now()
 );
 
+-- Mistake notebook (auto-saved missed questions + your explanation)
+create table if not exists public.mistakes (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  test_id text not null,
+  attempt_id uuid references public.test_attempts(id) on delete set null,
+  section text not null,
+  q_num integer not null,
+  given text,
+  correct text,
+  chapter_id text,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Spaced repetition queue (per missed question key)
+create table if not exists public.review_items (
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  item_key text not null,
+  due_at timestamptz not null default now(),
+  interval_days integer not null default 0,
+  ease real not null default 2.4,
+  reps integer not null default 0,
+  lapses integer not null default 0,
+  last_reviewed_at timestamptz,
+  last_correct boolean,
+  primary key (user_id, item_key)
+);
+
 -- Migrations (safe to run repeatedly)
 alter table public.test_attempts add column if not exists is_sandbox boolean not null default false;
 alter table public.post_scores add column if not exists is_sandbox boolean not null default false;
@@ -68,6 +98,8 @@ create index if not exists idx_post_scores_user_recorded on public.post_scores(u
 create index if not exists idx_post_scores_attempt_id on public.post_scores(attempt_id);
 create index if not exists idx_post_scores_sandbox on public.post_scores(is_sandbox);
 create index if not exists idx_studied_topics_user_completed on public.studied_topics(user_id, completed);
+create index if not exists idx_mistakes_user_created on public.mistakes(user_id, created_at desc);
+create index if not exists idx_review_items_user_due on public.review_items(user_id, due_at);
 
 -- Enable RLS (required for policies to take effect)
 alter table public.profiles enable row level security;
@@ -75,6 +107,8 @@ alter table public.test_attempts enable row level security;
 alter table public.post_scores enable row level security;
 alter table public.studied_topics enable row level security;
 alter table public.test_answer_keys enable row level security;
+alter table public.mistakes enable row level security;
+alter table public.review_items enable row level security;
 
 -- Role helper (admin only)
 create or replace function public.is_admin()
@@ -99,6 +133,8 @@ begin
   delete from public.post_scores where user_id = auth.uid();
   delete from public.test_attempts where user_id = auth.uid();
   delete from public.studied_topics where user_id = auth.uid();
+  delete from public.mistakes where user_id = auth.uid();
+  delete from public.review_items where user_id = auth.uid();
 end;
 $$;
 
@@ -115,6 +151,8 @@ begin
   delete from public.post_scores where user_id = target_user_id;
   delete from public.test_attempts where user_id = target_user_id;
   delete from public.studied_topics where user_id = target_user_id;
+  delete from public.mistakes where user_id = target_user_id;
+  delete from public.review_items where user_id = target_user_id;
 end;
 $$;
 
@@ -178,6 +216,23 @@ drop policy if exists "Admins can upsert test answer keys" on public.test_answer
 create policy "Users can view test answer keys" on public.test_answer_keys for select using (auth.role() = 'authenticated');
 create policy "Admins can upsert test answer keys" on public.test_answer_keys for insert with check (public.is_admin());
 create policy "Admins can update test answer keys" on public.test_answer_keys for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "Users can view own mistakes" on public.mistakes;
+drop policy if exists "Users can insert own mistakes" on public.mistakes;
+drop policy if exists "Users can update own mistakes" on public.mistakes;
+drop policy if exists "Admins see all mistakes" on public.mistakes;
+create policy "Users can view own mistakes" on public.mistakes for select using (auth.uid() = user_id);
+create policy "Users can insert own mistakes" on public.mistakes for insert with check (auth.uid() = user_id);
+create policy "Users can update own mistakes" on public.mistakes for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Admins see all mistakes" on public.mistakes for select using (public.is_admin());
+
+drop policy if exists "Users can view own review items" on public.review_items;
+drop policy if exists "Users can upsert own review items" on public.review_items;
+drop policy if exists "Admins see all review items" on public.review_items;
+create policy "Users can view own review items" on public.review_items for select using (auth.uid() = user_id);
+create policy "Users can insert own review items" on public.review_items for insert with check (auth.uid() = user_id);
+create policy "Users can update own review items" on public.review_items for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Admins see all review items" on public.review_items for select using (public.is_admin());
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { CHAPTERS } from '../data/testData.js'
+import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice } from '../lib/studyProgress.js'
 
@@ -80,14 +80,25 @@ function seededShuffle(arr, seed) {
   return out
 }
 
-function pickHints(concepts, seed) {
+function buildHintLadder(concepts, seed, isMC) {
   const bodies = (concepts || []).map(c => c.body).filter(Boolean)
-  if (!bodies.length) return [
-    'Re-read the question carefully and identify what it is actually asking you to do.',
-    'Eliminate options that contradict the setup before you pick your final choice.',
-  ]
-  const shuffled = seededShuffle(bodies, seed)
-  return shuffled.slice(0, 2)
+  const defaults = isMC
+    ? [
+      'Re-read the question and predict what the correct answer should DO before looking at choices.',
+      'Eliminate 2 choices by matching the logic and tone of the sentence, then re-check the remaining two.',
+    ]
+    : [
+      'Write down what the question is asking for (the exact value/expression). Keep units and words out of your final answer.',
+      'Check your algebra carefully, then verify with a quick plug-in or estimate to see if your answer makes sense.',
+    ]
+
+  const shuffled = bodies.length ? seededShuffle(bodies, seed) : defaults
+  const step1 = shuffled[0] || defaults[0]
+  const step2 = shuffled[1] || defaults[1]
+  const step3 = isMC
+    ? 'Example workflow: (1) Underline the contrast/continuation words, (2) eliminate two choices with one-sentence reasons, (3) plug the remaining choice back into the sentence/passage and read it aloud.'
+    : 'Example format: give a simplified value like `3/2`, `0.75`, or `pi/4`. Use `pi` (or `π`) for π, and use `^` for exponents (e.g., `2^3`).'
+  return [step1, step2, step3]
 }
 
 function extractGuideMap(practice) {
@@ -99,13 +110,17 @@ function extractGuideMap(practice) {
 
 function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
   const [choice, setChoice] = useState(null)
+  const [text, setText] = useState('')
   const [show, setShow] = useState(false)
   const [reveal, setReveal] = useState(false)
+  const [hintStep, setHintStep] = useState(0)
 
   useEffect(() => {
     setChoice(null)
+    setText('')
     setShow(false)
     setReveal(false)
+    setHintStep(0)
   }, [problem?.q])
 
   const isMC = Boolean(problem?.choices)
@@ -122,8 +137,12 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
     return { mapped, correctLabel }
   }, [isMC, problem?.q])
 
-  const isCorrect = show && choice && shuffledChoices?.correctLabel && choice === shuffledChoices.correctLabel
-  const hints = useMemo(() => pickHints(concepts, qSeed), [concepts, qSeed])
+  const isCorrect = show && (
+    isMC
+      ? (choice && shuffledChoices?.correctLabel && choice === shuffledChoices.correctLabel)
+      : (text.trim().length > 0 && freeResponseMatches(text, problem?.correct))
+  )
+  const ladder = useMemo(() => buildHintLadder(concepts, qSeed, isMC), [concepts, qSeed, isMC])
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
@@ -156,14 +175,31 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
           ))}
         </div>
       )}
+      {!isMC && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+            Open response: enter only the value/expression. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
+          </div>
+          <input
+            type="text"
+            className="free-response-input"
+            placeholder="Your answer"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12 }}>
         <button
           className="btn btn-primary"
           style={{ padding: '8px 14px', fontSize: 13 }}
           onClick={() => {
             if (isMC && !choice) return
-            const ok = isMC ? (choice === shuffledChoices?.correctLabel) : true
+            if (!isMC && !text.trim()) return
+            const ok = isMC ? (choice === shuffledChoices?.correctLabel) : freeResponseMatches(text, problem?.correct)
             setShow(true)
+            setHintStep(0)
             if (ok) onAnswered(true)
           }}
         >
@@ -186,14 +222,31 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
       </div>
       {show && !isCorrect && (
         <div style={{ marginTop: 10, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.65, color: '#7c2d12' }}>
-          <div style={{ fontWeight: 900, marginBottom: 6 }}>Try a different approach</div>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>Hint ladder (no answer given)</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            {[1, 2, 3].map((n) => (
+              <button
+                key={n}
+                className="btn btn-outline"
+                style={{ padding: '7px 12px', fontSize: 12 }}
+                onClick={() => setHintStep(s => Math.max(s, n))}
+              >
+                Hint {n}
+              </button>
+            ))}
+            <button
+              className="btn btn-outline"
+              style={{ padding: '7px 12px', fontSize: 12 }}
+              onClick={() => setReveal(true)}
+              title="This explanation may reveal the correct answer—use after you’ve tried the hints."
+            >
+              Reveal explanation
+            </button>
+          </div>
           <ul style={{ marginLeft: 18 }}>
-            {hints.map((h, i) => <li key={i} style={{ marginBottom: 6 }}>{h}</li>)}
+            {ladder.slice(0, hintStep).map((h, i) => <li key={i} style={{ marginBottom: 6 }}>{h}</li>)}
+            {hintStep === 0 && <li style={{ marginBottom: 6 }}>Start with Hint 1.</li>}
           </ul>
-          <button className="btn btn-outline" style={{ marginTop: 8, padding: '8px 14px', fontSize: 13 }}
-            onClick={() => setReveal(true)}>
-            Reveal explanation
-          </button>
         </div>
       )}
       {(reveal || isCorrect) && (

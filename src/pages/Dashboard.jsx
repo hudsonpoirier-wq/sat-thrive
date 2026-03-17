@@ -4,6 +4,8 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
+import { loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
+import { toLocalDateKey, computeStreak, computeWeeklyProgress, computeLevelAndBadges } from '../lib/progressMetrics.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -64,11 +66,28 @@ export default function Dashboard() {
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
   const [studied, setStudied] = useState({})
+  const [studiedRows, setStudiedRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [startingTest, setStartingTest] = useState(false)
   const [addingPost, setAddingPost] = useState(null)
   const [postInput, setPostInput] = useState('')
   const [confirmStart, setConfirmStart] = useState(false)
+  const [reviewItems, setReviewItems] = useState({})
+  const [weeklyGoalDays, setWeeklyGoalDays] = useState(5)
+
+  useEffect(() => {
+    if (!user?.id) return
+    try {
+      const raw = localStorage.getItem(`agora_weekly_goal_days_v1:${user.id}`)
+      const n = Number(raw)
+      if (Number.isFinite(n) && n >= 2 && n <= 7) setWeeklyGoalDays(n)
+    } catch {}
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) return
+    try { localStorage.setItem(`agora_weekly_goal_days_v1:${user.id}`, String(weeklyGoalDays)) } catch {}
+  }, [user?.id, weeklyGoalDays])
 
   function computeScoresFromAnswers(attempt) {
     try {
@@ -114,8 +133,10 @@ export default function Dashboard() {
       const rows = a.data || []
       setAttempts(rows)
       setPostScores(p.data || [])
-      getStudiedTopics(user.id).then(({ map }) => {
+      getStudiedTopics(user.id).then(({ map, rows: stRows }) => {
         setStudied(map || {})
+        setStudiedRows(stRows || [])
+        loadReviewItems(user.id).then((r) => setReviewItems(r.items || {})).catch(() => {})
         setLoading(false)
       })
 
@@ -181,6 +202,39 @@ export default function Dashboard() {
   const extraTests = TESTS.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
   const hasTakenPretest = completedPre.length > 0
+  const dueReviews = computeDueCount(reviewItems)
+
+  const activityKeys = (() => {
+    const set = new Set()
+    attempts.forEach((a) => {
+      const k1 = toLocalDateKey(a.started_at)
+      const k2 = toLocalDateKey(a.completed_at)
+      if (k1) set.add(k1)
+      if (k2) set.add(k2)
+    })
+    studiedRows.forEach((r) => {
+      const k1 = toLocalDateKey(r.updated_at)
+      const k2 = toLocalDateKey(r.completed_at)
+      if (k1) set.add(k1)
+      if (k2) set.add(k2)
+    })
+    Object.values(reviewItems || {}).forEach((it) => {
+      const k = toLocalDateKey(it?.last_reviewed_at)
+      if (k) set.add(k)
+    })
+    return set
+  })()
+  const streak = computeStreak(activityKeys)
+  const weekly = computeWeeklyProgress(activityKeys, weeklyGoalDays)
+  const level = computeLevelAndBadges({
+    hasPretest: hasTakenPretest,
+    studiedCount,
+    totalChapters: 34,
+    completedExtra: completedExtra.length,
+    streakCurrent: streak.current,
+    streakBest: streak.best,
+    dueReviews,
+  })
 
   const trendAttempts = completed
     .map(a => ({ a, scores: a.scores?.total ? a.scores : (computeScoresFromAnswers(a) || a.scores || {}) }))
@@ -235,6 +289,92 @@ export default function Dashboard() {
               <div className="stat-sub">{s.sub}</div>
             </div>
           ))}
+        </div>
+
+        {/* Momentum */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>⚡ Momentum</h2>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                Keep the streak, hit your weekly goal, and clear your review queue.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" onClick={() => navigate('/mistakes')}>Mistake Notebook →</button>
+              <button className="btn btn-primary" onClick={() => navigate('/review')}>
+                Review Due {dueReviews ? `(${dueReviews})` : ''}
+              </button>
+              <button className="btn btn-outline" onClick={() => navigate('/report')}>Progress Report →</button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 14 }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Streak</div>
+              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
+                {streak.current} day{streak.current === 1 ? '' : 's'}
+              </div>
+              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>Best: {streak.best} days</div>
+            </div>
+
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Weekly Goal</div>
+                <select
+                  value={weeklyGoalDays}
+                  onChange={(e) => setWeeklyGoalDays(Number(e.target.value))}
+                  style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '6px 10px', fontWeight: 800, fontSize: 12, background: 'white' }}
+                  title="Days per week with any activity"
+                >
+                  {[2, 3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}/wk</option>)}
+                </select>
+              </div>
+              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
+                {weekly.doneDays}/{weekly.goalDays}
+              </div>
+              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginTop: 10 }}>
+                <div style={{ height: '100%', width: `${weekly.pct}%`, background: weekly.pct >= 100 ? '#10b981' : '#f59e0b', transition: 'width .6s ease' }} />
+              </div>
+              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>Week starts {weekly.weekStartKey}</div>
+            </div>
+
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Level</div>
+              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
+                L{level.level} · {level.title}
+              </div>
+              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>
+                XP {level.xp}/{level.nextXp} · Badges {level.earnedBadges}/{level.badges.length}
+              </div>
+              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden', marginTop: 10 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, Math.round((level.xp / level.nextXp) * 100))}%`, background: '#1a2744', transition: 'width .6s ease' }} />
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px' }}>Review Queue</div>
+              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', marginTop: 6 }}>
+                {dueReviews} due
+              </div>
+              <div style={{ marginTop: 6, color: '#94a3b8', fontSize: 12 }}>
+                Clear this to lock in weak topics.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {level.badges.filter(b => b.earned).slice(0, 6).map((b) => (
+              <div key={b.id} style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(245,158,11,.16)', border: '1px solid rgba(245,158,11,.35)', fontSize: 12, fontWeight: 900, color: '#7c2d12' }}>
+                🏅 {b.label}
+              </div>
+            ))}
+            {level.earnedBadges === 0 && (
+              <div style={{ padding: '8px 10px', borderRadius: 999, background: 'rgba(255,255,255,.6)', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 800, color: '#64748b' }}>
+                Earn badges by completing tests, chapters, and streaks.
+              </div>
+            )}
+          </div>
         </div>
 
 	        {/* Pre Test CTA (hidden after completion) */}

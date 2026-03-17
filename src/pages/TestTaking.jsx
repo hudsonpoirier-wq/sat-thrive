@@ -11,6 +11,7 @@ import { getTestConfig } from '../data/tests.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import { saveMistakes, ensureReviewItems } from '../lib/mistakesStore.js'
 
 function isChoiceLetter(v) {
   const s = String(v || '').trim().toUpperCase()
@@ -381,6 +382,41 @@ export default function TestTaking() {
       setSubmitting(false)
       return
     }
+
+    // Mistake notebook + spaced repetition queue (auto-save missed questions).
+    try {
+      const testId = attempt?.test_id || testConfig?.id || 'pre_test'
+      const mistakes = []
+      for (const section of MODULE_ORDER) {
+        const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
+        const total = MODULES[section]?.questions || 0
+        const sectionAnswers = answers?.[section] || {}
+        for (let q = 1; q <= total; q++) {
+          const right = key?.[q]
+          if (right == null) continue
+          const given = sectionAnswers?.[q]
+          const attempted = String(given ?? '').trim().length > 0
+          if (!attempted) continue
+          const ok = isChoiceLetter(right)
+            ? String(given).toUpperCase() === String(right).toUpperCase()
+            : freeResponseMatches(given, right)
+          if (ok) continue
+          mistakes.push({
+            test_id: testId,
+            attempt_id: attemptId,
+            section,
+            q_num: q,
+            given: String(given ?? ''),
+            correct: String(right ?? ''),
+            chapter_id: QUESTION_CHAPTER_MAP?.[section]?.[q] || null,
+          })
+        }
+      }
+      if (mistakes.length && user?.id) {
+        const saved = await saveMistakes(user.id, mistakes)
+        await ensureReviewItems(user.id, saved.items || mistakes)
+      }
+    } catch {}
 
     // Auto-check Study Guide chapters that were mastered on the test (all questions correct for that chapter).
     try {

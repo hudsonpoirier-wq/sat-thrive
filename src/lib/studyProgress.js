@@ -23,17 +23,19 @@ export async function getStudiedTopics(userId) {
   if (!supabase) return { source: 'local', map: readLocal(userId) }
   const { data, error } = await supabase
     .from('studied_topics')
-    .select('chapter_id,completed,practice')
+    .select('chapter_id,completed,practice,updated_at,completed_at')
     .eq('user_id', userId)
   if (error) return { source: 'local', map: readLocal(userId) }
   const map = {}
   const practiceByChapter = {}
+  const rows = []
   for (const row of data || []) {
     map[row.chapter_id] = Boolean(row.completed)
     if (row.practice && typeof row.practice === 'object') practiceByChapter[row.chapter_id] = row.practice
+    rows.push(row)
   }
   writeLocal(userId, map)
-  return { source: 'supabase', map, practiceByChapter }
+  return { source: 'supabase', map, practiceByChapter, rows }
 }
 
 export async function setStudiedTopic(userId, chapterId, completed) {

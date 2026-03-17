@@ -7,6 +7,10 @@ import Results from './pages/Results.jsx'
 import Admin from './pages/Admin.jsx'
 import Guide from './pages/Guide.jsx'
 import FinalTest from './pages/FinalTest.jsx'
+import Mistakes from './pages/Mistakes.jsx'
+import Review from './pages/Review.jsx'
+import Report from './pages/Report.jsx'
+import Share from './pages/Share.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -34,6 +38,10 @@ export default function App() {
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
           <Route path="/final" element={<ProtectedRoute><FinalTest /></ProtectedRoute>} />
+          <Route path="/mistakes" element={<ProtectedRoute><Mistakes /></ProtectedRoute>} />
+          <Route path="/review" element={<ProtectedRoute><Review /></ProtectedRoute>} />
+          <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
+          <Route path="/share" element={<Share />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
