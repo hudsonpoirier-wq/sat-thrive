@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getTestConfig } from '../data/tests.js'
+import BrandLink from '../components/BrandLink.jsx'
 
 const FINAL_TEST_ID = 'final_test'
 
@@ -10,7 +11,7 @@ function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <button
           className="btn btn-outline"

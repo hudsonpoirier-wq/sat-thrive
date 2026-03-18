@@ -4,12 +4,13 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapterGuideStarted } from '../lib/studyProgress.js'
+import BrandLink from '../components/BrandLink.jsx'
 
 function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <button
           className="btn btn-outline"

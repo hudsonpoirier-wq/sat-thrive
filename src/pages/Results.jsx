@@ -6,6 +6,7 @@ import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatc
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildPlanFromAttempt, loadStudyPrefs, saveStudyPrefs, dayLabels } from '../lib/studyPlan.js'
+import BrandLink from '../components/BrandLink.jsx'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -92,13 +93,18 @@ function QuestionReview({ answers, keyBySection }) {
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {wrongs.map(({ q, given, right, ch }) => {
                   const chData = CHAPTERS[ch]
+                  const hint = chData
+                    ? `Hint: revisit Chapter ${ch} and solve the problem again using the core rule from ${chData.name}. Focus on the setup before checking any final answer.`
+                    : 'Hint: slow down the setup, identify what the question is really asking for, and try the problem again before checking anything else.'
                   return (
                     <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
                       <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#dc2626', minWidth: 28 }}>Q{q}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12 }}>
                           Your answer: <strong style={{ color: '#dc2626' }}>{given || '—'}</strong>
-                          &nbsp;&nbsp;Correct: <strong style={{ color: '#10b981' }}>{right}</strong>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 1.55 }}>
+                          <strong style={{ color: '#1a2744' }}>Hint:</strong> {hint}
                         </div>
                         {chData && (
                           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
@@ -199,7 +205,7 @@ export default function Results() {
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
       {/* Nav */}
       <nav className="nav">
-        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+        <BrandLink />
         <div className="nav-actions">
           <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
             ← Dashboard

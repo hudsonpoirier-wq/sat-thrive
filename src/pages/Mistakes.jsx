@@ -6,13 +6,14 @@ import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import PDFPage from '../components/PDFPage.jsx'
+import BrandLink from '../components/BrandLink.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
 
 function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <button
           className="btn btn-outline"

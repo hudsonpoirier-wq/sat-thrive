@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
-import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
-import { buildWeeklyStudyPlan, buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { loadMistakes, loadReviewItems } from '../lib/mistakesStore.js'
+import { buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
+import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Line } from 'react-chartjs-2'
@@ -21,7 +23,7 @@ function Navbar() {
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <Link
           to="/guide"
@@ -58,6 +60,69 @@ function Navbar() {
         </button>
       </div>
     </nav>
+  )
+}
+
+function ScoreOverviewCard({ label, value, sub, icon, dark = false }) {
+  return (
+    <div className={`stat-box${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+      <div style={{
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: dark ? 'rgba(255,255,255,.14)' : 'rgba(14,165,233,.10)',
+        color: dark ? 'white' : '#0f172a',
+      }}>
+        <Icon name={icon} size={20} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div className="stat-label">{label}</div>
+        <div className="stat-num" style={{ fontSize: 22 }}>{value}</div>
+        <div className="stat-sub">{sub}</div>
+      </div>
+    </div>
+  )
+}
+
+function ScheduleTaskLink({ task, compact = false }) {
+  const accent = task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9'
+  const icon = task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results'
+  return (
+    <Link
+      to={task.href}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: compact ? '8px 10px' : '10px 12px',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        textDecoration: 'none',
+        color: '#0f172a',
+        background: 'white',
+      }}
+    >
+      <span style={{
+        width: compact ? 28 : 32,
+        height: compact ? 28 : 32,
+        borderRadius: 10,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `${accent}14`,
+        color: accent,
+        flexShrink: 0,
+      }}>
+        <Icon name={icon} size={compact ? 15 : 16} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <div style={{ fontSize: compact ? 12 : 13, fontWeight: 900, color: '#1a2744', lineHeight: 1.35 }}>{task.title}</div>
+        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
+      </span>
+    </Link>
   )
 }
 
@@ -259,6 +324,14 @@ export default function Dashboard() {
   const preInProgress = inProgress.find(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
   const preTotals = completedPre.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
   const bestScore = preTotals.length ? Math.max(...preTotals) : null
+  const completedWithScores = completed
+    .map((attempt) => ({ attempt, scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}) }))
+    .filter((entry) => entry.scores?.total)
+  const bestSatRecord = completedWithScores.reduce((best, entry) => {
+    if (!best) return entry
+    return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
+  }, null)
+  const mostRecentRecord = completedWithScores[0] || null
   const latestPostScore = postScores[0]?.post_score
   const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
   const studiedCount = Object.values(studied).filter(Boolean).length
@@ -272,7 +345,6 @@ export default function Dashboard() {
   const extraTests = TESTS.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
   const hasTakenPretest = completedPre.length > 0
-  const dueReviews = computeDueCount(reviewItems)
   const viewedLatestResults = latestCompleted ? hasViewedResultsForAttempt(latestCompleted.id) : false
   const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
   const latestValidated = latestMistakes.filter((m) => {
@@ -287,6 +359,33 @@ export default function Dashboard() {
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
   })()
+  const reviewTodoCount = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
+
+  const journeySchedule = useMemo(() => {
+    if (!hasTakenPretest || !latestCompleted) return null
+    const schedule = buildAdaptiveSchedule({
+      weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+      studiedMap: studied,
+      reviewCount: reviewTodoCount,
+      hasViewedResults: viewedLatestResults,
+      hasTakenPretest: true,
+      prefs: studyPrefs,
+      testDate: satDate,
+    })
+    return {
+      ...schedule,
+      days: (schedule?.days || []).map((day) => ({
+        ...day,
+        tasks: (day.tasks || []).map((task) => (
+          task.type === 'results'
+            ? { ...task, href: `/results/${latestCompleted.id}` }
+            : task
+        )),
+      })),
+    }
+  }, [hasTakenPretest, latestCompleted, studied, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes])
+
+  const scheduleDayCards = journeySchedule?.days?.slice(0, 3) || []
 
   useEffect(() => {
     setConfirmExtraTestId(null)
@@ -361,25 +460,39 @@ export default function Dashboard() {
         {/* Welcome */}
         <div style={{marginBottom:28}}>
           <h1 style={{fontFamily:'Sora,sans-serif',fontSize:26,fontWeight:800,color:'#1a2744'}}>
-            Hey {profile?.full_name?.split(' ')[0] || 'there'} 👋
+            Hey {profile?.full_name?.split(' ')[0] || 'there'}
           </h1>
           <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your SAT progress</p>
         </div>
 
-        {/* Stats */}
+        {/* Score overview */}
 	        <div className="stats-grid">
-	          {[
-	            { label: 'Tests Completed', val: completed.length, sub: `${inProgress.length} in progress`, dark: false },
-	            { label: 'Best Pre-Test Score', val: bestScore || '—', sub: 'Pre Test', dark: false },
-	            { label: 'Post-Test Score', val: latestPostScore || '—', sub: latestPostScore ? 'Most recent' : 'Not yet recorded', dark: false },
-	            { label: 'Total Improvement', val: improvement ? `+${improvement}` : '—', sub: 'Points gained', dark: !!improvement },
-	          ].map(s => (
-            <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`}>
-              <div className="stat-label">{s.label}</div>
-              <div className="stat-num">{s.val}</div>
-              <div className="stat-sub">{s.sub}</div>
-            </div>
-          ))}
+            <ScoreOverviewCard
+              label="Best SAT Score"
+              value={bestSatRecord?.scores?.total || '—'}
+              sub={bestSatRecord ? `${TESTS.find((t) => t.id === (bestSatRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : bestSatRecord.attempt.test_id))?.label || 'Completed test'}` : 'All-time high'}
+              icon="sparkle"
+              dark={Boolean(bestSatRecord?.scores?.total)}
+            />
+            <ScoreOverviewCard
+              label="Highest Test"
+              value={bestScore || '—'}
+              sub={bestScore ? 'Highest full-length practice score' : 'No pre test recorded yet'}
+              icon="test"
+            />
+            <ScoreOverviewCard
+              label="Most Recent Test"
+              value={mostRecentRecord?.scores?.total || '—'}
+              sub={mostRecentRecord ? `${TESTS.find((t) => t.id === (mostRecentRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : mostRecentRecord.attempt.test_id))?.label || 'Latest test'} · ${new Date(mostRecentRecord.attempt.started_at).toLocaleDateString()}` : 'No completed attempt yet'}
+              icon="results"
+            />
+            <ScoreOverviewCard
+              label="Total Improvement"
+              value={improvement ? `+${improvement}` : '—'}
+              sub={improvement ? 'Post-test minus best pre-test' : `${completed.length} completed · ${inProgress.length} in progress`}
+              icon="chart"
+              dark={Boolean(improvement)}
+            />
         </div>
 
 	        {/* Pre Test CTA (hidden after completion) */}
@@ -387,8 +500,9 @@ export default function Dashboard() {
 	          <div className="card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
 	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
 	              <div>
-	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4}}>
-	                  📋 Pre Test
+	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
+	                  <Icon name="test" size={18} />
+	                  Pre Test
 	                </div>
 	                <div style={{fontSize:13, opacity:.7}}>
 	                  4 modules · 120 questions · 2 hrs 14 min · Timed like the real SAT
@@ -404,7 +518,7 @@ export default function Dashboard() {
 	              ) : (
 	                <button className="btn" onClick={() => startNewTest('pre_test')} disabled={startingTest}
 	                  style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
-	                  {startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : '🚀 Start Pre Test'}
+	                  {startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : 'Start Pre Test'}
 	                </button>
 	              )}
 	            </div>
@@ -419,7 +533,7 @@ export default function Dashboard() {
 	                    Cancel
 	                  </button>
 	                  <button className="btn" onClick={() => startNewTest('pre_test')} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
-	                    ✅ Yes — Start Test
+	                    Start Test
 	                  </button>
 	                </div>
 	              </div>
@@ -427,11 +541,69 @@ export default function Dashboard() {
 	          </div>
 	        )}
 
+        {/* Today / work-ahead */}
+        {hasTakenPretest && journeySchedule && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="task" size={18} />
+                  Today’s Tasks
+                </h2>
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening tomorrow’s tasks early.
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="calendar" size={16} />
+                {journeySchedule.hasTestDate ? 'Calendar runs through 3 days before your test.' : 'Set a test date to expand the full calendar.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+              {scheduleDayCards.map((day, idx) => (
+                <div key={day.key} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: idx === 0 ? 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.10))' : '#f8fafc' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 900, color: '#1a2744' }}>
+                        {idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : 'The Day After'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
+                    </div>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      background: day.focus === 'Reading' ? 'rgba(59,130,246,.12)' : day.focus === 'Math' ? 'rgba(16,185,129,.12)' : 'rgba(148,163,184,.14)',
+                      color: day.focus === 'Reading' ? '#2563eb' : day.focus === 'Math' ? '#059669' : '#64748b',
+                    }}>
+                      {day.focus}
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {day.tasks.length ? day.tasks.map((task) => (
+                      <ScheduleTaskLink key={task.id} task={task} compact />
+                    )) : (
+                      <div style={{ padding: '12px', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+                        No assigned tasks for this day. Use it as a catch-up or light review day.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Journey tracker + Study Guide */}
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗺 Journey Tracker</h2>
+              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="task" size={18} />
+                Smart Journey
+              </h2>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                 Work through these steps to be ready for the final test. <b>Click the tiles</b> to jump to each step.
               </div>
@@ -550,7 +722,7 @@ export default function Dashboard() {
 	              }}
 	              title={unlocked ? 'Final test unlocked' : 'Finish the Journey Tracker to unlock the Final Test'}
 	            >
-	              {unlocked ? '🏁 Final Test' : '🔒 Final Test (Unlocks after Journey Tracker)'}
+	              {unlocked ? 'Final Test' : 'Final Test (Unlocks after Journey Tracker)'}
 	            </button>
 	              )
 	            })()}
@@ -567,8 +739,11 @@ export default function Dashboard() {
           <div className="dashboard-plan-practice">
             <div id="study-plan-card" className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <div style={{ minWidth: 0 }}>
-                  <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🗓 Study Plan</h2>
+                  <div style={{ minWidth: 0 }}>
+                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon name="calendar" size={18} />
+                      Study Plan
+                    </h2>
                   <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                     Add your SAT date (or your best estimate) to generate a plan from now until <b>3 days before</b> test day.
                   </div>
@@ -697,6 +872,38 @@ export default function Dashboard() {
               </div>
 
               <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14, flex: 1 }}>
+                {journeySchedule && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 14 }}>
+                    {journeySchedule.days.map((day) => (
+                      <div
+                        key={day.key}
+                        style={{
+                          border: day.isToday ? '2px solid #0ea5e9' : '1px solid #e2e8f0',
+                          borderRadius: 12,
+                          padding: 10,
+                          background: day.isActive ? 'white' : '#f8fafc',
+                          opacity: day.isActive ? 1 : 0.65,
+                        }}
+                      >
+                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>
+                          {day.isToday ? 'Today' : day.date.toLocaleDateString(undefined, { weekday: 'short' })}
+                        </div>
+                        <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 8, fontSize: 13 }}>
+                          {day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </div>
+                        <div style={{ display: 'grid', gap: 6 }}>
+                          {day.tasks.length ? day.tasks.map((task) => (
+                            <ScheduleTaskLink key={task.id} task={task} compact />
+                          )) : (
+                            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                              {day.isActive ? 'Catch-up / light review' : 'Rest day'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {planText ? (
                   <div
                     style={{
@@ -723,7 +930,10 @@ export default function Dashboard() {
               <div className="card dashboard-practice-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
-                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
+                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon name="sparkle" size={18} />
+                      Extra Practice (Optional)
+                    </h2>
                     <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                       Optional skill builders to reinforce weak topics and track improvement.
                     </div>
@@ -777,7 +987,7 @@ export default function Dashboard() {
                                         startNewTest(t.id)
                                       }}
                                     >
-                                      ✅ Yes — Start
+                                      Start
                                     </button>
                                   </div>
                                 </div>
@@ -809,7 +1019,10 @@ export default function Dashboard() {
         {completed.length > 0 && (
           <div className="card">
             <h2 style={{fontFamily:'Sora,sans-serif', fontSize:16, fontWeight:700, marginBottom:16}}>
-              📊 Your Test Results
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="results" size={18} />
+                Your Test Results
+              </span>
             </h2>
 	            <div style={{overflowX:'auto'}}>
 	              <table style={{width:'100%', borderCollapse:'collapse'}}>
@@ -876,7 +1089,10 @@ export default function Dashboard() {
         {/* Score trend (hidden until pretest is taken) */}
         {hasTakenPretest && trendData && (
           <div className="card" style={{ marginTop: 24 }}>
-            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>📈 Your Improvement</h2>
+            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="chart" size={18} />
+              Your Improvement
+            </h2>
             <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
               Track how your scores change across the Pre Test and optional skill builders.
             </div>

@@ -1,6 +1,12 @@
 import { CHAPTERS } from '../data/testData.js'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const READING_DOMAINS = new Set([
+  'Craft & Structure',
+  'Information & Ideas',
+  'Standard English Conventions',
+  'Expression of Ideas',
+])
 
 function lsKeyTestDate(userId) {
   return `agora_sat_test_date_v1:${userId || 'anon'}`
@@ -97,6 +103,14 @@ function fmtDate(d) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function dateKeyLocal(d) {
+  const x = toDateOnly(d)
+  const y = x.getFullYear()
+  const m = String(x.getMonth() + 1).padStart(2, '0')
+  const day = String(x.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function next7Days(start = new Date()) {
   const s = new Date(start)
   s.setHours(0, 0, 0, 0)
@@ -131,6 +145,149 @@ function parseYyyyMmDd(s) {
 function daysBetween(a, b) {
   const ms = toDateOnly(b).getTime() - toDateOnly(a).getTime()
   return Math.round(ms / (24 * 60 * 60 * 1000))
+}
+
+export function chapterSubject(input) {
+  const chapterId = typeof input === 'string' ? input : input?.ch
+  const domain = CHAPTERS?.[chapterId]?.domain || input?.domain || ''
+  return READING_DOMAINS.has(domain) ? 'Reading' : 'Math'
+}
+
+function chapterTaskUnits(count) {
+  const n = Number(count || 0)
+  if (n >= 6) return 3
+  if (n >= 3) return 2
+  return 1
+}
+
+function buildChapterQueues(weakTopics, studiedMap) {
+  const reading = []
+  const math = []
+  for (const topic of normalizeWeakTopics(weakTopics)) {
+    if (!topic?.ch || studiedMap?.[String(topic.ch)]) continue
+    const units = chapterTaskUnits(topic.count)
+    const base = {
+      type: 'guide',
+      chapterId: String(topic.ch),
+      title: `Study Guide · Chapter ${topic.ch}`,
+      subtitle: `${topic.name || 'Topic'} · ${topic.count || 0} missed`,
+      href: `/guide?chapter=${encodeURIComponent(String(topic.ch))}`,
+      subject: chapterSubject(topic),
+      weight: Number(topic.count || 1),
+    }
+    for (let i = 0; i < units; i++) {
+      const task = units > 1
+        ? { ...base, id: `${base.chapterId}-${i + 1}`, subtitle: `${base.subtitle} · Session ${i + 1}/${units}` }
+        : { ...base, id: base.chapterId }
+      if (task.subject === 'Reading') reading.push(task)
+      else math.push(task)
+    }
+  }
+  const byWeight = (a, b) => (b.weight - a.weight) || String(a.chapterId).localeCompare(String(b.chapterId))
+  reading.sort(byWeight)
+  math.sort(byWeight)
+  return { reading, math }
+}
+
+export function buildAdaptiveSchedule({
+  weakTopics,
+  studiedMap,
+  reviewCount = 0,
+  hasViewedResults = false,
+  hasTakenPretest = false,
+  prefs,
+  testDate,
+  fromDate = new Date(),
+}) {
+  const p = prefs || defaultStudyPrefs()
+  const start = toDateOnly(fromDate)
+  const target = parseYyyyMmDd(testDate)
+  let end = target ? toDateOnly(target) : toDateOnly(new Date(start.getTime() + 13 * 24 * 60 * 60 * 1000))
+  if (target) end.setDate(end.getDate() - 3)
+  if (end.getTime() < start.getTime()) {
+    end = toDateOnly(new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000))
+  }
+
+  const days = []
+  for (let i = 0; ; i++) {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    days.push({
+      key: dateKeyLocal(d),
+      date: d,
+      label: fmtDate(d),
+      isToday: i === 0,
+      isActive: Boolean(p.days[weekdayIndex(d)]),
+      tasks: [],
+    })
+    if (dateKeyLocal(d) === dateKeyLocal(end)) break
+  }
+
+  const activeDays = days.filter((d) => d.isActive)
+  const usableDays = activeDays.length ? activeDays : days
+  const { reading, math } = buildChapterQueues(weakTopics, studiedMap || {})
+  const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
+  let reviewBlocks = Math.ceil(pendingReviewCount / 5)
+  let reviewLeft = pendingReviewCount
+  let needsResults = Boolean(hasTakenPretest && !hasViewedResults)
+  const totalUnits = reading.length + math.length + reviewBlocks + (needsResults ? 1 : 0)
+  const tasksPerDay = Math.max(1, Math.min(3, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
+  let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
+
+  for (const day of usableDays) {
+    const tasks = []
+
+    if (needsResults && tasks.length < tasksPerDay) {
+      tasks.push({
+        id: `results-${day.key}`,
+        type: 'results',
+        subject: 'Mixed',
+        title: 'Review latest results',
+        subtitle: 'Open your score report and identify the biggest weak spots.',
+        href: '/results',
+      })
+      needsResults = false
+    }
+
+    if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
+      const amount = Math.min(5, Math.max(1, reviewLeft || 5))
+      tasks.push({
+        id: `review-${day.key}`,
+        type: 'mistakes',
+        subject: 'Mixed',
+        title: `Review ${amount} missed question${amount === 1 ? '' : 's'}`,
+        subtitle: 'Use the Mistake Notebook and validate each one you fix.',
+        href: '/mistakes',
+      })
+      reviewLeft = Math.max(0, reviewLeft - amount)
+      reviewBlocks -= 1
+    }
+
+    while (tasks.length < tasksPerDay && (reading.length || math.length)) {
+      const preferredQueue = nextSubject === 'Reading' ? reading : math
+      const fallbackQueue = nextSubject === 'Reading' ? math : reading
+      const queue = preferredQueue.length ? preferredQueue : fallbackQueue
+      if (!queue.length) break
+      const task = queue.shift()
+      tasks.push(task)
+      if (reading.length && math.length) {
+        nextSubject = task.subject === 'Reading' ? 'Math' : 'Reading'
+      }
+    }
+
+    day.tasks = tasks
+    day.focus = tasks.find((task) => task.subject === 'Reading' || task.subject === 'Math')?.subject || (tasks.length ? 'Mixed' : 'Rest')
+  }
+
+  return {
+    startKey: days[0]?.key || '',
+    endKey: days[days.length - 1]?.key || '',
+    tasksPerDay,
+    days,
+    activeDays: usableDays,
+    totalTasks: totalUnits,
+    hasTestDate: Boolean(target),
+  }
 }
 
 export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
@@ -291,4 +448,3 @@ export function buildPlanFromAttempt(attempt, userId) {
 export function dayLabels() {
   return DAYS.slice()
 }
-

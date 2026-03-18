@@ -7,6 +7,7 @@ import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
 import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
+import BrandLink from '../components/BrandLink.jsx'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
@@ -16,7 +17,7 @@ function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <button
           className="btn btn-outline"

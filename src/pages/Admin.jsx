@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import { clearAdminTestingData } from '../lib/studyProgress.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
+import BrandLink from '../components/BrandLink.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, freeResponseMatches, rawToScaled } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -17,6 +18,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 const FINAL_TEST_ID = 'final_test'
+const REGRADER_VERSION = '2026-03-18-01'
 
 function toDayKey(iso) {
   try {
@@ -111,6 +113,7 @@ export default function Admin() {
   const [testKeyStatus, setTestKeyStatus] = useState({ loading: false, msg: '' })
   const [resettingUserId, setResettingUserId] = useState(null)
   const [resetMsg, setResetMsg] = useState('')
+  const [regrading, setRegrading] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -251,6 +254,49 @@ export default function Admin() {
       setResettingUserId(null)
     }
   }
+
+  async function runRegrade({ silent = false } = {}) {
+    if (!supabase || !isAdmin || regrading) return
+    setRegrading(true)
+    if (!silent) setResetMsg('')
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) throw new Error('Missing session token')
+      const res = await fetch('/api/admin/regrade-tests', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error || 'Regrade failed')
+      const msg = `✅ Regraded ${out.updated || 0} of ${out.scanned || 0} completed attempts.`
+      if (!silent) setResetMsg(msg)
+      try { localStorage.setItem(`agora_regrader_version:${profile?.id || 'admin'}`, REGRADER_VERSION) } catch {}
+
+      const [a, p] = await Promise.all([
+        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+        supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
+      ])
+      setAttempts(a.data || [])
+      setPostScores(p.data || [])
+    } catch (e) {
+      if (!silent) setResetMsg(`⚠️ Regrade failed: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setRegrading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin || !profile?.id) return
+    try {
+      const key = `agora_regrader_version:${profile.id}`
+      const seen = localStorage.getItem(key)
+      if (seen === REGRADER_VERSION) return
+      runRegrade({ silent: true })
+    } catch {
+      runRegrade({ silent: true })
+    }
+  }, [isAdmin, profile?.id])
 
   useEffect(() => {
     if (!supabase || profile?.role !== 'admin') return
@@ -664,9 +710,18 @@ export default function Admin() {
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
 		      <nav className="nav">
-	        <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+	        <BrandLink />
 	        <div className="nav-actions">
 	          <UserMenu profile={profile} />
+	          <button
+	            className="btn btn-outline"
+	            onClick={() => runRegrade({ silent: false })}
+	            disabled={regrading}
+	            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.9)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
+	            title="Regrade completed attempts using the latest answer-format logic"
+	          >
+	            {regrading ? 'Regrading…' : 'Regrade Attempts'}
+	          </button>
 	          <button
 	            className="btn btn-outline"
 	            onClick={resetMyData}

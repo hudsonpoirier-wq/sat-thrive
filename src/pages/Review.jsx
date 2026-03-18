@@ -6,6 +6,7 @@ import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import BrandLink from '../components/BrandLink.jsx'
 import {
   loadMistakes,
   loadReviewItems,
@@ -20,7 +21,7 @@ function Navbar() {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <a className="nav-brand" href="/dashboard">The Agora <span>Project</span></a>
+      <BrandLink />
       <div className="nav-actions">
         <button
           className="btn btn-outline"
