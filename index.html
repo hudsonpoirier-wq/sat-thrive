@@ -34,6 +34,7 @@
       (function () {
         try {
           window.__agoraLastError = null;
+          window.__agoraAppBooted = false;
           window.addEventListener('error', function (e) {
             try {
               var msg = (e && (e.message || (e.error && e.error.message))) || String(e || '');
@@ -67,8 +68,7 @@
         try {
           var root = document.getElementById('root');
           if (!root) return;
-          // If React mounted, it will replace this content.
-          if (root.childElementCount > 1) return;
+          if (window.__agoraAppBooted) return;
           // Self-heal once by clearing SW + caches, then reloading.
           try {
             var did = localStorage.getItem('agora_autofix_once_v1');
@@ -94,7 +94,7 @@
               '</div>' +
             '</div>';
         } catch {}
-      }, 6000);
+      }, 10000);
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

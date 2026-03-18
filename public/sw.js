@@ -5,7 +5,7 @@
 */
 
 // Bump this to force clients to refresh caches after deploys.
-const VERSION = 'v4'
+const VERSION = 'v5'
 const STATIC_CACHE = `agora-static-${VERSION}`
 const RUNTIME_CACHE = `agora-runtime-${VERSION}`
 
@@ -66,7 +66,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (isPdf || isStaticAsset) {
+  if (isPdf) {
     event.respondWith((async () => {
       const cached = await caches.match(req)
       if (cached) return cached
@@ -76,6 +76,21 @@ self.addEventListener('fetch', (event) => {
         cache.put(req, fresh.clone())
         return fresh
       } catch {
+        return cached || Response.error()
+      }
+    })())
+    return
+  }
+
+  if (isStaticAsset) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req)
+        const cache = await caches.open(RUNTIME_CACHE)
+        cache.put(req, fresh.clone())
+        return fresh
+      } catch {
+        const cached = await caches.match(req)
         return cached || Response.error()
       }
     })())
