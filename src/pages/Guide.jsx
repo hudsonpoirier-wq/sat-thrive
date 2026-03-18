@@ -157,6 +157,95 @@ function extractGuideMap(practice) {
   return {}
 }
 
+const SUPER_CHAR_MAP = {
+  '⁰': '0',
+  '¹': '1',
+  '²': '2',
+  '³': '3',
+  '⁴': '4',
+  '⁵': '5',
+  '⁶': '6',
+  '⁷': '7',
+  '⁸': '8',
+  '⁹': '9',
+  '⁺': '+',
+  '⁻': '-',
+  '⁼': '=',
+  '⁽': '(',
+  '⁾': ')',
+  'ⁿ': 'n',
+  'ᵃ': 'a',
+  'ᵇ': 'b',
+  'ᶜ': 'c',
+  'ᵈ': 'd',
+  'ᵉ': 'e',
+  'ᶠ': 'f',
+  'ᵍ': 'g',
+  'ʰ': 'h',
+  'ᶦ': 'i',
+  'ʲ': 'j',
+  'ᵏ': 'k',
+  'ˡ': 'l',
+  'ᵐ': 'm',
+  'ᵒ': 'o',
+  'ᵖ': 'p',
+  'ʳ': 'r',
+  'ˢ': 's',
+  'ᵗ': 't',
+  'ᵘ': 'u',
+  'ᵛ': 'v',
+  'ʷ': 'w',
+  'ˣ': 'x',
+  'ʸ': 'y',
+  'ᶻ': 'z',
+}
+const SUPER_CHAR_RE = /[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿᵃᵇᶜᵈᵉᶠᵍʰᶦʲᵏˡᵐᵒᵖʳˢᵗᵘᵛʷˣʸᶻ]+/g
+
+function toSuperscriptText(raw) {
+  return String(raw || '')
+    .split('')
+    .map(ch => SUPER_CHAR_MAP[ch] || ch)
+    .join('')
+}
+
+function renderStudyMathLine(line, keyPrefix = 'study') {
+  const nodes = []
+  const tokenRe = /\^\([^)]+\)|\^[A-Za-z0-9.+\-\/]+|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿᵃᵇᶜᵈᵉᶠᵍʰᶦʲᵏˡᵐᵒᵖʳˢᵗᵘᵛʷˣʸᶻ]+/g
+  let last = 0
+  let idx = 0
+  let match
+  while ((match = tokenRe.exec(line)) !== null) {
+    if (match.index > last) nodes.push(line.slice(last, match.index))
+    const token = match[0]
+    if (token.startsWith('^')) {
+      nodes.push(
+        <sup key={`${keyPrefix}-exp-${idx++}`} className="study-exp">
+          {token.slice(1)}
+        </sup>
+      )
+    } else {
+      nodes.push(
+        <sup key={`${keyPrefix}-sup-${idx++}`} className="study-exp">
+          {toSuperscriptText(token)}
+        </sup>
+      )
+    }
+    last = tokenRe.lastIndex
+  }
+  if (last < line.length) nodes.push(line.slice(last))
+  return nodes
+}
+
+function renderStudyMathText(text, keyPrefix = 'study') {
+  const lines = String(text || '').split('\n')
+  return lines.map((line, idx) => (
+    <span key={`${keyPrefix}-line-${idx}`}>
+      {renderStudyMathLine(line, `${keyPrefix}-${idx}`)}
+      {idx < lines.length - 1 ? <br /> : null}
+    </span>
+  ))
+}
+
 function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
   const [choice, setChoice] = useState(null)
   const [text, setText] = useState('')
@@ -201,7 +290,9 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
           {answered ? 'Completed' : 'Not completed'}
         </div>
       </div>
-      <div style={{ fontSize: 13, lineHeight: 1.65, color: '#0f172a', whiteSpace: 'pre-line' }}>{problem?.q}</div>
+      <div className="study-rich-text" style={{ fontSize: 13, lineHeight: 1.65, color: '#0f172a', whiteSpace: 'pre-line' }}>
+        {renderStudyMathText(problem?.q, `practice-q-${idx}`)}
+      </div>
       <div style={{ marginTop: 10, fontSize: 12, color: '#94a3b8' }}>
         Pick your answer, then click <b>Check</b> to submit it.
       </div>
@@ -228,7 +319,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
                 lineHeight: 1.5,
               }}
             >
-              <span style={{ fontWeight: 900, marginRight: 8 }}>{label}.</span> {text}
+              <span style={{ fontWeight: 900, marginRight: 8 }}>{label}.</span> <span className="study-rich-text">{renderStudyMathText(text, `choice-${idx}-${label}`)}</span>
             </button>
           ))}
         </div>
@@ -460,14 +551,16 @@ export default function Guide() {
               <>
                 <div className="card" style={{ marginBottom: 16 }}>
                   <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 900, marginBottom: 10, color: '#1a2744' }}>Guide</div>
-                  <div style={{ color: '#334155', lineHeight: 1.9, fontSize: 15, whiteSpace: 'pre-line', fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>
-                    {content.intro}
+                  <div className="study-rich-text" style={{ color: '#334155', lineHeight: 1.9, fontSize: 15, whiteSpace: 'pre-line', fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>
+                    {renderStudyMathText(content.intro, `intro-${selectedId}`)}
                   </div>
                   <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
                     {(content.concepts || []).map((c, i) => (
                       <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }}>
                         <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>{c.title}</div>
-                        <div style={{ color: '#334155', lineHeight: 1.85, fontSize: 14, fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>{c.body}</div>
+                        <div className="study-rich-text" style={{ color: '#334155', lineHeight: 1.85, fontSize: 14, fontFamily: 'ui-serif, Charter, Georgia, Cambria, \"Times New Roman\", Times, serif' }}>
+                          {renderStudyMathText(c.body, `concept-${selectedId}-${i}`)}
+                        </div>
                       </div>
                     ))}
                   </div>

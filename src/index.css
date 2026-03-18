@@ -198,6 +198,14 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
   flex-wrap: wrap;
 }
 
+.study-rich-text .study-exp {
+  font-size: .95em;
+  line-height: 0;
+  font-weight: 700;
+  vertical-align: super;
+  margin-left: 1px;
+}
+
 @media (max-width: 980px) {
   .dashboard-plan-practice { grid-template-columns: 1fr; }
   .dashboard-practice-grid {
