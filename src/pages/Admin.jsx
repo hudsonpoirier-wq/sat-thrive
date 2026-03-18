@@ -6,7 +6,7 @@ import { clearAdminTestingData } from '../lib/studyProgress.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import { TESTS } from '../data/tests.js'
-import { ANSWER_KEY, MODULES, freeResponseMatches, rawToScaled } from '../data/testData.js'
+import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, freeResponseMatches, rawToScaled } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
@@ -122,7 +122,7 @@ export default function Admin() {
       setLoading(true)
       const [p, a, ps] = await Promise.all([
         supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
-        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
         supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
       ])
       setStudents(p.data || [])
@@ -170,7 +170,7 @@ export default function Admin() {
       setResetMsg('✅ Student reset complete.')
       // Refresh tables
       const [a, p] = await Promise.all([
-        supabase.from('test_attempts').select('id,user_id,started_at,completed_at,scores,weak_topics').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
         supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').eq('is_sandbox', false).order('recorded_at', { ascending: false }).limit(5000),
       ])
       setAttempts(a.data || [])
@@ -397,6 +397,40 @@ export default function Admin() {
       return s === 'A' || s === 'B' || s === 'C' || s === 'D'
     }
 
+    const computeWeakTopicsFromAnswers = (attempt) => {
+      try {
+        const tid = normalizeTestId(attempt?.test_id)
+        const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
+        if (!keyBySection) return []
+        const answers = attempt?.answers || {}
+        const counts = new Map()
+
+        for (const section of Object.keys(MODULES)) {
+          const key = keyBySection?.[section] || {}
+          const sectionAnswers = answers?.[section] || {}
+          const chapterMap = QUESTION_CHAPTER_MAP?.[section] || {}
+
+          for (const [qStr, right] of Object.entries(key)) {
+            const chapterId = chapterMap?.[qStr]
+            if (!chapterId || right == null) continue
+            const given = sectionAnswers?.[qStr]
+            const ok = isChoiceLetter(right)
+              ? String(given || '').toUpperCase() === String(right).toUpperCase()
+              : freeResponseMatches(given, right)
+            if (!ok) counts.set(chapterId, (counts.get(chapterId) || 0) + 1)
+          }
+        }
+
+        return Array.from(counts.entries()).map(([chapterId, count]) => ({
+          ch: chapterId,
+          count,
+          domain: CHAPTERS?.[chapterId]?.domain || 'Other',
+        }))
+      } catch {
+        return []
+      }
+    }
+
     const computeScaledFromAnswers = (attempt) => {
       try {
         const tid = normalizeTestId(attempt?.test_id)
@@ -470,7 +504,9 @@ export default function Admin() {
       if (dayStarted) attemptsByDay.set(dayStarted, (attemptsByDay.get(dayStarted) || 0) + 1)
       if (dayCompleted) completesByDay.set(dayCompleted, (completesByDay.get(dayCompleted) || 0) + 1)
 
-      const wt = Array.isArray(a.weak_topics) ? a.weak_topics : []
+      const wt = Array.isArray(a.weak_topics) && a.weak_topics.length
+        ? a.weak_topics
+        : computeWeakTopicsFromAnswers(a)
       for (const t of wt) {
         const domain = t?.domain || 'Other'
         const ch = t?.ch || null
