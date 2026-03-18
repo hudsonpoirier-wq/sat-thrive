@@ -24,7 +24,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#64748b;">
+        Loading…
+      </div>
+    </div>
+    <script>
+      // Fallback if the app bundle fails to load (e.g., a stale service worker cache).
+      setTimeout(function () {
+        try {
+          var root = document.getElementById('root');
+          if (!root) return;
+          // If React mounted, it will replace this content.
+          if (root.childElementCount > 1) return;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
+              '<div style="max-width:720px;width:100%;background:rgba(255,255,255,.92);border:1px solid rgba(15,23,42,.12);border-radius:16px;padding:18px 18px 16px;">' +
+                '<div style="font-weight:800;color:#0f172a;font-size:16px;margin-bottom:6px;">The app didn’t load</div>' +
+                '<div style="color:#475569;font-size:13px;line-height:1.6;margin-bottom:12px;">This usually happens because your browser cached an older version. Try reloading the page.</div>' +
+                '<button onclick="location.reload()" style="padding:10px 14px;border-radius:12px;border:0;background:#0ea5e9;color:white;font-weight:800;cursor:pointer;">Reload</button>' +
+              '</div>' +
+            '</div>';
+        } catch {}
+      }, 6000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
