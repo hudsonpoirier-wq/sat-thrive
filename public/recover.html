@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recover — The Agora Project</title>
+    <style>
+      body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #0b1220; color: #e2e8f0; }
+      .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+      .card { max-width: 720px; width: 100%; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 18px; }
+      .title { font-weight: 900; font-size: 18px; margin-bottom: 8px; }
+      .sub { color: rgba(226,232,240,.8); font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
+      .btn { padding: 10px 14px; border-radius: 12px; border: 0; background: #0ea5e9; color: white; font-weight: 800; cursor: pointer; }
+      .muted { margin-top: 10px; font-size: 12px; color: rgba(226,232,240,.7); }
+      code { background: rgba(15,23,42,.45); padding: 2px 6px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="title">Recovering The Agora Project…</div>
+        <div class="sub">
+          This page clears any stuck service worker/cache (common on iPhone) and then sends you back to the login page.
+        </div>
+        <button class="btn" id="go">Fix Cache + Go to Login</button>
+        <div class="muted">If nothing happens, close all Safari tabs for <code>sat-thrive.vercel.app</code> and try again.</div>
+      </div>
+    </div>
+    <script>
+      async function fix() {
+        try {
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all((regs || []).map((r) => r.unregister()));
+          }
+        } catch {}
+        try {
+          if ('caches' in window) {
+            const keys = await caches.keys();
+            await Promise.all((keys || []).map((k) => caches.delete(k)));
+          }
+        } catch {}
+        try { location.href = '/login'; } catch {}
+      }
+      document.getElementById('go').addEventListener('click', fix);
+      // Auto-run once.
+      setTimeout(fix, 250);
+    </script>
+  </body>
+</html>
+
