@@ -86,10 +86,6 @@ export default function Dashboard() {
     setStudyPrefs(loadStudyPrefs(user?.id))
   }, [user?.id])
 
-  useEffect(() => {
-    setConfirmExtraTestId(null)
-  }, [hasTakenPretest])
-
   function hasViewedResultsForAttempt(attemptId) {
     if (!user?.id || !attemptId) return false
     try {
@@ -241,6 +237,10 @@ export default function Dashboard() {
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
   })()
+
+  useEffect(() => {
+    setConfirmExtraTestId(null)
+  }, [hasTakenPretest])
 
   // If the latest attempt doesn't have a stored plan, generate one locally from mistakes/weak-topics.
   useEffect(() => {
