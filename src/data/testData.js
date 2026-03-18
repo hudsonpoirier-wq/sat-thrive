@@ -178,10 +178,40 @@ export function calcWeakTopics(answers) {
     .map(([ch, count]) => ({ ch, count, ...CHAPTERS[ch] }))
 }
 
+function normalizeFreeResponseInput(value) {
+  let normalized = String(value ?? '').trim().replace(/[−–—]/g, '-')
+  let prev = null
+  while (normalized !== prev) {
+    prev = normalized
+    normalized = normalized.replace(/(\d),(?=\d)/g, '$1')
+  }
+  return normalized
+}
+
+function splitAcceptedAnswers(value) {
+  return String(value ?? '')
+    .split(/[;\n|]/g)
+    .flatMap(part => part.split(/,\s+/g))
+    .map(part => part.trim())
+    .filter(Boolean)
+}
+
 function parseFreeResponse(value) {
   const raw = String(value ?? '').trim()
   if (!raw) return { kind: 'empty', raw: '' }
-  const cleaned = raw.replace(/\s/g, '')
+  const normalized = normalizeFreeResponseInput(raw)
+  const mixedFrac = normalized.match(/^([+-]?\d+)\s+(\d+)\/(\d+)$/)
+  if (mixedFrac) {
+    const whole = Number(mixedFrac[1])
+    const num = Number(mixedFrac[2])
+    const den = Number(mixedFrac[3])
+    if (Number.isFinite(whole) && Number.isFinite(num) && Number.isFinite(den) && den !== 0) {
+      const sign = whole < 0 ? -1 : 1
+      return { kind: 'num', value: whole + sign * (num / den), raw: normalized }
+    }
+  }
+
+  const cleaned = normalized.replace(/\s/g, '')
   const frac = cleaned.match(/^([+-]?\d+(?:\.\d+)?)\/([+-]?\d+(?:\.\d+)?)$/)
   if (frac) {
     const num = Number(frac[1])
@@ -338,10 +368,8 @@ export function freeResponseMatches(given, correct) {
   if (g.kind === 'empty') return false
 
   // Support multiple accepted answers like: "30; -30" or "1/2, 0.5"
-  const options = rawCorrect
-    .split(/[;,]/g)
-    .map(s => s.trim())
-    .filter(Boolean)
+  // without breaking numeric commas like "15,000".
+  const options = splitAcceptedAnswers(rawCorrect)
   const list = options.length ? options : [rawCorrect]
 
   for (const opt of list) {

@@ -289,7 +289,7 @@ export default function Review() {
               </div>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
                 {isFR
-                  ? <>Enter your answer as a number or simple expression (examples: <code>1/2</code>, <code>0.5</code>, <code>pi</code>, <code>3*pi/2</code>). Don’t include units or extra words.</>
+                  ? <>Enter your answer as a number or simple expression (examples: <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>). Equivalent fractions and comma-formatted numbers count. Don’t include units or extra words.</>
                   : 'Pick A, B, C, or D.'}
               </div>
 

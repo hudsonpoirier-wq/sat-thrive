@@ -236,7 +236,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
       {!isMC && (
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-            Open response: enter only the value/expression. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
+            Open response: enter only the value/expression. Equivalent answers count, including fractions and comma-formatted numbers. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
           </div>
           <input
             type="text"
