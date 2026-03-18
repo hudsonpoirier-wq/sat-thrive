@@ -4,7 +4,8 @@
    This improves reliability on spotty iPhone/Wi‑Fi after the first load.
 */
 
-const VERSION = 'v3'
+// Bump this to force clients to refresh caches after deploys.
+const VERSION = 'v4'
 const STATIC_CACHE = `agora-static-${VERSION}`
 const RUNTIME_CACHE = `agora-runtime-${VERSION}`
 
@@ -45,6 +46,8 @@ self.addEventListener('fetch', (event) => {
   if (!isCacheableRequest(req)) return
 
   const url = new URL(req.url)
+  // Never intercept the service worker script itself (allows updates to always work).
+  if (url.pathname === '/sw.js') return
   const isNav = req.mode === 'navigate'
   const isPdf = url.pathname.endsWith('.pdf')
   const isStaticAsset = /\.(css|js|mjs|png|jpg|jpeg|webp|svg|ico|woff2?)$/i.test(url.pathname)
@@ -82,4 +85,3 @@ self.addEventListener('fetch', (event) => {
     return
   }
 })
-
