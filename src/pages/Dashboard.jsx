@@ -135,37 +135,87 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([
-      supabase.from('test_attempts').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
-      supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
-    ]).then(([a, p]) => {
-      const rows = a.data || []
+    let cancelled = false
+
+    async function loadDashboardData() {
+      setLoading(true)
+
+      const [attemptsRes, postScoresRes] = await Promise.allSettled([
+        supabase.from('test_attempts').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
+        supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
+      ])
+
+      const rows = attemptsRes.status === 'fulfilled' ? (attemptsRes.value.data || []) : []
+      const posts = postScoresRes.status === 'fulfilled' ? (postScoresRes.value.data || []) : []
+
+      if (cancelled) return
+
       setAttempts(rows)
-      setPostScores(p.data || [])
+      setPostScores(posts)
+
       try {
         const firstCompleted = (rows || []).find(r => r.completed_at || r.scores?.total) || null
         setPlanText(firstCompleted?.study_plan || '')
-      } catch {}
-      getStudiedTopics(user.id).then(({ map, rows: stRows }) => {
-        setStudied(map || {})
-        setStudiedRows(stRows || [])
-        loadReviewItems(user.id).then((r) => setReviewItems(r.items || {})).catch(() => {})
-        loadMistakes(user.id).then((m) => setMistakes(m.items || [])).catch(() => {})
-        setLoading(false)
-      })
+      } catch {
+        setPlanText('')
+      }
 
-      // If an attempt was completed but scores didn't persist for some reason,
-      // compute them client-side and patch the row (best-effort).
+      try {
+        const { map, rows: stRows } = await getStudiedTopics(user.id)
+        if (!cancelled) {
+          setStudied(map || {})
+          setStudiedRows(stRows || [])
+        }
+      } catch {
+        if (!cancelled) {
+          setStudied({})
+          setStudiedRows([])
+        }
+      }
+
+      try {
+        const r = await loadReviewItems(user.id)
+        if (!cancelled) setReviewItems(r.items || {})
+      } catch {
+        if (!cancelled) setReviewItems({})
+      }
+
+      try {
+        const m = await loadMistakes(user.id)
+        if (!cancelled) setMistakes(m.items || [])
+      } catch {
+        if (!cancelled) setMistakes([])
+      }
+
+      if (!cancelled) setLoading(false)
+
       const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
       needsPatch.slice(0, 3).forEach(async (r) => {
         const computed = computeScoresFromAnswers(r)
         if (!computed?.total) return
         try {
           await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
+          if (cancelled) return
           setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
         } catch {}
       })
+    }
+
+    loadDashboardData().catch(() => {
+      if (cancelled) return
+      setAttempts([])
+      setPostScores([])
+      setStudied({})
+      setStudiedRows([])
+      setReviewItems({})
+      setMistakes([])
+      setPlanText('')
+      setLoading(false)
     })
+
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   async function startNewTest(testId = 'pre_test') {
@@ -670,7 +720,7 @@ export default function Dashboard() {
             </div>
 
             {extraTests.length > 0 && (
-              <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="card dashboard-practice-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6 }}>🧠 Extra Practice (Optional)</h2>
@@ -683,19 +733,19 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14, flex: 1, alignContent: 'start' }}>
+                <div className="dashboard-practice-grid" style={{ '--practice-count': extraTests.length }}>
                   {extraTests.map((t) => {
                     const done = completed.some((a) => a.test_id === t.id && (a.completed_at || a.scores?.total))
                     const prog = inProgress.find((a) => a.test_id === t.id)
                     return (
-                      <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, background: '#f8fafc', minWidth: 0 }}>
+                      <div key={t.id} className="dashboard-practice-tile">
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                           <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, overflowWrap: 'anywhere' }}>{t.label}</div>
                           <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>
                             {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
                           </div>
                         </div>
-                        <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div className="dashboard-practice-actions">
                           {prog ? (
                             <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
                               Resume →

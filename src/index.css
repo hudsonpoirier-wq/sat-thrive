@@ -163,8 +163,47 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 }
 .dashboard-plan-practice > * { min-width: 0; }
 
+.dashboard-practice-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dashboard-practice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(var(--practice-count, 1), minmax(112px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  flex: 1;
+  align-content: stretch;
+}
+
+.dashboard-practice-tile {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  background: linear-gradient(180deg, #f8fafc, #ffffff);
+}
+
+.dashboard-practice-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 980px) {
   .dashboard-plan-practice { grid-template-columns: 1fr; }
+  .dashboard-practice-grid {
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+  }
 }
 
 /* SAT-style test UI */

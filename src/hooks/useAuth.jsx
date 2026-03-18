@@ -36,18 +36,37 @@ export function AuthProvider({ children }) {
       return
     }
     let cancelled = false
+    let latestProfileRequest = 0
     const safetyTimer = setTimeout(() => {
       if (cancelled) return
       // Prevent a blank screen if session/profile calls hang.
       setLoading(false)
     }, 10000)
 
+    async function loadProfile(userId) {
+      if (!supabase || !userId) return
+      const requestId = ++latestProfileRequest
+      try {
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+        if (cancelled || requestId !== latestProfileRequest) return
+        setProfile(data || null)
+      } catch {
+        if (cancelled || requestId !== latestProfileRequest) return
+        setProfile(null)
+      }
+    }
+
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         if (cancelled) return
-        setUser(session?.user ?? null)
-        if (session?.user) fetchProfile(session.user.id, session)
-        else setLoading(false)
+        const nextUser = session?.user ?? null
+        setUser(nextUser)
+        setLoading(false)
+        if (nextUser) {
+          setProfile(null)
+          loadProfile(nextUser.id)
+        }
+        else setProfile(null)
       })
       .catch(() => {
         if (cancelled) return
@@ -57,9 +76,14 @@ export function AuthProvider({ children }) {
       })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id, session)
-      else { setProfile(null); setLoading(false) }
+      const nextUser = session?.user ?? null
+      setUser(nextUser)
+      setLoading(false)
+      if (nextUser) {
+        setProfile(null)
+        loadProfile(nextUser.id)
+      }
+      else setProfile(null)
     })
     return () => {
       cancelled = true
@@ -67,18 +91,6 @@ export function AuthProvider({ children }) {
       subscription.unsubscribe()
     }
   }, [])
-
-  async function fetchProfile(userId, session) {
-    if (!supabase) return
-    try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-      setProfile(data)
-      setLoading(false)
-    } catch {
-      setProfile(null)
-      setLoading(false)
-    }
-  }
 
   async function signUp(email, password, fullName) {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
