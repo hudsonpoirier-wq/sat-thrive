@@ -30,6 +30,38 @@
       </div>
     </div>
     <script>
+      // Capture early JS/module errors (helps diagnose blank screens on iOS).
+      (function () {
+        try {
+          window.__agoraLastError = null;
+          window.addEventListener('error', function (e) {
+            try {
+              var msg = (e && (e.message || (e.error && e.error.message))) || String(e || '');
+              window.__agoraLastError = msg;
+            } catch {}
+          });
+          window.addEventListener('unhandledrejection', function (e) {
+            try { window.__agoraLastError = String((e && e.reason) || e || ''); } catch {}
+          });
+
+          window.agoraFixAndReload = async function () {
+            try {
+              if ('serviceWorker' in navigator) {
+                var regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all((regs || []).map(function (r) { try { return r.unregister(); } catch { return null; } }));
+              }
+            } catch {}
+            try {
+              if ('caches' in window) {
+                var keys = await caches.keys();
+                await Promise.all((keys || []).map(function (k) { try { return caches.delete(k); } catch { return null; } }));
+              }
+            } catch {}
+            try { location.reload(); } catch {}
+          };
+        } catch {}
+      })();
+
       // Fallback if the app bundle fails to load (e.g., a stale service worker cache).
       setTimeout(function () {
         try {
@@ -37,12 +69,19 @@
           if (!root) return;
           // If React mounted, it will replace this content.
           if (root.childElementCount > 1) return;
+          var err = '';
+          try { err = window.__agoraLastError ? String(window.__agoraLastError) : ''; } catch {}
+          if (err && err.length > 260) err = err.slice(0, 260) + '…';
           root.innerHTML =
             '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
               '<div style="max-width:720px;width:100%;background:rgba(255,255,255,.92);border:1px solid rgba(15,23,42,.12);border-radius:16px;padding:18px 18px 16px;">' +
                 '<div style="font-weight:800;color:#0f172a;font-size:16px;margin-bottom:6px;">The app didn’t load</div>' +
-                '<div style="color:#475569;font-size:13px;line-height:1.6;margin-bottom:12px;">This usually happens because your browser cached an older version. Try reloading the page.</div>' +
-                '<button onclick="location.reload()" style="padding:10px 14px;border-radius:12px;border:0;background:#0ea5e9;color:white;font-weight:800;cursor:pointer;">Reload</button>' +
+                '<div style="color:#475569;font-size:13px;line-height:1.6;margin-bottom:12px;">This is usually caused by a stale cache (especially on iPhone). Try Reload. If that doesn’t work, use Fix Cache + Reload.</div>' +
+                (err ? ('<div style="font-family:ui-monospace,Menlo,Monaco,Consolas,\\\"Liberation Mono\\\",\\\"Courier New\\\",monospace;font-size:12px;color:#64748b;background:rgba(15,23,42,.04);border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:10px;margin-bottom:12px;overflow:auto;">' + err.replace(/</g,'&lt;') + '</div>') : '') +
+                '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+                  '<button onclick="location.reload()" style="padding:10px 14px;border-radius:12px;border:0;background:#0ea5e9;color:white;font-weight:800;cursor:pointer;">Reload</button>' +
+                  '<button onclick="(window.agoraFixAndReload && window.agoraFixAndReload())" style="padding:10px 14px;border-radius:12px;border:1px solid rgba(15,23,42,.14);background:white;color:#0f172a;font-weight:800;cursor:pointer;">Fix Cache + Reload</button>' +
+                '</div>' +
               '</div>' +
             '</div>';
         } catch {}

@@ -55,13 +55,10 @@ self.addEventListener('fetch', (event) => {
   if (isNav) {
     event.respondWith((async () => {
       try {
-        const fresh = await fetch(req)
-        const cache = await caches.open(RUNTIME_CACHE)
-        cache.put(req, fresh.clone())
-        return fresh
+        // Network-only for navigations (prevents stale HTML pointing to missing hashed assets).
+        return await fetch(req)
       } catch {
-        const cached = await caches.match(req)
-        if (cached) return cached
+        // Offline fallback: app shell (best-effort).
         const shell = await caches.match('/index.html')
         return shell || Response.error()
       }
