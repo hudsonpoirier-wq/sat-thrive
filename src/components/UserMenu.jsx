@@ -93,7 +93,7 @@ export default function UserMenu({ profile }) {
             </button>
             {status.msg && (
               <div style={{ fontSize: 12, fontWeight: 800, color: status.kind === 'ok' ? '#10b981' : '#ef4444' }}>
-                {status.kind === 'ok' ? '✅ ' : '⚠️ '}{status.msg}
+                {status.kind === 'ok' ? 'Success: ' : 'Error: '}{status.msg}
               </div>
             )}
           </div>

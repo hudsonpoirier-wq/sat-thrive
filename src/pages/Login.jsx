@@ -122,8 +122,8 @@ export default function Login() {
               />
             </div>
 
-            {error && <div className="error-msg" style={{marginBottom:14}}>⚠ {error}</div>}
-            {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>✅ {success}</div>}
+            {error && <div className="error-msg" style={{marginBottom:14}}>Error: {error}</div>}
+            {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>Success: {success}</div>}
 
             <button type="submit" className="btn btn-primary" style={{width:'100%', padding:'13px', marginTop:4}} disabled={loading}>
               {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : 'Create Account →'}

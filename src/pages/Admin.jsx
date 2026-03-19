@@ -171,7 +171,7 @@ export default function Admin() {
           throw rpc.error
         }
       }
-      setResetMsg('✅ Student reset complete.')
+      setResetMsg('Success: student reset complete.')
       // Refresh tables
       const [a, p] = await Promise.all([
         supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
@@ -180,7 +180,7 @@ export default function Admin() {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
     } catch (e) {
-      setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
+      setResetMsg(`Error: reset failed: ${e?.message || 'Unknown error'}`)
     } finally {
       setResettingUserId(null)
     }
@@ -205,11 +205,11 @@ export default function Admin() {
       })
       const out = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(out?.error || 'Delete failed')
-      setResetMsg('✅ Student deleted.')
+      setResetMsg('Success: student deleted.')
       const p = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
       setStudents(p.data || [])
     } catch (e) {
-      setResetMsg(`⚠️ Delete failed: ${e?.message || 'Unknown error'}`)
+      setResetMsg(`Error: delete failed: ${e?.message || 'Unknown error'}`)
     } finally {
       setResettingUserId(null)
     }
@@ -247,10 +247,10 @@ export default function Admin() {
         }
       }
       await clearAdminTestingData(profile.id)
-      setResetMsg('✅ Your data was reset.')
+      setResetMsg('Success: your data was reset.')
       setTimeout(() => { window.location.assign('/dashboard') }, 400)
     } catch (e) {
-      setResetMsg(`⚠️ Reset failed: ${e?.message || 'Unknown error'}`)
+      setResetMsg(`Error: reset failed: ${e?.message || 'Unknown error'}`)
     } finally {
       setResettingUserId(null)
     }
@@ -270,7 +270,7 @@ export default function Admin() {
       })
       const out = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(out?.error || 'Regrade failed')
-      const msg = `✅ Regraded ${out.updated || 0} of ${out.scanned || 0} completed attempts.`
+      const msg = `Success: regraded ${out.updated || 0} of ${out.scanned || 0} completed attempts.`
       if (!silent) setResetMsg(msg)
       try { localStorage.setItem(`agora_regrader_version:${profile?.id || 'admin'}`, REGRADER_VERSION) } catch {}
 
@@ -281,7 +281,7 @@ export default function Admin() {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
     } catch (e) {
-      if (!silent) setResetMsg(`⚠️ Regrade failed: ${e?.message || 'Unknown error'}`)
+      if (!silent) setResetMsg(`Error: regrade failed: ${e?.message || 'Unknown error'}`)
     } finally {
       setRegrading(false)
     }
@@ -732,9 +732,10 @@ export default function Admin() {
 	          >
 	            {resettingUserId === profile?.id ? 'Resetting…' : 'Reset My Data'}
 	          </button>
-	          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-	            ← Dashboard
-	          </Link>
+          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="back" size={15} />
+            Dashboard
+          </Link>
           <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
             style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
             Sign Out
@@ -788,7 +789,7 @@ export default function Admin() {
           <div className="card" style={{ overflowX: 'auto' }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>All Students</h3>
             {resetMsg && (
-              <div style={{ marginBottom: 12, fontSize: 13, color: resetMsg.startsWith('✅') ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+              <div style={{ marginBottom: 12, fontSize: 13, color: resetMsg.toLowerCase().startsWith('success:') ? '#10b981' : '#ef4444', fontWeight: 700 }}>
                 {resetMsg}
               </div>
             )}
@@ -1289,9 +1290,9 @@ export default function Admin() {
 		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: builtIn, updated_at: new Date().toISOString() })
 		                                if (up.error) throw up.error
 		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: builtIn }))
-		                                setTestKeyStatus({ loading: false, msg: `✅ Fixed ${t.label} (${builtInCount} answers)` })
+		                                setTestKeyStatus({ loading: false, msg: `Success: fixed ${t.label} (${builtInCount} answers)` })
 		                              } catch (e) {
-		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${e?.message || 'Could not fix key'}` })
+		                                setTestKeyStatus({ loading: false, msg: `Error: ${e?.message || 'Could not fix key'}` })
 		                              }
 		                            }}
 		                            title="Your database has an older/incomplete key. This overwrites it with the built-in full key."
@@ -1317,13 +1318,13 @@ export default function Admin() {
 		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: toSave, updated_at: new Date().toISOString() })
 		                                if (up.error) throw up.error
 		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: toSave }))
-		                                setTestKeyStatus({ loading: false, msg: `✅ Imported ${t.label} (${countKey(toSave)} answers)` })
+		                                setTestKeyStatus({ loading: false, msg: `Success: imported ${t.label} (${countKey(toSave)} answers)` })
 		                              } catch (e) {
 		                                const msg = String(e?.message || 'Import failed')
 		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
 		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
 		                                  : ''
-		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${msg}${hint}` })
+		                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
 		                              }
 		                            }}
 	                            title="Import from the bundled scoring guide PDF"
@@ -1351,13 +1352,13 @@ export default function Admin() {
 		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
 		                                if (up.error) throw up.error
 		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
-		                                setTestKeyStatus({ loading: false, msg: `✅ Saved ${t.label} (${parsedCount} answers)` })
+		                                setTestKeyStatus({ loading: false, msg: `Success: saved ${t.label} (${parsedCount} answers)` })
 		                              } catch (err) {
 		                                const msg = String(err?.message || 'Could not parse PDF')
 		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
 		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
 		                                  : ''
-		                                setTestKeyStatus({ loading: false, msg: `⚠️ ${msg}${hint}` })
+		                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
 		                              } finally {
 		                                e.target.value = ''
 		                              }
@@ -1373,8 +1374,8 @@ export default function Admin() {
 		            </div>
 
 	            {testKeyStatus.msg && (
-	              <div style={{ marginTop: 12, fontSize: 12, color: testKeyStatus.msg.startsWith('✅') ? '#10b981' : '#ef4444', fontWeight: 900 }}>
-	                {testKeyStatus.loading ? '⏳ ' : ''}{testKeyStatus.msg}
+	              <div style={{ marginTop: 12, fontSize: 12, color: testKeyStatus.msg.toLowerCase().startsWith('success:') ? '#10b981' : '#ef4444', fontWeight: 900 }}>
+	                {testKeyStatus.loading ? 'Working: ' : ''}{testKeyStatus.msg}
 	              </div>
 	            )}
 

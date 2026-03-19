@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import Icon from './AppIcons.jsx'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
@@ -154,7 +155,9 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
       {status === 'error' && (
         <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef2f2', borderRadius: 4 }}>
           <div style={{ textAlign: 'center', color: '#dc2626', padding: 24 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+            <div style={{ marginBottom: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, background: 'rgba(239,68,68,.10)', color: '#dc2626' }}>
+              <Icon name="warning" size={22} />
+            </div>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>PDF not loaded</div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
               Couldn’t load <code>{fileLabel(pdfUrl)}</code>. Try again (this can happen on spotty connections).

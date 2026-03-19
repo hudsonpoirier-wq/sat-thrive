@@ -86,7 +86,7 @@ function Timer({ seconds, onExpire, onTick }) {
 
   return (
     <div className={`timer-display${isWarning ? ' warning' : ''}`} onClick={() => setHidden(h => !h)} title="Click to hide/show">
-      <span className="timer-icon">⏱</span>
+      <span className="timer-icon">Timer</span>
       {hidden ? '--:--' : formatted}
     </div>
   )
@@ -102,7 +102,7 @@ function BreakScreen({ nextModule, onContinue }) {
   const secs = breakTime % 60
   return (
     <div className="break-screen">
-      <div style={{ fontSize: 64, marginBottom: 16 }}>☕</div>
+      <div style={{ fontSize: 32, fontWeight: 900, color: '#1a2744', marginBottom: 16 }}>Break</div>
       <div className="break-title">Section Break</div>
       <div className="break-sub">
         Take a 10-minute break. Next up: {MODULES[nextModule]?.label} – {MODULES[nextModule]?.module}
@@ -880,7 +880,7 @@ export default function TestTaking() {
               const isCurr = n === currentQ
               return (
                 <button key={n} className={`q-nav-btn${isCurr ? ' current' : ''}${isAnswered ? ' answered' : ''}${isMrk ? ' marked' : ''}`}
-                  onClick={() => setCurrentQ(n)} title={`Q${n}${isMrk ? ' ★' : ''}${isAnswered ? ' ✓' : ''}`}>
+                  onClick={() => setCurrentQ(n)} title={`Q${n}${isMrk ? ' · Marked' : ''}${isAnswered ? ' · Answered' : ''}`}>
                   {n}
                 </button>
               )
@@ -892,7 +892,7 @@ export default function TestTaking() {
             <div className="q-label">Question {currentQ}</div>
             <div className="q-counter">{mod.label} · {mod.module}</div>
             <button className={`mark-review-btn${isMarked ? ' marked' : ''}`} onClick={() => toggleMark(currentQ)}>
-              {isMarked ? '★ Marked for Review' : '☆ Mark for Review'}
+              {isMarked ? 'Marked for Review' : 'Mark for Review'}
             </button>
           </div>
 
@@ -937,7 +937,7 @@ export default function TestTaking() {
               </button>
               {isLastQ ? (
                 <button className="nav-btn nav-btn-submit" onClick={advanceModule} disabled={submitting}>
-                  {isLastModule ? (submitting ? 'Submitting…' : 'Submit Test ✓') : 'End Module →'}
+                  {isLastModule ? (submitting ? 'Submitting…' : 'Submit Test') : 'End Module →'}
                 </button>
               ) : (
                 <button className="nav-btn nav-btn-next" onClick={() => setCurrentQ(q => Math.min(totalQ, q + 1))}>

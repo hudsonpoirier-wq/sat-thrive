@@ -79,7 +79,7 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
         if (wrongs.length === 0) return (
           <div key={mod} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2744', marginBottom: 8 }}>
-              ✅ {MODULES[mod].label} — {MODULES[mod].module} <span style={{ color: '#10b981' }}>(Perfect!)</span>
+              {MODULES[mod].label} — {MODULES[mod].module} <span style={{ color: '#10b981' }}>(Perfect)</span>
             </div>
           </div>
         )

@@ -222,6 +222,13 @@ function toSuperscriptText(raw) {
     .join('')
 }
 
+function sanitizeGuideDisplayText(raw) {
+  return String(raw || '')
+    .replaceAll('✅', 'Right:')
+    .replaceAll('❌', 'Wrong:')
+    .replaceAll('✓', ' (checks out)')
+}
+
 function renderStudyMathLine(line, keyPrefix = 'study') {
   const nodes = []
   const tokenRe = /\^\([^)]+\)|\^[A-Za-z0-9.+\-\/]+|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿᵃᵇᶜᵈᵉᶠᵍʰᶦʲᵏˡᵐᵒᵖʳˢᵗᵘᵛʷˣʸᶻ]+/g
@@ -251,7 +258,7 @@ function renderStudyMathLine(line, keyPrefix = 'study') {
 }
 
 function renderStudyMathText(text, keyPrefix = 'study') {
-  const lines = String(text || '').split('\n')
+  const lines = sanitizeGuideDisplayText(text).split('\n')
   return lines.map((line, idx) => (
     <span key={`${keyPrefix}-line-${idx}`}>
       {renderStudyMathLine(line, `${keyPrefix}-${idx}`)}
@@ -422,7 +429,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
       )}
       {(reveal || isCorrect) && (
         <div style={{ marginTop: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.6, color: '#334155' }}>
-          <strong>Explanation:</strong> {problem?.exp}
+          <strong>Explanation:</strong> <span className="study-rich-text">{renderStudyMathText(problem?.exp, `exp-${idx}`)}</span>
         </div>
       )}
     </div>

@@ -344,11 +344,11 @@ export default function Review() {
                 >
                   Check →
                 </button>
-                {feedback && (
-                  <div style={{ fontSize: 12, fontWeight: 900, color: ok ? '#10b981' : '#ef4444' }}>
-                    {ok ? '✅ Correct' : '❌ Not quite'}
-                  </div>
-                )}
+                  {feedback && (
+                    <div style={{ fontSize: 12, fontWeight: 900, color: ok ? '#10b981' : '#ef4444' }}>
+                    {ok ? 'Correct' : 'Not quite'}
+                    </div>
+                  )}
                 <button
                   className="btn btn-outline"
                   onClick={() => {
