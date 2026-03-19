@@ -573,7 +573,7 @@ export default function Dashboard() {
 
             {journeySchedule.needsMoreTime && (
               <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.28)', color: '#92400e', fontSize: 13, lineHeight: 1.6 }}>
-                You need to spend <b>at least {journeySchedule.requiredMinutesPerDay} minutes/day</b> on your available days to be ready by your test date. Your current setting is {journeySchedule.selectedMinutesPerDay} minutes/day.
+                Based on your remaining work and availability, plan for <b>about {journeySchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.
               </div>
             )}
 
@@ -616,8 +616,8 @@ export default function Dashboard() {
                       {day.focus}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
-                    {day.estimatedMinutes ? `Planned for about ${day.estimatedMinutes} minutes · ` : ''}Click this card to open the full day plan.
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
+                    {day.estimatedMinutes ? `Planned for about ${day.estimatedMinutes} minutes · ` : ''}Missed work automatically rolls into your next available study day.
                   </div>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {day.tasks.length ? day.tasks.map((task) => (

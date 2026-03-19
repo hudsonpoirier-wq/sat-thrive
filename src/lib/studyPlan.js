@@ -15,7 +15,6 @@ function lsKeyTestDate(userId) {
 export function defaultStudyPrefs() {
   return {
     days: [true, true, true, true, true, false, false], // Mon–Fri
-    minutesPerDay: 45,
   }
 }
 
@@ -27,8 +26,7 @@ export function loadStudyPrefs(userId) {
     const p = JSON.parse(raw)
     const base = defaultStudyPrefs()
     const days = Array.isArray(p?.days) && p.days.length === 7 ? p.days.map(Boolean) : base.days
-    const minutesPerDay = Number.isFinite(Number(p?.minutesPerDay)) ? Math.max(20, Math.min(180, Number(p.minutesPerDay))) : base.minutesPerDay
-    return { days, minutesPerDay }
+    return { days }
   } catch {
     return defaultStudyPrefs()
   }
@@ -243,7 +241,7 @@ export function buildAdaptiveSchedule({
   const totalUnits = reading.length + math.length + reviewBlocks
   const totalMinutes = [...reading, ...math].reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
   const requiredMinutesPerDay = Math.max(20, Math.ceil((totalMinutes / Math.max(1, usableDays.length)) / 5) * 5)
-  const effectiveMinutesPerDay = Math.max(Number(p.minutesPerDay || 45), requiredMinutesPerDay)
+  const effectiveMinutesPerDay = requiredMinutesPerDay
   const tasksPerDay = Math.max(1, Math.min(4, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
   let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
 
@@ -307,9 +305,8 @@ export function buildAdaptiveSchedule({
     totalMinutes,
     hasTestDate: Boolean(target),
     requiredMinutesPerDay,
-    selectedMinutesPerDay: Number(p.minutesPerDay || 45),
     effectiveMinutesPerDay,
-    needsMoreTime: Number(p.minutesPerDay || 45) < requiredMinutesPerDay,
+    needsMoreTime: requiredMinutesPerDay > 90,
   }
 }
 
@@ -340,7 +337,7 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
 
   const lines = []
   lines.push('WEEKLY STUDY PLAN (AUTO)')
-  lines.push(`Target: ${p.minutesPerDay} min/day · ${sessions} sessions this week`)
+  lines.push(`Recommended pace: about ${Math.max(20, Math.ceil((45 * sessions) / Math.max(1, sessions) / 5) * 5)} min per study day · ${sessions} sessions this week`)
   if (scores?.total) lines.push(`Last score: ${scores.total} (R&W ${scores.rw || '—'} / Math ${scores.math || '—'})`)
   lines.push('')
 
@@ -420,7 +417,8 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   const lines = []
   lines.push('STUDY PLAN (TO TEST DATE)')
   lines.push(`SAT test date: ${fmtDate(target)} · Plan runs until: ${fmtDate(end)} (3-day taper)`)
-  lines.push(`Target: ${p.minutesPerDay} min/day · ${sessions} sessions planned`)
+  const recommendedMinutes = Math.max(20, Math.ceil((top.reduce((sum, t) => sum + chapterTaskUnits(t.count) * Math.max(15, Math.min(32, 14 + Number(t.count || 1) * 3)), 0) / Math.max(1, sessions)) / 5) * 5)
+  lines.push(`Recommended pace: about ${recommendedMinutes} min per study day · ${sessions} sessions planned`)
   if (scores?.total) lines.push(`Last score: ${scores.total} (R&W ${scores.rw || '—'} / Math ${scores.math || '—'})`)
   lines.push('')
 

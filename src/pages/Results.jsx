@@ -411,25 +411,6 @@ export default function Results() {
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
                 />
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Min/day:
-                <input
-                  type="number"
-                  min={20}
-                  max={180}
-                  value={prefs?.minutesPerDay || 45}
-                  onChange={(e) => {
-                    if (readOnlyView) return
-                    const v = Number(String(e.target.value || '').trim())
-                    const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
-                    const next = { ...(prefs || loadStudyPrefs(viewUserId)), minutesPerDay }
-                    setPrefs(next)
-                    try { saveStudyPrefs(viewUserId, next) } catch {}
-                  }}
-                  disabled={readOnlyView}
-                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
-                />
-              </label>
             </div>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
@@ -461,6 +442,11 @@ export default function Results() {
                   </button>
                 )
               })}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: resultSchedule?.needsMoreTime ? '#92400e' : '#64748b', lineHeight: 1.6 }}>
+              {resultSchedule?.needsMoreTime
+                ? <>Plan for about <b>{resultSchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.</>
+                : <>This plan updates from your latest results, and any missed day rolls forward into the next available study day automatically.</>}
             </div>
           </div>
 

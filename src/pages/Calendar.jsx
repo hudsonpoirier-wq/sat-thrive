@@ -197,7 +197,7 @@ export default function CalendarPage() {
   const settingsChanged = useMemo(() => {
     const currentDays = JSON.stringify(studyPrefs?.days || [])
     const draftDays = JSON.stringify(draftStudyPrefs?.days || [])
-    return String(satDate || '') !== String(draftSatDate || '') || Number(studyPrefs?.minutesPerDay || 45) !== Number(draftStudyPrefs?.minutesPerDay || 45) || currentDays !== draftDays
+    return String(satDate || '') !== String(draftSatDate || '') || currentDays !== draftDays
   }, [satDate, draftSatDate, studyPrefs, draftStudyPrefs])
 
   function applyJourneySettings() {
@@ -265,7 +265,7 @@ export default function CalendarPage() {
                   Journey Settings
                 </div>
                 <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Edit your test date, daily study time, and available days here. Your Smart Journey tasks update from your latest test results.
+                  Edit your test date and available days here. Your Smart Journey tasks update from your latest test results and automatically roll missed work forward.
                 </div>
               </div>
             </div>
@@ -281,24 +281,6 @@ export default function CalendarPage() {
                   }}
                   disabled={isAdminPreview}
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
-                />
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Min/day:
-                <input
-                  type="number"
-                  min={20}
-                  max={180}
-                  value={draftStudyPrefs?.minutesPerDay || 45}
-                  onChange={(e) => {
-                    if (isAdminPreview) return
-                    const value = Number(String(e.target.value || '').trim())
-                    const minutesPerDay = Number.isFinite(value) ? Math.max(20, Math.min(180, value)) : 45
-                    const next = { ...(draftStudyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
-                    setDraftStudyPrefs(next)
-                  }}
-                  disabled={isAdminPreview}
-                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
                 />
               </label>
             </div>
@@ -337,9 +319,11 @@ export default function CalendarPage() {
                 Change your settings, then hit <b>Update Track</b> to rebuild the calendar and your dashboard to-dos.
                 {schedule?.needsMoreTime ? (
                   <>
-                    {' '}You need at least <b>{schedule.requiredMinutesPerDay} minutes/day</b> on your available days to be ready by your test date.
+                    {' '}To stay on track, plan for about <b>{schedule.requiredMinutesPerDay} minutes on each study day</b>. If that feels too heavy, add more available days or move your test date back.
                   </>
-                ) : ''}
+                ) : (
+                  <> Missed work automatically moves into the next available study day.</>
+                )}
               </div>
               <button
                 className="btn btn-primary"
