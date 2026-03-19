@@ -16,6 +16,7 @@ import { getChoiceOptionsForQuestion, getExamConfigForTest, getGuideContentForEx
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
+import { hasUnlockedResources } from '../lib/pretestGate.js'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -28,14 +29,14 @@ const ALL_GUIDE_CONTENT = {
   ...getGuideContentForExam('act'),
 }
 
-function Navbar({ dashboardHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref }) {
+function Navbar({ dashboardHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref, showResources = true }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={dashboardHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <TopResourceNav current="mistakes" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <TopResourceNav hidden={!showResources} current="mistakes" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -125,6 +126,53 @@ async function loadPdfTextRange(pdfUrl, startPageIndex, endPageIndex) {
   return parts.join(' ')
 }
 
+function digitsOnly(value) {
+  return String(value || '').replace(/[^\d]/g, '')
+}
+
+function extractQuestionSnippet(items = [], startIndex = 0, qNum = 0) {
+  const wanted = String(qNum || '')
+  const out = []
+  for (let index = startIndex; index < items.length; index += 1) {
+    const str = String(items[index]?.str || '').trim()
+    if (index > startIndex) {
+      const nextDigits = digitsOnly(str)
+      if (nextDigits && nextDigits !== wanted && nextDigits.length <= 2 && /^[\d.)\]]+$/.test(str)) break
+    }
+    if (str) out.push(str)
+    if (out.join(' ').length > 320) break
+  }
+  return out.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+function findQuestionAnchorOnPage(items = [], qNum = 0) {
+  const wanted = String(qNum || '')
+  const patterns = [
+    new RegExp(`^${wanted}[.)\\]]?$`),
+    new RegExp(`^Q${wanted}$`, 'i'),
+    new RegExp(`^${wanted}$`),
+  ]
+
+  for (let index = 0; index < items.length; index += 1) {
+    const here = String(items[index]?.str || '').trim()
+    const next = String(items[index + 1]?.str || '').trim()
+    const joined = `${here}${next}`.replace(/\s+/g, '')
+    const joinedDigits = digitsOnly(joined)
+    const hereDigits = digitsOnly(here)
+    const directMatch = patterns.some((pattern) => pattern.test(here)) || (hereDigits === wanted && /^[\d.)\]]+$/.test(here))
+    const splitMatch = joinedDigits === wanted && /^[\d.)\]]*$/.test(joined.replace(/[0-9]/g, ''))
+    if (directMatch || splitMatch) {
+      return {
+        index,
+        y: Number(items[index]?.transform?.[5] || 0),
+        snippet: extractQuestionSnippet(items, index, qNum),
+      }
+    }
+  }
+
+  return null
+}
+
 async function findQuestionPageInSection(pdfUrl, startPageIndex, endPageIndex, qNum, preferredPageIndex = null) {
   const url = String(pdfUrl || '').trim()
   if (!url || !Number.isFinite(Number(qNum))) return null
@@ -144,24 +192,22 @@ async function findQuestionPageInSection(pdfUrl, startPageIndex, endPageIndex, q
     const pb = preferredPageIndex == null ? Number.MAX_SAFE_INTEGER : Math.abs(b - preferredPageIndex)
     return pa - pb
   })
-  const patterns = [
-    new RegExp(`\\b${qNum}[\\.):]`),
-    new RegExp(`Question\\s*${qNum}\\b`, 'i'),
-    new RegExp(`\\b${qNum}\\b`),
-  ]
   let best = null
   for (const pageIndex of orderedPages) {
     const page = await pdf.getPage(pageIndex + 1)
     const text = await page.getTextContent()
-    const joined = (text?.items || []).map((item) => item?.str || '').join(' ')
-    let score = 0
-    for (const pattern of patterns) {
-      if (pattern.test(joined)) score += 1
+    const items = text?.items || []
+    const anchor = findQuestionAnchorOnPage(items, qNum)
+    const viewport = page.getViewport({ scale: 1 })
+    if (anchor) {
+      const ratio = Math.max(0, Math.min(0.96, 1 - (anchor.y / Math.max(1, viewport.height || 1))))
+      return { pageIndex, scrollRatio: ratio, snippet: anchor.snippet }
     }
-    if (score > 0 && (!best || score > best.score)) best = { pageIndex, score }
-    if (score >= 2) return pageIndex
+    const joined = items.map((item) => item?.str || '').join(' ')
+    const score = joined.includes(` ${qNum} `) || joined.includes(`${qNum}.`) || joined.includes(`${qNum})`) ? 1 : 0
+    if (score > 0 && (!best || score > best.score)) best = { pageIndex, score, scrollRatio: 0, snippet: '' }
   }
-  return best?.pageIndex ?? null
+  return best || null
 }
 
 export default function Mistakes() {
@@ -190,17 +236,25 @@ export default function Mistakes() {
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
+  const showResourceNav = hasUnlockedResources(viewUserId, exam)
 
   useEffect(() => {
     if (!viewUserId) return
+    let cancelled = false
     setLoading(true)
-    Promise.all([loadMistakes(viewUserId), loadReviewItems(viewUserId)])
+    Promise.allSettled([loadMistakes(viewUserId), loadReviewItems(viewUserId)])
       .then(([m, r]) => {
-        setItems(m.items || [])
-        setReviewItems(r.items || {})
+        if (cancelled) return
+        setItems(m.status === 'fulfilled' ? (m.value.items || []) : [])
+        setReviewItems(r.status === 'fulfilled' ? (r.value.items || {}) : {})
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [viewUserId])
 
   const dueCount = useMemo(() => computeDueCount(reviewItems), [reviewItems])
@@ -245,6 +299,12 @@ export default function Mistakes() {
   }, [selectedItemKey])
 
   useEffect(() => {
+    if (selected && !filtered.some((item) => item.id === selected.id)) {
+      setSelected(null)
+    }
+  }, [filtered, selected])
+
+  useEffect(() => {
     if (!selected) {
       setResolvedPdfTarget({ pageIndex: 0, scrollRatio: 0 })
       return
@@ -257,15 +317,20 @@ export default function Mistakes() {
     async function refineTarget() {
       if (!selectedCfg?.pdfUrl || selectedViewerMode !== 'stack' || !Array.isArray(selectedSectionRange)) return
       try {
-        const pageIndex = await findQuestionPageInSection(
+        const target = await findQuestionPageInSection(
           selectedCfg.pdfUrl,
           selectedSectionRange[0],
           selectedSectionRange[1],
           selected?.q_num,
           resolvedPdfTarget.pageIndex
         )
-        if (!cancelled && Number.isFinite(Number(pageIndex))) {
-          setResolvedPdfTarget((prev) => ({ ...prev, pageIndex }))
+        if (!cancelled && Number.isFinite(Number(target?.pageIndex))) {
+          setResolvedPdfTarget((prev) => ({
+            ...prev,
+            pageIndex: Number(target.pageIndex),
+            scrollRatio: Number.isFinite(Number(target.scrollRatio)) ? Number(target.scrollRatio) : prev.scrollRatio,
+          }))
+          if (target?.snippet) setQuestionContextText(target.snippet)
         }
       } catch {}
     }
@@ -280,6 +345,7 @@ export default function Mistakes() {
     async function loadContext() {
       if (!selected || !selectedCfg?.pdfUrl) return
       try {
+        if (selectedViewerMode === 'stack' && questionContextText) return
         const start = resolvedPdfTarget.pageIndex
         const end = selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange)
           ? Math.min(selectedSectionRange[1], start + 1)
@@ -294,7 +360,7 @@ export default function Mistakes() {
     return () => {
       cancelled = true
     }
-  }, [selected, selectedCfg?.pdfUrl, resolvedPdfTarget.pageIndex, selectedViewerMode, selectedSectionRange])
+  }, [selected, selectedCfg?.pdfUrl, resolvedPdfTarget.pageIndex, selectedViewerMode, selectedSectionRange, questionContextText])
 
   if (loading) {
     return (
@@ -321,6 +387,7 @@ export default function Mistakes() {
         currentExam={exam}
         satHref={satHref}
         actHref={actHref}
+        showResources={showResourceNav}
       />
       <div className="page fade-up">
         {isAdminPreview && (
@@ -430,7 +497,7 @@ export default function Mistakes() {
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'auto', background: 'white', marginBottom: 14 }}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: 'white', marginBottom: 14 }}>
                   {selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange) ? (
                     <PDFSectionStack
                       pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
@@ -439,6 +506,7 @@ export default function Mistakes() {
                       zoom={zoom}
                       initialPageIndex={resolvedPdfTarget.pageIndex}
                       initialScrollRatio={resolvedPdfTarget.scrollRatio}
+                      containerStyle={{ maxHeight: '62vh', padding: 10 }}
                     />
                   ) : (
                     <PDFPage
@@ -450,7 +518,7 @@ export default function Mistakes() {
                   )}
                 </div>
 
-                <div className={`mistake-answer-box${exam === 'act' ? ' act-sticky' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                <div className={`mistake-answer-box${exam === 'act' ? ' act-sticky' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
                     <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
@@ -550,6 +618,7 @@ export default function Mistakes() {
                           )}
                         </div>
 
+                        {redoFeedback && !redoFeedback.ok && (
                         <div style={{ marginTop: 14, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: 14 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             <div style={{ fontWeight: 900, color: '#9a3412' }}>Hints (optional)</div>
@@ -576,6 +645,7 @@ export default function Mistakes() {
                             {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
                           </ul>
                         </div>
+                        )}
 
                         {redoFeedback?.ok && (
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>

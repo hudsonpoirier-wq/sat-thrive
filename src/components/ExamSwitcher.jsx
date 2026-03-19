@@ -3,9 +3,9 @@ import { Link, useLocation } from 'react-router-dom'
 export default function ExamSwitcher({ currentExam = 'sat', satHref = '/dashboard?exam=sat', actHref = '/dashboard?exam=act' }) {
   const location = useLocation()
   const searchExam = String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase()
-  const normalizedExam = currentExam === 'act' || currentExam === 'sat'
-    ? currentExam
-    : (searchExam === 'act' || searchExam === 'sat' ? searchExam : 'sat')
+  const normalizedExam = searchExam === 'act' || searchExam === 'sat'
+    ? searchExam
+    : (currentExam === 'act' || currentExam === 'sat' ? currentExam : 'sat')
   const tabs = [
     { id: 'sat', label: 'SAT', sub: 'Dashboard', href: satHref },
     { id: 'act', label: 'ACT', sub: 'Dashboard', href: actHref },
@@ -22,6 +22,7 @@ export default function ExamSwitcher({ currentExam = 'sat', satHref = '/dashboar
             aria-selected={active}
             aria-current={active ? 'page' : undefined}
             className={`exam-switcher-tab${active ? ' active' : ''}`}
+            data-exam={tab.id}
           >
             <span className="exam-switcher-label">{tab.label}</span>
             <span className="exam-switcher-sub">{tab.sub}</span>

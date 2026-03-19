@@ -12,7 +12,10 @@ export default function TopResourceNav({
   guideHref = '/guide',
   mistakesHref = '/mistakes',
   current = '',
+  hidden = false,
 }) {
+  if (hidden) return null
+
   const hrefById = {
     calendar: calendarHref,
     guide: guideHref,

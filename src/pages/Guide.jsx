@@ -11,15 +11,16 @@ import { getChaptersForExam, getGuideContentForExam } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
+import { hasUnlockedResources } from '../lib/pretestGate.js'
 
-function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref }) {
+function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref, showResources = true }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <TopResourceNav current="guide" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <TopResourceNav hidden={!showResources} current="guide" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -444,6 +445,7 @@ export default function Guide() {
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
+  const showResourceNav = hasUnlockedResources(viewUserId, exam)
 
   useEffect(() => {
     const sp = new URLSearchParams(location.search || '')
@@ -518,6 +520,7 @@ export default function Guide() {
         currentExam={exam}
         satHref={satHref}
         actHref={actHref}
+        showResources={showResourceNav}
       />
       <div className="page fade-up">
         {isAdminPreview && (

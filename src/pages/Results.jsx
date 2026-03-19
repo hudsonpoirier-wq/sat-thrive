@@ -14,6 +14,7 @@ import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.j
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintSummary } from '../lib/questionHints.js'
+import { hasUnlockedResources, setUnlockedResources } from '../lib/pretestGate.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -198,6 +199,7 @@ export default function Results() {
   const examConfig = getExamConfigForTest(attempt?.test_id || (exam === 'act' ? 'act1' : 'pre_test'))
   const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
+  const [showDatePrompt, setShowDatePrompt] = useState(false)
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
@@ -247,6 +249,7 @@ export default function Results() {
   const answers = attempt?.answers || {}
   const keyBySection = getAnswerKeyBySection(attempt?.test_id)
   const isPreTest = (attempt?.test_id === examConfig.preTestId) || (attempt?.test_id === 'practice_test_11' && exam === 'sat') || !attempt?.test_id
+  const showResourceNav = hasUnlockedResources(viewUserId, exam) || Boolean(isPreTest && attempt?.completed_at)
   const scoreColumns = getScoreColumnsForExam(exam)
   const reviewCount = useMemo(() => {
     if (!keyBySection) return 0
@@ -274,6 +277,20 @@ export default function Results() {
   }), [weakTopics, reviewCount, prefs, satDate, exam])
 
   const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
+
+  useEffect(() => {
+    if (attempt?.completed_at && isPreTest) {
+      setUnlockedResources(viewUserId, exam, true)
+    }
+  }, [attempt?.completed_at, isPreTest, viewUserId, exam])
+
+  useEffect(() => {
+    if (readOnlyView) {
+      setShowDatePrompt(false)
+      return
+    }
+    setShowDatePrompt(Boolean(isPreTest && attempt?.completed_at && !satDate))
+  }, [readOnlyView, isPreTest, attempt?.completed_at, satDate])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>
@@ -305,7 +322,7 @@ export default function Results() {
         <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
           <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
-          <TopResourceNav calendarHref={viewHref('/calendar')} guideHref={viewHref('/guide')} mistakesHref={viewHref('/mistakes')} />
+          <TopResourceNav hidden={!showResourceNav} calendarHref={viewHref('/calendar')} guideHref={viewHref('/guide')} mistakesHref={viewHref('/mistakes')} />
           <button
             className="btn btn-outline"
             onClick={() => navigate(-1)}
@@ -323,6 +340,39 @@ export default function Results() {
       </nav>
 
       <div className="page fade-up">
+        {showDatePrompt && (
+          <div className="card" style={{ marginBottom: 18, border: '1px solid rgba(14,165,233,.24)', background: 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.08))' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ minWidth: 280, flex: '1 1 320px' }}>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>
+                  Before we build your Smart Journey calendar…
+                </div>
+                <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.65 }}>
+                  Enter your <b>official or estimated {examConfig.label} test date</b>. We use it to build your day-by-day plan before you open the calendar.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={satDate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSatDate(value)
+                    saveSatTestDate(viewUserId, value, exam)
+                  }}
+                  style={{ padding: '10px 12px', border: '1.5px solid #cbd5e1', borderRadius: 12, fontSize: 14, background: 'white', minWidth: 180 }}
+                />
+                <button
+                  className="btn btn-primary"
+                  disabled={!satDate}
+                  onClick={() => setShowDatePrompt(false)}
+                >
+                  Continue →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
             <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
@@ -432,15 +482,21 @@ export default function Results() {
                 Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target {examConfig.label} date.
               </p>
             </div>
-            <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
-              Open Full Calendar →
-            </Link>
+            {showDatePrompt ? (
+              <button className="btn btn-outline" style={{ flexShrink: 0 }} disabled>
+                Set Test Date First
+              </button>
+            ) : (
+              <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
+                Open Full Calendar →
+              </Link>
+            )}
           </div>
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Test date:
+                Official or estimated test date:
                 <input
                   type="date"
                   value={satDate || ''}

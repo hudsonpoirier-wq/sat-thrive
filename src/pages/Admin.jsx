@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -187,6 +187,19 @@ export default function Admin() {
   const [regrading, setRegrading] = useState(false)
   const [analyticsExam, setAnalyticsExam] = useState('sat')
 
+  const fetchAdminSnapshot = useCallback(async () => {
+    const [p, a, ps] = await Promise.allSettled([
+      supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
+      supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+      supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
+    ])
+    return {
+      students: p.status === 'fulfilled' ? (p.value.data || []) : [],
+      attempts: a.status === 'fulfilled' ? (a.value.data || []) : [],
+      postScores: ps.status === 'fulfilled' ? (ps.value.data || []) : [],
+    }
+  }, [])
+
   useEffect(() => {
     if (!supabase) return
     if (profile && !isAdmin) {
@@ -196,15 +209,11 @@ export default function Admin() {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const [p, a, ps] = await Promise.allSettled([
-        supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
-        supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
-        supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
-      ])
+      const snapshot = await fetchAdminSnapshot()
       if (cancelled) return
-      setStudents(p.status === 'fulfilled' ? (p.value.data || []) : [])
-      setAttempts(a.status === 'fulfilled' ? (a.value.data || []) : [])
-      setPostScores(ps.status === 'fulfilled' ? (ps.value.data || []) : [])
+      setStudents(snapshot.students)
+      setAttempts(snapshot.attempts)
+      setPostScores(snapshot.postScores)
       setLoading(false)
     }
     load().catch(() => {
@@ -213,7 +222,46 @@ export default function Admin() {
     return () => {
       cancelled = true
     }
-  }, [profile, isAdmin, navigate])
+  }, [profile, isAdmin, navigate, fetchAdminSnapshot])
+
+  useEffect(() => {
+    if (!supabase || !isAdmin) return
+    let disposed = false
+    let debounce = null
+
+    const refresh = async () => {
+      try {
+        const snapshot = await fetchAdminSnapshot()
+        if (disposed) return
+        setStudents(snapshot.students)
+        setAttempts(snapshot.attempts)
+        setPostScores(snapshot.postScores)
+      } catch {}
+    }
+
+    const queueRefresh = () => {
+      clearTimeout(debounce)
+      debounce = setTimeout(refresh, 250)
+    }
+
+    const channel = supabase
+      .channel(`admin-live:${profile?.id || 'shared'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'test_attempts' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_scores' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'studied_topics' }, queueRefresh)
+      .subscribe()
+
+    const interval = setInterval(refresh, 15000)
+
+    return () => {
+      disposed = true
+      clearTimeout(debounce)
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
+  }, [isAdmin, profile?.id, fetchAdminSnapshot])
 
   async function resetStudentData(userId, email) {
     if (!supabase || !isAdmin) return

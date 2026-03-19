@@ -54,6 +54,14 @@ function extractQuestionAnchors(questionText = '') {
   return { numbers, refs, variables }
 }
 
+function meaningfulFragment(questionText = '') {
+  const cleaned = String(questionText || '').replace(/\s+/g, ' ').trim()
+  if (!cleaned) return ''
+  const sentence = firstSentence(cleaned).replace(/\b[A-HJ-K]\.\s+[A-Z][A-Z\s-]+/g, '').trim()
+  if (!sentence) return ''
+  return sentence.length > 140 ? `${sentence.slice(0, 137).trim()}…` : sentence
+}
+
 function inferSignals({ questionText = '', chapterName = '', section = '', exam = '' }) {
   const haystack = `${questionText} ${chapterName} ${section} ${exam}`.toLowerCase()
   return {
@@ -129,7 +137,7 @@ function buildCheckHint({ exam, section, isMC, signals }) {
   return 'After narrowing it down, test your answer against the original problem one more time. The correct choice should satisfy every condition in the question.'
 }
 
-function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors }) {
+function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment }) {
   const family = sectionFamily(exam, section)
   const moduleLabel = chapterCode ? `${chapterCode} — ${chapterName}` : chapterName
   if (family === 'math') {
@@ -141,22 +149,26 @@ function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode
     return `For Q${qNum}, write the setup before doing arithmetic. If the choices are close, the setup matters more than the computation speed.`
   }
   if (family === 'english') {
+    if (fragment) return `For Q${qNum}, reread the part around “${fragment}” and decide what the sentence needs most: grammar, punctuation, or the smoother wording. Then eliminate every choice that fails that one job.`
     if (anchors.refs.length) return `For Q${qNum}, reread ${anchors.refs[0]} and the sentence around the underlined part. Choose the option that keeps the grammar clean and the paragraph moving logically.`
     if (signals.transition) return `For Q${qNum}, ignore the answer choices for a second and decide how the sentence should connect to the ideas around it—continuation, contrast, cause/effect, or conclusion. Then pick the choice that does exactly that.`
     if (signals.punctuation) return `For Q${qNum}, check whether the sentence has one complete thought or two. Use that to decide if the punctuation should join, separate, or set off information.`
     return `For Q${qNum}, reread the sentence before and after the underlined part. The correct ACT English answer has to be grammatically correct and fit the paragraph’s flow.`
   }
   if (family === 'reading-writing') {
+    if (fragment) return `For Q${qNum}, go back to “${fragment}” and decide what that sentence is supposed to do there—clarify, connect ideas, or make the point more precise.`
     if (anchors.refs.length) return `For Q${qNum}, go back to ${anchors.refs[0]} and decide exactly what that sentence needs—clarity, support, or a better transition—before comparing choices.`
     if (signals.transition) return `For Q${qNum}, decide what the sentence or paragraph needs next—support, contrast, continuation, or conclusion—before comparing the choices.`
     if (signals.punctuation) return `For Q${qNum}, test the structure of the sentence first. Ask whether the punctuation changes meaning, separates full ideas, or simply adds extra detail.`
     return `For Q${qNum}, go back to the exact sentence and ask what job the correct answer must do there: clarify, connect ideas, or improve precision.`
   }
   if (family === 'reading') {
+    if (fragment) return `For Q${qNum}, start with the lines around “${fragment}” and find the exact words in the passage that support one choice better than the others.`
     if (anchors.refs.length) return `For Q${qNum}, start at ${anchors.refs[0]} and locate the exact phrase that answers the question. The best choice should match the passage wording more precisely than the others.`
     return `For Q${qNum}, find the exact part of the passage that answers the question${phrases.readingTask ? ` about ${phrases.readingTask}` : ''}. Do not choose until you can point to the supporting words in the text.`
   }
   if (family === 'science') {
+    if (fragment) return `For Q${qNum}, use the part about “${fragment}” to decide which figure, table, or experiment you should read first. Then pull only the data that answers that one point.`
     if (anchors.refs.length) return `For Q${qNum}, use ${anchors.refs[0]} first. Read the labels and units there, then pull only the data needed for this question before comparing choices.`
     if (signals.graph || phrases.scienceTask) return `For Q${qNum}, begin with ${phrases.scienceTask || 'the relevant figure or table'}. Read the labels and units, then trace only the data needed for this question before looking at the answer choices.`
     return `For Q${qNum}, decide whether the question is asking about a trend, a comparison, or an experimental setup. Then use the data first and the science vocabulary second.`
@@ -166,7 +178,7 @@ function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode
     : `For Q${qNum}, write down the exact value or expression the question wants, solve for only that, and make sure your final response is in the right format.`
 }
 
-function buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices }) {
+function buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices, fragment }) {
   const family = sectionFamily(exam, section)
   if (family === 'math') {
     if (anchors.variables.length) return `Track what each symbol means in Q${qNum} (${anchors.variables.join(', ')}). Solve for only the quantity the question asks for, then compare that to the choices.`
@@ -176,6 +188,7 @@ function buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors
       : 'Check each transformation in your work line by line. Most misses here come from one setup slip that carries through the rest of the problem.'
   }
   if (family === 'english' || family === 'reading-writing') {
+    if (fragment) return `Use the wording around “${fragment}” as your checkpoint. Read each option back into that exact spot and keep only the choice that is both correct and natural in context.`
     return phrases.grammarTask
       ? `This is a ${phrases.grammarTask} style question. Explain out loud why each wrong choice fails—grammar, logic, repetition, or flow—before you settle on the final answer.`
       : 'Eliminate answer choices with a specific reason, not a feeling. The best choice should improve both correctness and flow.'
@@ -213,14 +226,15 @@ export function buildQuestionHintLadder({
   const signals = inferSignals({ questionText, chapterName, section, exam })
   const phrases = detectPhrases(questionText)
   const anchors = extractQuestionAnchors(questionText)
+  const fragment = meaningfulFragment(questionText)
   const seed = hashString(`${exam}:${section}:${chapterCode || chapterName}:${qNum}:${questionText}`)
   const shuffledConcepts = conceptBodies.length ? seededShuffle(conceptBodies, seed) : []
   const sectionHint = buildSectionHint({ exam, section, isMC, qNum, signals })
   const checkHint = buildCheckHint({ exam, section, isMC, signals })
 
-  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors })
+  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment })
   const conceptHint = shuffledConcepts[0] ? firstSentence(shuffledConcepts[0]) : ''
-  const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices })}${conceptHint ? ` ${conceptHint}` : ''}`
+  const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices, fragment })}${conceptHint ? ` ${conceptHint}` : ''}`
   const step3 = checkHint
 
   return distinctHints([step1, step2, step3, conceptLead ? `Key concept reminder: ${conceptLead}` : '', sectionHint]).slice(0, 3)

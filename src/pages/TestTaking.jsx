@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import PDFPage from '../components/PDFPage.jsx'
 import PDFSectionStack from '../components/PDFSectionStack.jsx'
-import { answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
+import { PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
@@ -900,6 +900,7 @@ export default function TestTaking() {
                   pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'}
                   startPage={sectionRange[0]}
                   endPage={sectionRange[1]}
+                  containerStyle={{ width: '100%' }}
                 />
               ) : (
 	              <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />

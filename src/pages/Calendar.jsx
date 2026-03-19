@@ -11,15 +11,16 @@ import { getExamFromTestId, getTestsForExam } from '../data/tests.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
+import { hasUnlockedResources } from '../lib/pretestGate.js'
 
-function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, isAdminPreview, currentExam, satHref, actHref }) {
+function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, isAdminPreview, currentExam, satHref, actHref, showResources = true }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <TopResourceNav current="calendar" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <TopResourceNav hidden={!showResources} current="calendar" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -73,6 +74,7 @@ export default function CalendarPage() {
   const requestedDayKey = useMemo(() => new URLSearchParams(location.search || '').get('day') || '', [location.search])
   const satHref = useMemo(() => withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
   const actHref = useMemo(() => withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
+  const showResourceNav = hasUnlockedResources(viewUserId, exam)
 
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
@@ -224,6 +226,7 @@ export default function CalendarPage() {
           currentExam={exam}
           satHref={satHref}
           actHref={actHref}
+          showResources={showResourceNav}
         />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
           Loading calendar…
@@ -243,6 +246,7 @@ export default function CalendarPage() {
         currentExam={exam}
         satHref={satHref}
         actHref={actHref}
+        showResources={showResourceNav}
       />
       <div className="page fade-up">
         {isAdminPreview && (

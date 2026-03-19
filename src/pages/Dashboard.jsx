@@ -22,12 +22,13 @@ import {
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withViewUser, withExam } from '../lib/viewAs.js'
 import { chooseDashboardExam, saveLocalPreferredExam, userNeedsExamChoice } from '../lib/examChoice.js'
+import { setUnlockedResources } from '../lib/pretestGate.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar({ viewUserId, isAdminPreview, currentExam }) {
+function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
@@ -41,7 +42,7 @@ function Navbar({ viewUserId, isAdminPreview, currentExam }) {
       <BrandLink to={withViewUser(withExam('/dashboard', currentExam), viewUserId, isAdminPreview)} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <TopResourceNav calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <TopResourceNav hidden={!showResources} calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         {isAdmin && (
           <Link
             to="/admin"
@@ -389,6 +390,7 @@ export default function Dashboard() {
   const totalDuration = formatDurationMinutes(
     examConfig.moduleOrder.reduce((sum, moduleId) => sum + Number(examConfig.modules?.[moduleId]?.time || 0), 0)
   )
+  const calendarEntryHref = (!satDate && latestCompleted?.id) ? viewHref(`/results/${latestCompleted.id}`) : viewHref('/calendar')
   const scoreColumns = getScoreColumnsForExam(exam)
   const bestScoreLabel = exam === 'act' ? 'Best ACT Composite' : 'Best SAT Score'
   const improvementLabel = lowestScoreRecord
@@ -442,6 +444,10 @@ export default function Dashboard() {
     return (primary.length ? primary : fallback).slice(0, 3)
   }, [journeySchedule])
 
+  useEffect(() => {
+    setUnlockedResources(viewUserId, exam, hasTakenPretest)
+  }, [viewUserId, exam, hasTakenPretest])
+
   function scheduleCardTitle(day, idx) {
     if (idx === 0 && day?.isToday) return 'Today'
     if (idx === 0) return 'Next Study Day'
@@ -492,13 +498,13 @@ export default function Dashboard() {
   } : null
 
   if (loading) return <>
-    <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
+    <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} currentExam={exam} showResources={false} />
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100vh - 60px)',color:'#64748b'}}>Loading…</div>
   </>
 
   return (
     <>
-      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
+      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} currentExam={exam} showResources={hasTakenPretest} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 18, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -623,13 +629,13 @@ export default function Dashboard() {
                 </div>
                 <button
                   className="btn btn-outline"
-                  onClick={() => navigate(viewHref('/calendar'))}
+                  onClick={() => navigate(calendarEntryHref)}
                   style={{ padding: '8px 12px', fontSize: 12 }}
                 >
-                  Edit Test Date &amp; Availability
+                  {satDate ? 'Edit Test Date & Availability' : 'Set Test Date & Availability'}
                 </button>
-                <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ padding: '8px 12px', fontSize: 12 }}>
-                  View Calendar →
+                <Link className="btn btn-outline" to={calendarEntryHref} style={{ padding: '8px 12px', fontSize: 12 }}>
+                  {satDate ? 'View Calendar →' : 'Set Test Date →'}
                 </Link>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import PDFPage from './PDFPage.jsx'
 
-export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zoom = 1, initialPageIndex = null, initialScrollRatio = 0 }) {
+export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zoom = 1, initialPageIndex = null, initialScrollRatio = 0, containerStyle = {} }) {
   const start = Math.max(0, Number(startPage || 0))
   const end = Math.max(start, Number(endPage || start))
   const pages = Array.from({ length: end - start + 1 }, (_, index) => start + index)
@@ -29,7 +29,7 @@ export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zo
   }, [initialPageIndex, initialScrollRatio, pdfUrl, startPage, endPage, zoom])
 
   return (
-    <div ref={rootRef} style={{ display: 'grid', gap: 12 }}>
+    <div ref={rootRef} style={{ display: 'grid', gap: 12, overflowY: 'auto', height: '100%', ...containerStyle }}>
       {pages.map((pageIndex) => (
         <div
           key={pageIndex}
