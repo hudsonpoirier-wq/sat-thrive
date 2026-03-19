@@ -5,12 +5,13 @@ import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapterGuideStarted } from '../lib/studyProgress.js'
 import BrandLink from '../components/BrandLink.jsx'
+import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 
-function Navbar() {
+function Navbar({ viewUserId, isAdminPreview }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <BrandLink />
+      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
       <div className="nav-actions">
         <button
           className="btn btn-outline"
@@ -20,10 +21,10 @@ function Navbar() {
         >
           ← Back
         </button>
-        <Link to="/guide" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={withViewUser('/guide', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
           Study Guide
         </Link>
-        <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={withViewUser('/dashboard', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
       </div>
@@ -286,7 +287,9 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-        <div style={{ fontWeight: 800, color: '#1a2744' }}>Practice {idx + 1}</div>
+        <div style={{ fontWeight: 800, color: '#1a2744' }}>
+          {problem?.mode === 'redo' ? `Mastery Redo ${problem?.redoIndex || 1}` : `Core Problem ${idx + 1}`}
+        </div>
         <div style={{ fontSize: 12, color: answered ? '#10b981' : '#94a3b8', fontWeight: 800 }}>
           {answered ? 'Completed' : 'Not completed'}
         </div>
@@ -415,11 +418,16 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
 }
 
 export default function Guide() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const location = useLocation()
+  const { viewUserId, isAdminPreview } = useMemo(
+    () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
+    [user?.id, profile, location.search]
+  )
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
   const [practiceByChapter, setPracticeByChapter] = useState({})
+  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
 
   useEffect(() => {
     const sp = new URLSearchParams(location.search || '')
@@ -428,25 +436,25 @@ export default function Guide() {
   }, [location.search])
 
   useEffect(() => {
-    if (!user?.id) return
-    getStudiedTopics(user.id).then(({ map, practiceByChapter }) => {
+    if (!viewUserId) return
+    getStudiedTopics(viewUserId).then(({ map, practiceByChapter }) => {
       setCompletedMap(map || {})
       setPracticeByChapter(practiceByChapter || {})
     })
-  }, [user?.id])
+  }, [viewUserId])
 
   useEffect(() => {
-    if (!user?.id || !selectedId) return
+    if (!viewUserId || !selectedId || isAdminPreview) return
     const existingPractice = practiceByChapter?.[selectedId] || {}
     if (existingPractice?.meta?.guide_started_at) return
     // Mark the chapter as "started" so the dashboard list reflects In progress only after opening it.
-    markChapterGuideStarted(user.id, selectedId, existingPractice).catch(() => {})
+    markChapterGuideStarted(viewUserId, selectedId, existingPractice).catch(() => {})
     setPracticeByChapter(prev => {
       const base = prev?.[selectedId] && typeof prev[selectedId] === 'object' ? prev[selectedId] : {}
       const meta = base.meta && typeof base.meta === 'object' ? base.meta : {}
       return { ...(prev || {}), [selectedId]: { ...base, meta: { ...meta, guide_started_at: new Date().toISOString() } } }
     })
-  }, [user?.id, selectedId])
+  }, [viewUserId, selectedId, isAdminPreview])
 
   const domains = useMemo(() => {
     const grouped = {}
@@ -466,10 +474,16 @@ export default function Guide() {
     const out = []
     for (let i = 0; i < 25; i++) {
       const base = problems[i % problems.length]
-      out.push({ ...base, q: i < problems.length ? base.q : `${base.q}\n\n(Variant ${i - problems.length + 1})` })
+      out.push({
+        ...base,
+        mode: i < problems.length ? 'core' : 'redo',
+        redoIndex: i >= problems.length ? (i - problems.length + 1) : null,
+      })
     }
     return out
   }, [problems])
+  const corePracticeCount = Math.min(25, problems.length)
+  const masteryRedoCount = Math.max(0, expandedProblems.length - corePracticeCount)
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const totalChapters = Object.keys(CHAPTERS).length
@@ -479,8 +493,16 @@ export default function Guide() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar />
+      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
       <div className="page fade-up">
+        {isAdminPreview && (
+          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+              You’re viewing this student’s Study Guide in read-only mode, so their progress won’t change while you troubleshoot.
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
 	          <div>
 	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📖 Study Guide</h1>
@@ -521,23 +543,24 @@ export default function Guide() {
 	                  return (
 	                <button
 	                  className="btn"
-	                  disabled={!allCorrect && !completedMap[selectedId]}
+	                  disabled={isAdminPreview || (!allCorrect && !completedMap[selectedId])}
                   style={{
-                    opacity: (!allCorrect && !completedMap[selectedId]) ? .6 : 1,
-                    cursor: (!allCorrect && !completedMap[selectedId]) ? 'not-allowed' : 'pointer',
+                    opacity: (isAdminPreview || (!allCorrect && !completedMap[selectedId])) ? .6 : 1,
+                    cursor: (isAdminPreview || (!allCorrect && !completedMap[selectedId])) ? 'not-allowed' : 'pointer',
                     background: completedMap[selectedId] ? '#10b981' : '#f59e0b',
                     color: '#1a2744',
                     fontWeight: 800
                   }}
                   onClick={async () => {
+                    if (isAdminPreview) return
                     const next = !completedMap[selectedId]
                     if (next && !allCorrect) return
                     const updated = { ...completedMap, [selectedId]: next }
                     setCompletedMap(updated)
-                    await setStudiedTopic(user.id, selectedId, next)
+                    await setStudiedTopic(viewUserId, selectedId, next)
                   }}
                 >
-                  {completedMap[selectedId] ? '✅ Marked Complete' : 'Mark Chapter Complete'}
+                  {isAdminPreview ? 'Preview only' : completedMap[selectedId] ? '✅ Marked Complete' : 'Mark Chapter Complete'}
                 </button>
                   )
                 })()}
@@ -573,6 +596,12 @@ export default function Guide() {
 	                    {Object.values(selectedGuideMap || {}).filter(Boolean).length}/{expandedProblems.length} correct
 	                  </div>
 	                </div>
+	                <div className="card" style={{ marginBottom: 12, background: '#f8fafc', borderStyle: 'dashed' }}>
+	                  <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>How many to do in this chapter</div>
+	                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>
+	                    Complete <b>{corePracticeCount} core question{corePracticeCount === 1 ? '' : 's'}</b> first, then <b>{masteryRedoCount} mastery redo{masteryRedoCount === 1 ? '' : 's'}</b> to reach the full <b>25/25</b> target. If you see repeats, that’s intentional—they’re there to lock the skill in before the chapter counts as complete.
+	                  </div>
+	                </div>
 	                <div style={{ display: 'grid', gap: 12 }}>
 	                  {expandedProblems.map((p, idx) => (
 	                    <PracticeProblem
@@ -582,13 +611,14 @@ export default function Guide() {
 	                      concepts={content.concepts}
 	                      answered={Boolean(selectedGuideMap[idx])}
 	                      onAnswered={async (correct) => {
+	                        if (isAdminPreview) return
 	                        if (!correct) return
 	                        const existingPractice = practiceByChapter[selectedId] || {}
 	                        const existingGuide = extractGuideMap(existingPractice)
 	                        const nextGuide = { ...existingGuide, [idx]: true }
 	                        const nextPractice = { ...(existingPractice && typeof existingPractice === 'object' ? existingPractice : {}), guide: nextGuide }
 	                        setPracticeByChapter(prev => ({ ...prev, [selectedId]: nextPractice }))
-	                        await setChapterGuidePractice(user.id, selectedId, nextGuide, existingPractice)
+	                        await setChapterGuidePractice(viewUserId, selectedId, nextGuide, existingPractice)
 	                      }}
 	                    />
 	                  ))}

@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
-import { getStudiedTopics } from '../lib/studyProgress.js'
-import { loadMistakes, loadReviewItems } from '../lib/mistakesStore.js'
 import { buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
@@ -12,21 +10,23 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import { TESTS } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
+import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar() {
+function Navbar({ viewUserId, isAdminPreview }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
   return (
     <nav className="nav">
-      <BrandLink />
+      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
       <div className="nav-actions">
         <Link
-          to="/guide"
+          to={withViewUser('/guide', viewUserId, isAdminPreview)}
           className="btn btn-outline"
           style={{
             padding: '6px 14px',
@@ -128,7 +128,12 @@ function ScheduleTaskLink({ task, compact = false }) {
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
+  const { viewUserId, isAdminPreview } = useMemo(
+    () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
+    [user?.id, profile, location.search]
+  )
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
   const [studied, setStudied] = useState({})
@@ -143,18 +148,23 @@ export default function Dashboard() {
   const [mistakes, setMistakes] = useState([])
   const [planText, setPlanText] = useState('')
   const [rebalancing, setRebalancing] = useState(false)
-  const [satDate, setSatDate] = useState(() => loadSatTestDate(user?.id))
-  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(user?.id))
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
+  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const [targetProfile, setTargetProfile] = useState(null)
 
   useEffect(() => {
-    setSatDate(loadSatTestDate(user?.id))
-    setStudyPrefs(loadStudyPrefs(user?.id))
-  }, [user?.id])
+    setSatDate(loadSatTestDate(viewUserId))
+    setStudyPrefs(loadStudyPrefs(viewUserId))
+  }, [viewUserId])
+
+  const displayProfile = isAdminPreview ? targetProfile : profile
+  const readOnlyView = isAdminPreview
+  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
 
   function hasViewedResultsForAttempt(attemptId) {
-    if (!user?.id || !attemptId) return false
+    if (!viewUserId || !attemptId) return false
     try {
-      const key = `agora_viewed_results_v1:${user.id}`
+      const key = `agora_viewed_results_v1:${viewUserId}`
       const raw = localStorage.getItem(key)
       const obj = raw ? JSON.parse(raw) : {}
       return Boolean(obj?.[String(attemptId)])
@@ -199,24 +209,23 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !viewUserId) return
     let cancelled = false
 
     async function loadDashboardData() {
       setLoading(true)
-
-      const [attemptsRes, postScoresRes] = await Promise.allSettled([
-        supabase.from('test_attempts').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
-        supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })
+      const [data, previewProfile] = await Promise.all([
+        loadDashboardViewData(viewUserId),
+        isAdminPreview ? loadProfileSafe(viewUserId) : Promise.resolve(null),
       ])
-
-      const rows = attemptsRes.status === 'fulfilled' ? (attemptsRes.value.data || []) : []
-      const posts = postScoresRes.status === 'fulfilled' ? (postScoresRes.value.data || []) : []
+      const rows = data?.attempts || []
+      const posts = data?.postScores || []
 
       if (cancelled) return
 
       setAttempts(rows)
       setPostScores(posts)
+      setTargetProfile(previewProfile || null)
 
       try {
         const firstCompleted = (rows || []).find(r => r.completed_at || r.scores?.total) || null
@@ -225,35 +234,14 @@ export default function Dashboard() {
         setPlanText('')
       }
 
-      try {
-        const { map, rows: stRows } = await getStudiedTopics(user.id)
-        if (!cancelled) {
-          setStudied(map || {})
-          setStudiedRows(stRows || [])
-        }
-      } catch {
-        if (!cancelled) {
-          setStudied({})
-          setStudiedRows([])
-        }
-      }
-
-      try {
-        const r = await loadReviewItems(user.id)
-        if (!cancelled) setReviewItems(r.items || {})
-      } catch {
-        if (!cancelled) setReviewItems({})
-      }
-
-      try {
-        const m = await loadMistakes(user.id)
-        if (!cancelled) setMistakes(m.items || [])
-      } catch {
-        if (!cancelled) setMistakes([])
-      }
+      setStudied(data?.studiedMap || {})
+      setStudiedRows(data?.studiedRows || [])
+      setReviewItems(data?.reviewItems || {})
+      setMistakes(data?.mistakes || [])
 
       if (!cancelled) setLoading(false)
 
+      if (readOnlyView) return
       const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
       needsPatch.slice(0, 3).forEach(async (r) => {
         const computed = computeScoresFromAnswers(r)
@@ -281,9 +269,10 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, viewUserId, isAdminPreview, readOnlyView])
 
   async function startNewTest(testId = 'pre_test') {
+    if (readOnlyView) return
     if (testId === 'pre_test') {
       if (!confirmStart) { setConfirmStart(true); return }
       setConfirmStart(false)
@@ -305,6 +294,7 @@ export default function Dashboard() {
   }
 
   async function savePostScore(attemptId) {
+    if (readOnlyView) return
     const sc = parseInt(postInput)
     if (isNaN(sc) || sc < 400 || sc > 1600) return alert('Enter a valid score (400–1600)')
     const rw = Math.round(sc * 0.5 / 10) * 10
@@ -376,14 +366,13 @@ export default function Dashboard() {
       ...schedule,
       days: (schedule?.days || []).map((day) => ({
         ...day,
-        tasks: (day.tasks || []).map((task) => (
-          task.type === 'results'
-            ? { ...task, href: `/results/${latestCompleted.id}` }
-            : task
-        )),
+        tasks: (day.tasks || []).map((task) => {
+          const href = task.type === 'results' ? `/results/${latestCompleted.id}` : task.href
+          return { ...task, href: viewHref(href) }
+        }),
       })),
     }
-  }, [hasTakenPretest, latestCompleted, studied, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes])
+  }, [hasTakenPretest, latestCompleted, studied, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes, viewHref])
 
   const scheduleDayCards = journeySchedule?.days?.slice(0, 3) || []
 
@@ -449,18 +438,34 @@ export default function Dashboard() {
   } : null
 
   if (loading) return <>
-    <Navbar />
+    <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100vh - 60px)',color:'#64748b'}}>Loading…</div>
   </>
 
   return (
     <>
-      <Navbar />
+      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
       <div className="page fade-up">
+        {isAdminPreview && (
+          <div className="card" style={{ marginBottom: 18, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+                  You’re previewing {displayProfile?.full_name || 'this student'}’s dashboard. Troubleshooting links work, but data-changing actions are read-only here.
+                </div>
+              </div>
+              <Link className="btn btn-outline" to="/admin" style={{ color: 'white', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}>
+                Back to Admin
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Welcome */}
         <div style={{marginBottom:28}}>
           <h1 style={{fontFamily:'Sora,sans-serif',fontSize:26,fontWeight:800,color:'#1a2744'}}>
-            Hey {profile?.full_name?.split(' ')[0] || 'there'}
+            {`Hey there ${displayProfile?.full_name?.split(' ')[0] || 'there'}!`}
           </h1>
           <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your SAT progress</p>
         </div>
@@ -510,15 +515,15 @@ export default function Dashboard() {
 	              </div>
 	              {preInProgress ? (
 	                <div style={{display:'flex', gap:10}}>
-	                  <button className="btn" onClick={() => navigate(`/test/${preInProgress.id}`)}
+	                  <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
 	                    style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
-	                    ▶ Resume
+	                    {readOnlyView ? 'Preview only' : '▶ Resume'}
 	                  </button>
 	                </div>
 	              ) : (
-	                <button className="btn" onClick={() => startNewTest('pre_test')} disabled={startingTest}
+	                <button className="btn" onClick={() => startNewTest('pre_test')} disabled={startingTest || readOnlyView}
 	                  style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
-	                  {startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : 'Start Pre Test'}
+	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : 'Start Pre Test'}
 	                </button>
 	              )}
 	            </div>
@@ -532,8 +537,8 @@ export default function Dashboard() {
 	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
 	                    Cancel
 	                  </button>
-	                  <button className="btn" onClick={() => startNewTest('pre_test')} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
-	                    Start Test
+	                  <button className="btn" onClick={() => startNewTest('pre_test')} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
+	                    {readOnlyView ? 'Preview only' : 'Start Test'}
 	                  </button>
 	                </div>
 	              </div>
@@ -554,9 +559,14 @@ export default function Dashboard() {
                   Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening tomorrow’s tasks early.
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="calendar" size={16} />
-                {journeySchedule.hasTestDate ? 'Calendar runs through 3 days before your test.' : 'Set a test date to expand the full calendar.'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="calendar" size={16} />
+                  {journeySchedule.hasTestDate ? 'Calendar runs through 3 days before your test.' : 'Set a test date to expand the full calendar.'}
+                </div>
+                <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ padding: '8px 12px', fontSize: 12 }}>
+                  View Calendar →
+                </Link>
               </div>
             </div>
 
@@ -620,7 +630,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 16 }}>
+          <div className="journey-grid" style={{ marginTop: 16 }}>
             {(() => {
               const toReview = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
               const steps = [
@@ -629,6 +639,7 @@ export default function Dashboard() {
                   status: hasTakenPretest ? 'DONE' : (preInProgress ? 'IN PROGRESS' : 'TODO'),
                   desc: 'Take the full timed Pre Test to set your baseline.',
                   onClick: () => {
+                    if (readOnlyView) return
                     if (preInProgress?.id) navigate(`/test/${preInProgress.id}`)
                     else startNewTest('pre_test')
                   },
@@ -648,7 +659,7 @@ export default function Dashboard() {
                   desc: latestCompleted?.id ? 'Open your most recent results and identify weak topics.' : 'Complete a test to unlock results.',
                   onClick: () => {
                     if (!latestCompleted?.id) return
-                    navigate(`/results/${latestCompleted.id}`)
+                    navigate(viewHref(`/results/${latestCompleted.id}`))
                   },
                 },
                 {
@@ -657,13 +668,13 @@ export default function Dashboard() {
                   desc: !hasTakenPretest
                     ? 'Take the Pre Test to generate your mistake list.'
                     : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
-                  onClick: () => navigate('/mistakes'),
+                  onClick: () => navigate(viewHref('/mistakes')),
                 },
                 {
                   title: '5) Study Guide',
                   status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
                   desc: 'Master chapters (25/25) to mark them complete.',
-                  onClick: () => navigate('/guide'),
+                  onClick: () => navigate(viewHref('/guide')),
                 },
               ]
 
@@ -705,7 +716,7 @@ export default function Dashboard() {
           </div>
 
 	          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-	            <button className="btn btn-outline" onClick={() => navigate('/report')} disabled={!hasTakenPretest}>
+	            <button className="btn btn-outline" onClick={() => navigate(viewHref('/report'))} disabled={!hasTakenPretest}>
 	              Progress Report →
 	            </button>
 	            {(() => {
@@ -714,7 +725,7 @@ export default function Dashboard() {
 	            <button
 	              className="btn"
 	              onClick={() => startNewTest('final_test')}
-	              disabled={!unlocked}
+	              disabled={!unlocked || readOnlyView}
 	              style={{
 	                background: unlocked ? '#10b981' : '#e2e8f0',
 	                color: unlocked ? 'white' : '#64748b',
@@ -756,28 +767,31 @@ export default function Dashboard() {
                       value={satDate || ''}
                       onChange={(e) => {
                         const v = e.target.value
-                        setSatDate(v)
-                        saveSatTestDate(user?.id, v)
+	                        setSatDate(v)
+	                        saveSatTestDate(viewUserId, v)
                         if (!latestCompleted) return
                         try {
                           const prefs = studyPrefs
-                          const txt = buildStudyPlanToTestDate({
-                            scores: latestCompleted?.scores || {},
-                            weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-                            prefs,
-                            testDate: v,
-                          })
-                          setPlanText(txt)
-                          supabase
-                            .from('test_attempts')
-                            .update({ study_plan: txt })
-                            .eq('id', latestCompleted.id)
-                            .eq('user_id', user.id)
-                            .catch(() => {})
-                        } catch {}
-                      }}
-                      style={{
-                        padding: '7px 10px',
+	                  const txt = buildStudyPlanToTestDate({
+	                    scores: latestCompleted?.scores || {},
+	                    weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+	                    prefs,
+	                    testDate: v,
+	                  })
+	                  setPlanText(txt)
+	                  if (!readOnlyView) {
+	                    supabase
+	                      .from('test_attempts')
+	                      .update({ study_plan: txt })
+	                      .eq('id', latestCompleted.id)
+	                      .eq('user_id', user.id)
+	                      .catch(() => {})
+	                  }
+	                } catch {}
+	              }}
+	                      disabled={readOnlyView}
+	                      style={{
+	                        padding: '7px 10px',
                         borderRadius: 10,
                         border: '1px solid #e2e8f0',
                         fontSize: 12,
@@ -797,28 +811,31 @@ export default function Dashboard() {
                       onChange={(e) => {
                         const v = Number(String(e.target.value || '').trim())
                         const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
-                        const next = { ...(studyPrefs || loadStudyPrefs(user?.id)), minutesPerDay }
+                        const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
                         setStudyPrefs(next)
-                        try { saveStudyPrefs(user?.id, next) } catch {}
+                        try { saveStudyPrefs(viewUserId, next) } catch {}
                         if (!latestCompleted) return
                         try {
                           const txt = buildStudyPlanToTestDate({
-                            scores: latestCompleted?.scores || {},
-                            weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-                            prefs: next,
-                            testDate: satDate,
-                          })
-                          setPlanText(txt)
-                          supabase
-                            .from('test_attempts')
-                            .update({ study_plan: txt })
-                            .eq('id', latestCompleted.id)
-                            .eq('user_id', user.id)
-                            .catch(() => {})
-                        } catch {}
-                      }}
-                      style={{
-                        width: 86,
+	                          scores: latestCompleted?.scores || {},
+	                          weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+	                          prefs: next,
+	                          testDate: satDate,
+	                        })
+	                        setPlanText(txt)
+	                        if (!readOnlyView) {
+	                          supabase
+	                            .from('test_attempts')
+	                            .update({ study_plan: txt })
+	                            .eq('id', latestCompleted.id)
+	                            .eq('user_id', user.id)
+	                            .catch(() => {})
+	                        }
+	                      } catch {}
+	                    }}
+	                      disabled={readOnlyView}
+	                      style={{
+	                        width: 86,
                         padding: '7px 10px',
                         borderRadius: 10,
                         border: '1px solid #e2e8f0',
@@ -840,11 +857,11 @@ export default function Dashboard() {
                   >
                     Copy
                   </button>
-                  <button
-                    className="btn btn-primary"
-                    disabled={rebalancing || !latestCompleted}
-                    onClick={async () => {
-                      if (!latestCompleted) return
+	                  <button
+	                    className="btn btn-primary"
+	                    disabled={rebalancing || !latestCompleted || readOnlyView}
+	                    onClick={async () => {
+	                      if (!latestCompleted) return
                       setRebalancing(true)
                       try {
                         const prefs = studyPrefs
@@ -855,11 +872,13 @@ export default function Dashboard() {
                           testDate: satDate,
                         })
                         setPlanText(txt)
-                        await supabase
-                          .from('test_attempts')
-                          .update({ study_plan: txt })
-                          .eq('id', latestCompleted.id)
-                          .eq('user_id', user.id)
+                        if (!readOnlyView) {
+                          await supabase
+                            .from('test_attempts')
+                            .update({ study_plan: txt })
+                            .eq('id', latestCompleted.id)
+                            .eq('user_id', user.id)
+                        }
                       } catch {
                         // no-op
                       }
@@ -957,17 +976,18 @@ export default function Dashboard() {
                         </div>
                         <div className="dashboard-practice-actions">
                           {prog ? (
-                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} onClick={() => navigate(`/test/${prog.id}`)}>
-                              Resume →
+                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} disabled={readOnlyView} onClick={() => navigate(`/test/${prog.id}`)}>
+                              {readOnlyView ? 'Preview only' : 'Resume →'}
                             </button>
                           ) : (
                             <>
                               <button
                                 className="btn"
                                 style={{ background: '#1a2744', color: 'white', fontWeight: 900 }}
+                                disabled={readOnlyView}
                                 onClick={() => setConfirmExtraTestId((prev) => (prev === t.id ? null : t.id))}
                               >
-                                Start →
+                                {readOnlyView ? 'Preview only' : 'Start →'}
                               </button>
                               {confirmExtraTestId === t.id && (
                                 <div style={{ marginTop: 10, width: '100%', background: 'rgba(255,255,255,.65)', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
@@ -999,7 +1019,7 @@ export default function Dashboard() {
                               className="btn btn-outline"
                               onClick={() => {
                                 const last = completed.find((a) => a.test_id === t.id)
-                                if (last) navigate(`/results/${last.id}`)
+                                if (last) navigate(viewHref(`/results/${last.id}`))
                               }}
                             >
                               View Results →
@@ -1060,8 +1080,9 @@ export default function Dashboard() {
                             <span style={{fontFamily:'Sora,sans-serif', fontWeight:800, color:'#10b981'}}>{post.post_score}</span>
                           ) : (
                             <button onClick={() => setAddingPost(a.id)}
+                              disabled={readOnlyView}
                               style={{padding:'4px 10px', background:'#f1f5f9', border:'1px solid #e2e8f0', borderRadius:7, fontSize:12, cursor:'pointer', color:'#475569'}}>
-                              + Add
+                              {readOnlyView ? 'Preview only' : '+ Add'}
                             </button>
                           )}
                         </td>
@@ -1073,7 +1094,7 @@ export default function Dashboard() {
                           )}
                         </td>
                         <td style={{padding:'12px'}}>
-                          <Link to={`/results/${a.id}`} style={{fontSize:12, color:'#1a2744', fontWeight:600}}>
+                          <Link to={viewHref(`/results/${a.id}`)} style={{fontSize:12, color:'#1a2744', fontWeight:600}}>
                             View →
                           </Link>
                         </td>

@@ -794,7 +794,11 @@ export default function Admin() {
                   const isSelf = s.id === profile?.id
                   return (
                     <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>{s.full_name || '—'}</td>
+                      <td style={{ padding: '12px', fontWeight: 700 }}>
+                        <Link to={`/dashboard?user=${encodeURIComponent(s.id)}`} style={{ color: '#1a2744', textDecoration: 'none' }}>
+                          {s.full_name || '—'}
+                        </Link>
+                      </td>
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{s.email}</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{ padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: s.role === 'admin' ? '#fef3c7' : s.role === 'tutor' ? '#dbeafe' : '#f0fdf4', color: s.role === 'admin' ? '#92400e' : s.role === 'tutor' ? '#1e40af' : '#166534' }}>
@@ -815,6 +819,9 @@ export default function Admin() {
                           >
                             {resettingUserId === s.id ? 'Resetting…' : 'Reset'}
                           </button>
+                          <Link className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} to={`/dashboard?user=${encodeURIComponent(s.id)}`}>
+                            View UI →
+                          </Link>
                           <Link className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} to={`/report?user=${encodeURIComponent(s.id)}`}>
                             Report →
                           </Link>
@@ -859,7 +866,11 @@ export default function Admin() {
                   const topWeak = a.weak_topics?.[0]
                   return (
                     <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>{student?.full_name || 'Unknown'}</td>
+                      <td style={{ padding: '12px', fontWeight: 700 }}>
+                        <Link to={`/dashboard?user=${encodeURIComponent(a.user_id)}`} style={{ color: '#1a2744', textDecoration: 'none' }}>
+                          {student?.full_name || 'Unknown'}
+                        </Link>
+                      </td>
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(a.started_at).toLocaleDateString()}</td>
                       <td style={{ padding: '12px', fontWeight: 700 }}>{a.scores?.rw || '—'}</td>
                       <td style={{ padding: '12px', fontWeight: 700 }}>{a.scores?.math || '—'}</td>
@@ -872,7 +883,7 @@ export default function Admin() {
                         {topWeak ? `${topWeak.name} (p.${topWeak.page})` : '—'}
                       </td>
                       <td style={{ padding: '12px' }}>
-                        <Link to={`/results/${a.id}`} style={{ fontSize: 12, color: '#1a2744', fontWeight: 600 }}>View →</Link>
+                        <Link to={`/results/${a.id}?user=${encodeURIComponent(a.user_id)}`} style={{ fontSize: 12, color: '#1a2744', fontWeight: 600 }}>View →</Link>
                       </td>
                     </tr>
                   )

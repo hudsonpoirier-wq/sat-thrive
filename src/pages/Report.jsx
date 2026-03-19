@@ -8,16 +8,17 @@ import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesS
 import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
 import BrandLink from '../components/BrandLink.jsx'
+import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar() {
+function Navbar({ dashboardHref, mistakesHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <BrandLink />
+      <BrandLink to={dashboardHref} />
       <div className="nav-actions">
         <button
           className="btn btn-outline"
@@ -27,10 +28,10 @@ function Navbar() {
         >
           ← Back
         </button>
-        <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={dashboardHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
-        <Link to="/mistakes" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={mistakesHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Mistakes
         </Link>
       </div>
@@ -46,9 +47,10 @@ function useQuery() {
 export default function Report() {
   const { user, profile } = useAuth()
   const q = useQuery()
-  const targetUser = q.get('user') || user?.id
-  const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
+  const { viewUserId, isAdminPreview, isAdmin } = resolveViewContext({ userId: user?.id, profile, search: q.toString() ? `?${q.toString()}` : '' })
+  const targetUser = viewUserId || user?.id
   const canView = (String(targetUser) === String(user?.id)) || isAdmin
+  const viewHref = (path) => withViewUser(path, targetUser, isAdminPreview)
 
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
@@ -182,11 +184,12 @@ export default function Report() {
       }]
     }
   }, [report?.series])
+  const completedAttempts = useMemo(() => (attempts || []).filter(a => a.completed_at || a.scores?.total), [attempts])
 
   if (!canView) {
     return (
       <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Navbar />
+        <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
         <div className="page fade-up">
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>Not authorized</div>
@@ -202,7 +205,7 @@ export default function Report() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Navbar />
+        <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
           Building report…
         </div>
@@ -212,8 +215,16 @@ export default function Report() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar />
+      <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
       <div className="page fade-up">
+        {isAdminPreview && (
+          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+              You’re viewing this student’s report. Use the result links below to open the same detailed post-test screens they see.
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
             <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📣 Progress Report</h1>
@@ -248,6 +259,37 @@ export default function Report() {
             </button>
           </div>
         </div>
+
+        {completedAttempts.length > 0 && (
+          <div className="card" style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, color: '#1a2744' }}>Detailed Test Screens</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                  Open the exact post-test results pages this student sees after each completed test.
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {completedAttempts.slice(0, 8).map((attempt) => {
+                const label = TESTS.find(t => t.id === (attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id))?.label || attempt.test_id
+                return (
+                  <div key={attempt.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{label}</div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                        {new Date(attempt.started_at).toLocaleDateString()} · Total {attempt.scores?.total || '—'}
+                      </div>
+                    </div>
+                    <Link className="btn btn-outline" to={viewHref(`/results/${attempt.id}`)}>
+                      Open Results →
+                    </Link>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="stats-grid" style={{ marginBottom: 18 }}>
           {[

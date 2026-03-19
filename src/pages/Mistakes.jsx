@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
@@ -8,12 +8,13 @@ import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import PDFPage from '../components/PDFPage.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
+import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 
-function Navbar() {
+function Navbar({ viewUserId, isAdminPreview }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <BrandLink />
+      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
       <div className="nav-actions">
         <button
           className="btn btn-outline"
@@ -23,7 +24,7 @@ function Navbar() {
         >
           ← Back
         </button>
-        <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={withViewUser('/dashboard', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
       </div>
@@ -50,7 +51,12 @@ function pdfPageFor(testId, section, qNum) {
 }
 
 export default function Mistakes() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const location = useLocation()
+  const { viewUserId, isAdminPreview } = useMemo(
+    () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
+    [user?.id, profile, location.search]
+  )
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState([])
   const [reviewItems, setReviewItems] = useState({})
@@ -63,17 +69,19 @@ export default function Mistakes() {
   const [redoFeedback, setRedoFeedback] = useState(null)
   const [redoSaving, setRedoSaving] = useState(false)
 
+  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+
   useEffect(() => {
-    if (!user?.id) return
+    if (!viewUserId) return
     setLoading(true)
-    Promise.all([loadMistakes(user.id), loadReviewItems(user.id)])
+    Promise.all([loadMistakes(viewUserId), loadReviewItems(viewUserId)])
       .then(([m, r]) => {
         setItems(m.items || [])
         setReviewItems(r.items || {})
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [user?.id])
+  }, [viewUserId])
 
   const dueCount = useMemo(() => computeDueCount(reviewItems), [reviewItems])
 
@@ -125,8 +133,16 @@ export default function Mistakes() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar />
+      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
       <div className="page fade-up">
+        {isAdminPreview && (
+          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+              You’re viewing this student’s Mistake Notebook in read-only mode. Notes and validations won’t overwrite their data.
+            </div>
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
             <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>🧾 Mistake Notebook</h1>
@@ -280,9 +296,9 @@ export default function Mistakes() {
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
                           <button
                             className="btn btn-primary"
-                            disabled={redoSaving || (selectedIsMC ? !redoChoice : !redoText.trim())}
+                            disabled={isAdminPreview || redoSaving || (selectedIsMC ? !redoChoice : !redoText.trim())}
                             onClick={async () => {
-                              if (!selectedItemKey) return
+                              if (isAdminPreview || !selectedItemKey) return
                               const right = String(selectedCorrect || '').trim()
                               const ok = selectedIsMC
                                 ? (String(redoChoice || '').toUpperCase() === right.toUpperCase())
@@ -295,7 +311,7 @@ export default function Mistakes() {
                               try {
                                 const currentItem = reviewItems?.[selectedItemKey] || { due_at: new Date().toISOString() }
                                 const next = applyReviewResult(currentItem, true)
-                                await saveReviewItem(user.id, selectedItemKey, next)
+                                await saveReviewItem(viewUserId, selectedItemKey, next)
                                 setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
                                 // Remove from list immediately.
                                 setItems(prev => (prev || []).filter(m => m.id !== selected.id))
@@ -337,6 +353,7 @@ export default function Mistakes() {
                       value={selected.note || ''}
                       onChange={(e) => setSelected(prev => ({ ...prev, note: e.target.value }))}
                       placeholder="Write 2–4 sentences: what you missed, what the question was testing, and the exact rule/step you’ll use next time."
+                      readOnly={isAdminPreview}
                       style={{
                         width: '100%',
                         minHeight: 110,
@@ -357,15 +374,16 @@ export default function Mistakes() {
                       <button
                         className="btn"
                         style={{ background: '#1a2744', color: 'white', fontWeight: 900 }}
-                        disabled={savingId === selected.id}
+                        disabled={isAdminPreview || savingId === selected.id}
                         onClick={async () => {
+                          if (isAdminPreview) return
                           setSavingId(selected.id)
-                          await updateMistakeNote(user.id, selected.id, selected.note || '')
+                          await updateMistakeNote(viewUserId, selected.id, selected.note || '')
                           setItems(prev => (prev || []).map(m => m.id === selected.id ? { ...m, note: selected.note || '' } : m))
                           setSavingId(null)
                         }}
                       >
-                        {savingId === selected.id ? 'Saving…' : 'Save note'}
+                        {isAdminPreview ? 'Preview only' : savingId === selected.id ? 'Saving…' : 'Save note'}
                       </button>
                     </div>
                   </div>

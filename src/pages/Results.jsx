@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
@@ -7,6 +7,7 @@ import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildPlanFromAttempt, loadStudyPrefs, saveStudyPrefs, dayLabels } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
+import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -49,7 +50,7 @@ function SectionBreakdown({ answers, keyBySection }) {
   )
 }
 
-function QuestionReview({ answers, keyBySection }) {
+function QuestionReview({ answers, keyBySection, guideHref }) {
   const [expanded, setExpanded] = useState(null)
 
   return (
@@ -108,7 +109,7 @@ function QuestionReview({ answers, keyBySection }) {
                         </div>
                         {chData && (
                           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                            📖 Study Guide: <Link to={`/guide?chapter=${encodeURIComponent(ch)}`} style={{ color: '#1a2744', fontWeight: 800 }}>
+                            📖 Study Guide: <Link to={guideHref(ch)} style={{ color: '#1a2744', fontWeight: 800 }}>
                               Chapter {ch} — {chData.name}
                             </Link>
                           </div>
@@ -128,44 +129,57 @@ function QuestionReview({ answers, keyBySection }) {
 
 export default function Results() {
   const { attemptId } = useParams()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const location = useLocation()
+  const { viewUserId, isAdminPreview } = resolveViewContext({ userId: user?.id, profile, search: location.search })
   const navigate = useNavigate()
   const [attempt, setAttempt] = useState(null)
   const [loading, setLoading] = useState(true)
   const [plan, setPlan] = useState('')
   const [generatingPlan, setGeneratingPlan] = useState(false)
-  const [prefs, setPrefs] = useState(() => loadStudyPrefs(user?.id))
+  const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const readOnlyView = isAdminPreview
 
   useEffect(() => {
-    if (!supabase || !user?.id) return
-    supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', user.id).single()
+    setPrefs(loadStudyPrefs(viewUserId))
+  }, [viewUserId])
+
+  useEffect(() => {
+    if (!supabase || !viewUserId) return
+    supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', viewUserId).single()
       .then(({ data }) => {
-        if (!data) { navigate('/dashboard'); return }
-        if (!data.completed_at) { navigate(`/test/${attemptId}`); return }
+        if (!data) { navigate(viewHref('/dashboard')); return }
+        if (!data.completed_at) { navigate(readOnlyView ? viewHref('/dashboard') : `/test/${attemptId}`); return }
         setAttempt(data)
-        try {
-          const key = `agora_viewed_results_v1:${user.id}`
-          const raw = localStorage.getItem(key)
-          const obj = raw ? JSON.parse(raw) : {}
-          obj[String(attemptId)] = new Date().toISOString()
-          localStorage.setItem(key, JSON.stringify(obj))
-        } catch {}
+        if (!readOnlyView) {
+          try {
+            const key = `agora_viewed_results_v1:${viewUserId}`
+            const raw = localStorage.getItem(key)
+            const obj = raw ? JSON.parse(raw) : {}
+            obj[String(attemptId)] = new Date().toISOString()
+            localStorage.setItem(key, JSON.stringify(obj))
+          } catch {}
+        }
         if (data.study_plan) setPlan(data.study_plan)
         else {
-          const txt = buildPlanFromAttempt(data, user.id)
+          const txt = buildPlanFromAttempt(data, viewUserId)
           setPlan(txt)
-          supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', user.id).catch(() => {})
+          if (!readOnlyView) {
+            supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', viewUserId).catch(() => {})
+          }
         }
         setLoading(false)
       })
-  }, [attemptId, user?.id, navigate])
+  }, [attemptId, viewUserId, navigate, readOnlyView])
 
   async function generatePlan() {
+    if (readOnlyView) return
     setGeneratingPlan(true)
     try {
-      const txt = buildPlanFromAttempt(attempt, user.id)
+      const txt = buildPlanFromAttempt(attempt, viewUserId)
       setPlan(txt)
-      await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', user.id)
+      await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', viewUserId)
     } catch (e) {
       setPlan('Error generating plan. Please try again.')
     }
@@ -205,15 +219,23 @@ export default function Results() {
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
       {/* Nav */}
       <nav className="nav">
-        <BrandLink />
+        <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
-          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+          <Link to={viewHref('/dashboard')} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
             ← Dashboard
           </Link>
         </div>
       </nav>
 
       <div className="page fade-up">
+        {isAdminPreview && (
+          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+              You’re viewing this student’s post-test results in read-only mode.
+            </div>
+          </div>
+        )}
         {/* Score Hero */}
         <div className="results-score-hero" style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', opacity: .6, marginBottom: 8 }}>
@@ -298,7 +320,7 @@ export default function Results() {
               <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>🧭 Weekly Study Plan</h3>
               <p style={{ fontSize: 13, color: '#64748b' }}>Auto-built from your missed topics and your available days.</p>
             </div>
-            <button className="btn btn-primary" onClick={generatePlan} disabled={generatingPlan} style={{ flexShrink: 0 }}>
+            <button className="btn btn-primary" onClick={generatePlan} disabled={generatingPlan || readOnlyView} style={{ flexShrink: 0 }}>
               {generatingPlan ? <><span className="spinner" /> Updating…</> : plan ? '🔄 Rebalance' : '🤖 Build Plan'}
             </button>
           </div>
@@ -314,12 +336,14 @@ export default function Results() {
                     type="checkbox"
                     checked={!!prefs?.days?.[i]}
                     onChange={(e) => {
-                      const next = { ...(prefs || loadStudyPrefs(user.id)) }
+                      if (readOnlyView) return
+                      const next = { ...(prefs || loadStudyPrefs(viewUserId)) }
                       next.days = (next.days || Array(7).fill(false)).map(Boolean)
                       next.days[i] = e.target.checked
                       setPrefs(next)
-                      try { saveStudyPrefs(user.id, next) } catch {}
+                      try { saveStudyPrefs(viewUserId, next) } catch {}
                     }}
+                    disabled={readOnlyView}
                   />
                   {d}
                 </label>
@@ -332,11 +356,13 @@ export default function Results() {
                   max={180}
                   value={prefs?.minutesPerDay || 45}
                   onChange={(e) => {
+                    if (readOnlyView) return
                     const v = Number(e.target.value)
-                    const next = { ...(prefs || loadStudyPrefs(user.id)), minutesPerDay: v }
+                    const next = { ...(prefs || loadStudyPrefs(viewUserId)), minutesPerDay: v }
                     setPrefs(next)
-                    try { saveStudyPrefs(user.id, next) } catch {}
+                    try { saveStudyPrefs(viewUserId, next) } catch {}
                   }}
+                  disabled={readOnlyView}
                   style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, background: 'white' }}
                 />
               </div>
@@ -359,11 +385,11 @@ export default function Results() {
         </div>
 
 	        {/* Q-by-Q review */}
-	        {keyBySection && <QuestionReview answers={answers} keyBySection={keyBySection} />}
+	        {keyBySection && <QuestionReview answers={answers} keyBySection={keyBySection} guideHref={(chapterId) => viewHref(`/guide?chapter=${encodeURIComponent(chapterId)}`)} />}
 
         {/* CTA */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 40 }}>
-          <Link to="/dashboard" className="btn btn-primary">← Back to Dashboard</Link>
+          <Link to={viewHref('/dashboard')} className="btn btn-primary">← Back to Dashboard</Link>
         </div>
       </div>
     </div>
