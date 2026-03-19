@@ -242,7 +242,9 @@ export function buildAdaptiveSchedule({
   const totalMinutes = [...reading, ...math].reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
   const requiredMinutesPerDay = Math.max(20, Math.ceil((totalMinutes / Math.max(1, usableDays.length)) / 5) * 5)
   const effectiveMinutesPerDay = requiredMinutesPerDay
-  const tasksPerDay = Math.max(1, Math.min(4, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
+  const avgTasksNeeded = Math.ceil(totalUnits / Math.max(1, usableDays.length))
+  const capacityByTime = Math.max(1, Math.floor(effectiveMinutesPerDay / 15))
+  const tasksPerDay = Math.max(1, Math.min(Math.max(8, avgTasksNeeded), Math.max(avgTasksNeeded, capacityByTime)))
   let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
 
   for (const day of usableDays) {
@@ -293,6 +295,37 @@ export function buildAdaptiveSchedule({
     const subjects = new Set(tasks.map((task) => task.subject).filter((subject) => subject === 'Reading' || subject === 'Math'))
     day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((task) => task.subject === 'Reading' || task.subject === 'Math')?.subject || (tasks.length ? 'Mixed' : 'Rest')
     day.estimatedMinutes = usedMinutes
+  }
+
+  const overflowTasks = []
+  while (reviewBlocks > 0) {
+    const amount = Math.min(5, Math.max(1, reviewLeft || 5))
+    overflowTasks.push({
+      id: `review-overflow-${overflowTasks.length + 1}`,
+      type: 'mistakes',
+      subject: 'Mixed',
+      title: `Review ${amount} missed question${amount === 1 ? '' : 's'}`,
+      subtitle: 'Use the Mistake Notebook and validate each one you fix.',
+      href: '/mistakes',
+      estimatedMinutes: Math.max(12, amount * 3),
+    })
+    reviewLeft = Math.max(0, reviewLeft - amount)
+    reviewBlocks -= 1
+  }
+  overflowTasks.push(...reading, ...math)
+
+  if (overflowTasks.length && usableDays.length) {
+    let dayIndex = 0
+    for (const task of overflowTasks) {
+      const targetDay = usableDays[dayIndex % usableDays.length]
+      targetDay.tasks.push(task)
+      targetDay.estimatedMinutes = Number(targetDay.estimatedMinutes || 0) + Number(task.estimatedMinutes || 0)
+      const subjects = new Set(targetDay.tasks.map((item) => item.subject).filter((subject) => subject === 'Reading' || subject === 'Math'))
+      targetDay.focus = subjects.size > 1
+        ? 'Mixed'
+        : targetDay.tasks.find((item) => item.subject === 'Reading' || item.subject === 'Math')?.subject || (targetDay.tasks.length ? 'Mixed' : 'Rest')
+      dayIndex += 1
+    }
   }
 
   return {
