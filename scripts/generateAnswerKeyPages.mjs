@@ -2,19 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { TESTS } from '../src/data/tests.js'
-import { ANSWER_KEY } from '../src/data/testData.js'
-import { EXTRA_ANSWER_KEYS } from '../src/data/extraAnswerKeys.js'
-import { FINAL_ANSWER_KEY } from '../src/data/finalAnswerKey.js'
+import { getAnswerKeyBySection } from '../src/data/answerKeys.js'
+import { getExamConfigForTest, getQuestionCountForTest } from '../src/data/examData.js'
 
 const ROOT = path.resolve(process.cwd())
 const OUT_DIR = path.join(ROOT, 'public', 'answer-keys')
-
-function keyFor(testId) {
-  if (testId === 'pre_test') return ANSWER_KEY
-  if (testId === 'final_test') return FINAL_ANSWER_KEY
-  if (EXTRA_ANSWER_KEYS?.[testId]) return EXTRA_ANSWER_KEYS[testId]
-  return null
-}
 
 function escapeHtml(s) {
   return String(s)
@@ -32,13 +24,20 @@ function renderTable(map) {
   )).join('\n')
 }
 
-function pageHtml({ title, subtitle, pdfUrl, appUrl, key }) {
-  const sections = [
-    { id: 'rw_m1', label: 'Reading & Writing · Module 1 (Q1–33)' },
-    { id: 'rw_m2', label: 'Reading & Writing · Module 2 (Q1–33)' },
-    { id: 'math_m1', label: 'Math · Module 1 (Q1–27)' },
-    { id: 'math_m2', label: 'Math · Module 2 (Q1–27)' },
-  ]
+function buildSections(testId, key) {
+  const cfg = getExamConfigForTest(testId)
+  return (cfg.moduleOrder || []).map((id) => {
+    const meta = cfg.modules?.[id] || {}
+    return {
+      id,
+      label: `${meta.label || id} · ${meta.module || ''} (Q1–${Number(meta.questions || 0)})`.replace(' ·  (', ' ('),
+      rows: renderTable(key?.[id] || {}),
+    }
+  })
+}
+
+function pageHtml({ testId, title, subtitle, pdfUrl, explanationUrl, appUrl, key }) {
+  const sections = buildSections(testId, key)
 
   return `<!doctype html>
 <html lang="en">
@@ -75,6 +74,7 @@ function pageHtml({ title, subtitle, pdfUrl, appUrl, key }) {
         <div class="sub">${escapeHtml(subtitle)}</div>
         <div class="actions">
           ${pdfUrl ? `<a class="btn primary" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Open Test PDF →</a>` : ''}
+          ${explanationUrl ? `<a class="btn" href="${escapeHtml(explanationUrl)}" target="_blank" rel="noreferrer">Open Explanations PDF →</a>` : ''}
           <a class="btn" href="${escapeHtml(appUrl)}" target="_blank" rel="noreferrer">Open App →</a>
         </div>
         <div class="note">
@@ -86,10 +86,9 @@ function pageHtml({ title, subtitle, pdfUrl, appUrl, key }) {
       <div class="wrap">
         <div class="grid">
           ${sections.map((s) => {
-            const rows = renderTable(key?.[s.id] || {})
             return `<div class="card">
               <div class="title">${escapeHtml(s.label)}</div>
-              <table><tbody>${rows}</tbody></table>
+              <table><tbody>${s.rows}</tbody></table>
             </div>`
           }).join('\n')}
         </div>
@@ -103,15 +102,19 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
   const appUrl = '/login'
-  const targets = TESTS.map((t) => ({ id: t.id, label: t.label, pdfUrl: t.pdfUrl }))
+  const targets = TESTS.map((t) => ({ ...t }))
   for (const t of targets) {
-    const key = keyFor(t.id)
+    const key = getAnswerKeyBySection(t.id)
     if (!key) throw new Error(`Missing built-in key for ${t.id}`)
     const outPath = path.join(OUT_DIR, `${t.id}.html`)
+    const cfg = getExamConfigForTest(t.id)
+    const totalQuestions = getQuestionCountForTest(t.id)
     const html = pageHtml({
+      testId: t.id,
       title: `${t.label} — Answer Key`,
-      subtitle: 'The Agora Project · 4 modules · 120 questions',
+      subtitle: `The Agora Project · ${cfg.moduleOrder.length} sections · ${totalQuestions} questions`,
       pdfUrl: t.pdfUrl,
+      explanationUrl: t.explanationUrl || '',
       appUrl,
       key,
     })
@@ -125,4 +128,3 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
-

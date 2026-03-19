@@ -17,7 +17,6 @@ import {
   getQuestionCountForTest,
   getScoreColumnsForExam,
   scoreAttemptFromKey,
-  scoreToPercentile,
 } from '../data/examData.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withViewUser, withExam } from '../lib/viewAs.js'
@@ -317,7 +316,6 @@ export default function Dashboard() {
 
   const examAttemptIds = new Set(examTests.map((test) => test.id))
   const examAttempts = attempts.filter((attempt) => examAttemptIds.has(normalizeTestId(attempt?.test_id)))
-  const examPostScores = postScores.filter((row) => examAttempts.some((attempt) => attempt.id === row.attempt_id))
   const studiedForExam = Object.fromEntries(Object.entries(studied || {}).filter(([chapterId]) => Boolean(chaptersForExam?.[chapterId])))
   const studiedRowsForExam = (studiedRows || []).filter((row) => Boolean(chaptersForExam?.[row.chapter_id]))
   const mistakesForExam = (mistakes || []).filter((row) => getExamFromTestId(row?.test_id) === exam)
@@ -327,8 +325,6 @@ export default function Dashboard() {
   const latestCompleted = completed.length ? completed[0] : null
   const completedPre = completed.filter(a => normalizeTestId(a.test_id) === examConfig.preTestId)
   const preInProgress = inProgress.find(a => normalizeTestId(a.test_id) === examConfig.preTestId)
-  const preTotals = completedPre.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
-  const bestScore = preTotals.length ? Math.max(...preTotals) : null
   const completedWithScores = completed
     .map((attempt) => ({ attempt, scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}) }))
     .filter((entry) => entry.scores?.total)
@@ -340,13 +336,18 @@ export default function Dashboard() {
     if (!best) return entry
     return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
   }, null)
+  const lowestScoreRecord = completedWithScores.reduce((lowest, entry) => {
+    if (!lowest) return entry
+    return Number(entry.scores.total || 0) < Number(lowest.scores.total || 0) ? entry : lowest
+  }, null)
   const highestTestRecord = fullLengthRecords.reduce((best, entry) => {
     if (!best) return entry
     return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
   }, null)
   const mostRecentRecord = completedWithScores[0] || null
-  const latestPostScore = examPostScores[0]?.post_score
-  const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
+  const improvement = mostRecentRecord && lowestScoreRecord
+    ? Number(mostRecentRecord.scores?.total || 0) - Number(lowestScoreRecord.scores?.total || 0)
+    : null
   const studiedCount = Object.values(studiedForExam).filter(Boolean).length
   const studiedPct = Math.round((studiedCount / Math.max(1, examConfig.guideCompletionTarget)) * 100)
   const hasStartedGuide = (studiedRowsForExam || []).some((r) => {
@@ -365,7 +366,9 @@ export default function Dashboard() {
   )
   const scoreColumns = getScoreColumnsForExam(exam)
   const bestScoreLabel = exam === 'act' ? 'Best ACT Composite' : 'Best SAT Score'
-  const improvementLabel = exam === 'act' ? 'Post-test minus best pre-test composite' : 'Post-test minus best pre-test'
+  const improvementLabel = lowestScoreRecord
+    ? `Most recent minus lowest ${exam === 'act' ? 'composite' : 'score'}`
+    : `${completed.length} completed · ${inProgress.length} in progress`
   const viewedLatestResults = latestCompleted ? hasViewedResultsForAttempt(latestCompleted.id) : false
   const latestMistakes = latestCompleted ? mistakesForExam.filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
   const latestValidated = latestMistakes.filter((m) => {
@@ -392,6 +395,7 @@ export default function Dashboard() {
       hasTakenPretest: true,
       prefs: studyPrefs,
       testDate: satDate,
+      exam,
     })
     return {
       ...schedule,
@@ -521,10 +525,10 @@ export default function Dashboard() {
             />
             <ScoreOverviewCard
               label="Total Improvement"
-              value={improvement ? `+${improvement}` : '—'}
-              sub={improvement ? improvementLabel : `${completed.length} completed · ${inProgress.length} in progress`}
+              value={improvement !== null ? `${improvement > 0 ? '+' : ''}${improvement}` : '—'}
+              sub={improvement !== null ? improvementLabel : `${completed.length} completed · ${inProgress.length} in progress`}
               icon="chart"
-              dark={Boolean(improvement)}
+              dark={improvement !== null && improvement !== 0}
             />
         </div>
 

@@ -73,7 +73,7 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <div style={{ fontWeight: 900, color: '#1a2744', flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.25 }}>
-                      Ch {ch.id}: {ch.name}
+                      {(ch.code || ch.id)}: {ch.name}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       {hasGuide && (
@@ -496,6 +496,7 @@ export default function Guide() {
 
   const ch = selectedId ? chapters[selectedId] : null
   const content = selectedId ? guideContent[selectedId] : null
+  const selectedLabel = ch?.code || selectedId
   const problems = content?.problems || []
   const expandedProblems = useMemo(() => {
     if (!problems.length) return []
@@ -538,7 +539,7 @@ export default function Guide() {
                 Study Guide
               </h1>
 	            <div style={{ color: '#64748b', marginTop: 4, fontSize: 13 }}>
-	              Work through chapters, complete practice, and mark each chapter done. To mark a chapter complete, you must get all 25 practice questions correct.
+	              Work through {exam === 'act' ? 'modules' : 'chapters'}, complete practice, and mark each one done. To mark one complete, you must get all 25 practice questions correct.
 	            </div>
 	          </div>
           <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '12px 14px', minWidth: 280 }}>
@@ -565,7 +566,7 @@ export default function Guide() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, color: '#1a2744' }}>
-                    Chapter {selectedId}: {ch?.name}
+                    {exam === 'act' ? `ACT Module ${selectedLabel}` : `Chapter ${selectedLabel}`}: {ch?.name}
                   </div>
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain}{ch?.page ? ` · Guide p.${ch?.page}` : ''}</div>
                 </div>

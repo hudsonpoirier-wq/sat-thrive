@@ -174,16 +174,24 @@ function chapterTaskUnits(count) {
   return 1
 }
 
-function buildChapterQueues(weakTopics, studiedMap) {
+function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
   const buckets = {}
   for (const topic of normalizeWeakTopics(weakTopics)) {
     if (!topic?.ch || studiedMap?.[String(topic.ch)]) continue
     const units = chapterTaskUnits(topic.count)
+    const isAct = exam === 'act'
+    const label = isAct ? (topic.name || 'ACT Module') : `Chapter ${topic.ch}`
+    const title = isAct
+      ? `${topic.subject || 'ACT'} · ${label}`
+      : `Study Guide · Chapter ${topic.ch}`
+    const subtitle = isAct
+      ? `${topic.domain || topic.subject || 'ACT'} · ${topic.count || 0} missed`
+      : `${topic.name || 'Topic'} · ${topic.count || 0} missed`
     const base = {
       type: 'guide',
       chapterId: String(topic.ch),
-      title: `Study Guide · Chapter ${topic.ch}`,
-      subtitle: `${topic.name || 'Topic'} · ${topic.count || 0} missed`,
+      title,
+      subtitle,
       href: `/guide?chapter=${encodeURIComponent(String(topic.ch))}`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
@@ -218,6 +226,7 @@ export function buildAdaptiveSchedule({
   prefs,
   testDate,
   fromDate = new Date(),
+  exam = 'sat',
 }) {
   const p = prefs || defaultStudyPrefs()
   const start = toDateOnly(fromDate)
@@ -245,7 +254,7 @@ export function buildAdaptiveSchedule({
 
   const activeDays = days.filter((d) => d.isActive)
   const usableDays = activeDays.length ? activeDays : days
-  const subjectQueues = buildChapterQueues(weakTopics, studiedMap || {})
+  const subjectQueues = buildChapterQueues(weakTopics, studiedMap || {}, exam)
   const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
   let reviewBlocks = Math.ceil(pendingReviewCount / 5)
   let reviewLeft = pendingReviewCount
@@ -277,8 +286,8 @@ export function buildAdaptiveSchedule({
         id: `review-${day.key}`,
         type: 'mistakes',
         subject: 'Mixed',
-        title: `Review ${amount} missed question${amount === 1 ? '' : 's'}`,
-        subtitle: 'Use the Mistake Notebook and validate each one you fix.',
+        title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
+        subtitle: `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
         href: '/mistakes',
         estimatedMinutes: Math.max(12, amount * 3),
       }
@@ -328,8 +337,8 @@ export function buildAdaptiveSchedule({
       id: `review-overflow-${overflowTasks.length + 1}`,
       type: 'mistakes',
       subject: 'Mixed',
-      title: `Review ${amount} missed question${amount === 1 ? '' : 's'}`,
-      subtitle: 'Use the Mistake Notebook and validate each one you fix.',
+      title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
+      subtitle: `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
       href: '/mistakes',
       estimatedMinutes: Math.max(12, amount * 3),
     })

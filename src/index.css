@@ -86,6 +86,16 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .btn-success { background: var(--sat-green); color: white; border-color: var(--sat-green); }
 .btn-danger { background: var(--sat-red); color: white; }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+.btn,
+button,
+.nav-brand,
+.exam-switcher-tab,
+.choice-btn,
+.q-nav-btn,
+.mark-review-btn {
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 .input-wrap { margin-bottom: 16px; }
 .input-label { display: block; font-size: 12px; font-weight: 600; color: var(--sat-gray); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
@@ -139,6 +149,57 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .nav-brand-text span { color: var(--sat-accent); }
 .nav-actions { display: flex; align-items: center; gap: 12px; }
 .nav-user { font-size: 13px; color: rgba(255,255,255,.6); }
+
+.exam-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.exam-switcher-tab {
+  min-width: 88px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: rgba(255,255,255,.82);
+  transition: all .18s ease;
+  border: 1px solid transparent;
+}
+
+.exam-switcher-tab:hover {
+  color: white;
+  background: rgba(255,255,255,.08);
+}
+
+.exam-switcher-tab.active {
+  background: white;
+  color: #0f172a;
+  border-color: rgba(255,255,255,.65);
+  box-shadow: 0 12px 28px rgba(15,23,42,.22);
+}
+
+.exam-switcher-label {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .35px;
+}
+
+.exam-switcher-sub {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .22px;
+  opacity: .72;
+}
 
 /* Page wrapper */
 .page {
@@ -401,6 +462,19 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
   overflow-y: auto;
 }
 
+.choice-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-grid.sat {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-grid.act {
+  grid-template-columns: 1fr;
+}
+
 .choice-btn {
   display: flex;
   align-items: flex-start;
@@ -517,6 +591,38 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
   max-width: 100%;
 }
 .pdf-canvas-wrap canvas { display: block; max-width: 100%; height: auto !important; }
+
+.test-layout-act .test-answer-panel {
+  width: 380px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.test-layout-act .answer-choices {
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.test-layout-act .q-navigator {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: white;
+}
+
+.test-layout-act .answer-panel-header {
+  position: sticky;
+  top: 56px;
+  z-index: 2;
+  background: white;
+}
+
+.test-layout-act .answer-panel-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: white;
+}
 
 /* Results page */
 .results-score-hero {
@@ -641,6 +747,30 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
 .login-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
 .login-switch-btn { background: none; border: none; color: #1a2744; font-weight: 700; cursor: pointer; font-size: 13px; }
 
+@media (max-width: 1260px) {
+  .test-layout-act {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .test-layout-act .test-body {
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .test-layout-act .test-pdf-panel {
+    flex: 0 0 auto;
+    min-height: 45vh;
+  }
+
+  .test-layout-act .test-answer-panel {
+    width: 100%;
+    max-height: none;
+    border-left: none;
+    border-top: 1px solid #e5e7eb;
+  }
+}
+
 /* iPhone-only layout fixes (keep iPad/desktop unchanged) */
 @supports (-webkit-touch-callout: none) {
   @media (max-width: 540px) and (pointer: coarse) {
@@ -722,5 +852,16 @@ h1,h2,h3,h4,h5 { font-family: 'Sora', sans-serif; }
     .login-points { margin-top: 8px; }
     .login-auth-col { padding: 6px 0 10px; }
     .login-card { padding: 26px 18px; border-radius: 20px; max-width: 520px; }
+  }
+}
+
+@media (max-width: 720px) {
+  .exam-switcher-tab {
+    min-width: 72px;
+    padding: 8px 10px;
+  }
+
+  .exam-switcher-sub {
+    display: none;
   }
 }

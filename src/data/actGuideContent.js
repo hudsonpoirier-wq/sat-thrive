@@ -1,78 +1,12 @@
-export const ACT_GUIDE_CONTENT = {
-  'act-english': {
-    intro: `ACT English rewards clean editing. Most questions test grammar, punctuation, sentence structure, and whether a revision improves clarity, logic, or organization. The fastest path is to read just enough context to understand the sentence, predict what must be fixed, and then choose the clearest answer.`,
-    concepts: [
-      { title: 'Start with grammar before style', body: 'If one choice creates a comma splice, pronoun mismatch, verb tense error, or modifier issue, eliminate it first. ACT English often hides an obvious grammar rule inside a “best revision” question.', type: 'rule' },
-      { title: 'Prefer concise, precise wording', body: 'When multiple answers are grammatically valid, choose the one that says the same thing most directly. The ACT rarely rewards extra words, repetition, or vague transitions.', type: 'tip' },
-      { title: 'Read around the underlined part', body: 'Look one sentence before and after the change. Many English questions are really testing paragraph logic, sentence order, or whether a detail supports the main idea.', type: 'rule' },
-      { title: 'Use transition meaning, not tone', body: 'Transitions must match the relationship between ideas: addition, contrast, cause/effect, or example. Pick the word that matches the logic of the passage, not the one that merely sounds formal.', type: 'tip' },
-    ],
-    problems: [
-      { q: 'The hikers packed extra water, sunscreen, and trail maps, ___ they knew the desert route offered little shade.', choices: { A: 'however,', B: 'because', C: 'for example,', D: 'meanwhile,' }, correct: 'B', exp: 'The second clause explains why they packed the supplies, so a cause word is needed. “Because” is the only logical transition.' },
-      { q: 'At the museum, Maya admired the sculpture, and she took notes about the artist’s techniques.', choices: { A: 'NO CHANGE', B: 'sculpture and, she took', C: 'sculpture and took', D: 'sculpture, she took' }, correct: 'C', exp: 'The sentence has a compound predicate with the same subject, so no comma is needed before “and took.”' },
-      { q: 'The article describes how engineers redesigned the bridge to make it safer, lighter, and more cost-efficient for the city.', choices: { A: 'NO CHANGE', B: 'city more cost-efficient.', C: 'city, and more efficient in cost.', D: 'city and, cost-efficient.' }, correct: 'A', exp: 'The original version is parallel, concise, and clear. The other choices break parallel structure or add awkward wording.' },
-      { q: 'During rehearsal, the violinist tuned her instrument carefully. ___, the conductor asked the orchestra to begin from measure thirty-two.', choices: { A: 'For instance', B: 'Afterward', C: 'Nevertheless', D: 'Similarly' }, correct: 'B', exp: 'The second sentence happens next in time. “Afterward” best shows sequence.' },
-      { q: 'Leah placed the seedlings near the window, hoping the extra sunlight would help them grow faster.', choices: { A: 'NO CHANGE', B: 'window hoping the extra sunlight would help them grow faster.', C: 'window; hoping the extra sunlight would help them grow faster.', D: 'window, and hoping the extra sunlight would help them grow faster.' }, correct: 'A', exp: 'The original correctly uses a comma before the participial phrase that describes Leah’s action.' },
-      { q: 'The final paragraph should be revised to emphasize the telescope’s long-term impact on astronomy. Which choice best accomplishes that goal?', choices: { A: 'It repeats the opening sentence word for word.', B: 'It adds a brief definition of telescope.', C: 'It explains how later discoveries depended on the instrument.', D: 'It removes all references to scientists.' }, correct: 'C', exp: 'To emphasize long-term impact, the best revision connects the telescope to later discoveries.' },
-      { q: 'The botanist recorded each plant’s height, color, and the number of leaves it produced.', choices: { A: 'NO CHANGE', B: 'plant’s height, color, and leaf count.', C: 'plant’s height, how colorful it was, and the number of leaves it produced.', D: 'plant’s height, color, and produce leaves.' }, correct: 'B', exp: 'Choice B keeps the list parallel and concise. The original is acceptable, but B improves precision and consistency the most.' },
-      { q: 'The essay argues that public libraries remain essential, ___ they provide free internet access, study space, and community programs.', choices: { A: 'for', B: 'yet', C: 'instead', D: 'otherwise' }, correct: 'A', exp: 'The second clause supports the claim, so “for” correctly introduces the reason.' },
-    ],
-  },
-  'act-math': {
-    intro: `ACT Math moves quickly across algebra, geometry, probability, functions, and trigonometry. The best strategy is to identify the topic fast, write the cleanest equation possible, and avoid overcomplicating straightforward arithmetic.`,
-    concepts: [
-      { title: 'Translate before solving', body: 'Turn the words into algebra first. Once the setup is correct, many ACT Math questions collapse into a short equation or proportion.', type: 'rule' },
-      { title: 'Use the answer choices strategically', body: 'If a problem feels messy, test the answers, plug values back in, or estimate. The ACT rewards efficient shortcuts when they are accurate.', type: 'tip' },
-      { title: 'Watch units and labels', body: 'A surprising number of mistakes come from choosing area instead of perimeter, degrees instead of radians, or feet instead of inches.', type: 'rule' },
-      { title: 'Simplify before you calculate', body: 'Reduce fractions, factor common terms, and rewrite expressions before multiplying. Cleaner algebra prevents avoidable errors.', type: 'tip' },
-    ],
-    problems: [
-      { q: 'If 3x + 7 = 22, what is the value of x?', choices: { A: '3', B: '4', C: '5', D: '7' }, correct: 'C', exp: 'Subtract 7 to get 3x = 15, then divide by 3. x = 5.' },
-      { q: 'A rectangle has length 12 and width 5. What is its area?', choices: { A: '17', B: '34', C: '60', D: '120' }, correct: 'C', exp: 'Area of a rectangle is length × width = 12 × 5 = 60.' },
-      { q: 'A bag contains 4 red marbles and 6 blue marbles. What is the probability of drawing a red marble?', choices: { A: '2/5', B: '1/2', C: '3/5', D: '4/5' }, correct: 'A', exp: 'There are 10 total marbles, 4 of them red, so the probability is 4/10 = 2/5.' },
-      { q: 'If y = 2x - 3 and x = 4, what is y?', choices: { A: '1', B: '5', C: '8', D: '11' }, correct: 'B', exp: 'Substitute x = 4: y = 2(4) - 3 = 8 - 3 = 5.' },
-      { q: 'A circle has radius 3. What is its circumference?', choices: { A: '3π', B: '6π', C: '9π', D: '18π' }, correct: 'B', exp: 'Circumference = 2πr = 2π(3) = 6π.' },
-      { q: 'What is the slope of the line through (1, 2) and (5, 10)?', choices: { A: '1', B: '2', C: '4', D: '8' }, correct: 'B', exp: 'Slope = (10 - 2) / (5 - 1) = 8 / 4 = 2.' },
-      { q: 'If a shirt costs $24 after a 20% discount, what was the original price?', choices: { A: '$28', B: '$30', C: '$32', D: '$36' }, correct: 'B', exp: 'After a 20% discount, the price is 80% of original. 24 ÷ 0.8 = 30.' },
-      { q: 'In a right triangle, one leg is 6 and the hypotenuse is 10. What is the length of the other leg?', choices: { A: '4', B: '6', C: '8', D: '12' }, correct: 'C', exp: 'Use the Pythagorean theorem: 6² + b² = 10², so 36 + b² = 100, giving b² = 64 and b = 8.' },
-    ],
-  },
-  'act-reading': {
-    intro: `ACT Reading is about accuracy under time pressure. Focus on what the passage actually says, not what seems reasonable from outside knowledge. Strong readers move quickly to line evidence and stay literal unless the question clearly asks for an inference.`,
-    concepts: [
-      { title: 'Answer from the passage, not memory', body: 'Go back to the relevant lines for almost every question. The ACT often uses tempting choices that sound true but are not supported by the exact wording.', type: 'rule' },
-      { title: 'Literal first, inference second', body: 'If two choices seem possible, the one most directly supported is usually right. ACT inference questions are still grounded in clear passage evidence.', type: 'tip' },
-      { title: 'Track viewpoint and tone', body: 'Notice whether the passage is admiring, skeptical, reflective, or neutral. Tone and author-purpose questions become easier when you name the attitude in plain language.', type: 'rule' },
-      { title: 'Use passage structure', body: 'The ACT Reading test is organized in predictable chunks. If a question asks about a paragraph or shift, identify what that section is doing: introducing, contrasting, illustrating, or concluding.', type: 'tip' },
-    ],
-    problems: [
-      { q: 'The passage states that the inventor tested three prototypes before choosing a final design. This detail primarily suggests that the inventor was:', choices: { A: 'impatient', B: 'methodical', C: 'uncertain of science', D: 'uninterested in improvement' }, correct: 'B', exp: 'Testing several prototypes before deciding shows a careful, methodical approach.' },
-      { q: 'When the author describes the town square as “finally awake,” the phrase most nearly indicates that the square was:', choices: { A: 'physically moving', B: 'crowded and active', C: 'newly built', D: 'in danger' }, correct: 'B', exp: '“Awake” is figurative here and suggests that the square had become lively and active.' },
-      { q: 'Which statement is best supported by the passage?', choices: { A: 'The scientist disliked collaboration.', B: 'The team changed its hypothesis after collecting new evidence.', C: 'The experiment failed completely.', D: 'The author never visited the site.' }, correct: 'B', exp: 'The supported idea is the one directly tied to the new evidence described in the passage.' },
-      { q: 'The main purpose of the second paragraph is to:', choices: { A: 'introduce the problem the rest of the passage examines', B: 'argue that the first paragraph is incorrect', C: 'list every event in chronological order', D: 'shift the passage to an unrelated topic' }, correct: 'A', exp: 'The second paragraph frames the issue and sets up the argument that follows.' },
-      { q: 'As used in line 42, the word “plain” most nearly means:', choices: { A: 'ordinary', B: 'flat land', C: 'obvious', D: 'undecorated clothing' }, correct: 'C', exp: 'Context points to “plain” meaning obvious or clear, not a physical landscape.' },
-      { q: 'The narrator’s attitude toward her childhood home is best described as:', choices: { A: 'dismissive', B: 'nostalgic', C: 'hostile', D: 'confused' }, correct: 'B', exp: 'The passage reflects affectionate memory and reflection, which signals nostalgia.' },
-      { q: 'The comparison in the final paragraph helps the reader understand the mountain by emphasizing its:', choices: { A: 'size and permanence', B: 'ability to change color', C: 'economic value', D: 'danger to tourists' }, correct: 'A', exp: 'The comparison is used to highlight scale and lasting presence.' },
-      { q: 'It can reasonably be inferred that the researchers would most likely agree with which statement?', choices: { A: 'All earlier studies were invalid.', B: 'More data is needed before a final conclusion is made.', C: 'Their experiment proved the theory beyond doubt.', D: 'The subject is no longer worth studying.' }, correct: 'B', exp: 'The passage presents evidence with caution, so the most reasonable inference is that more data is still needed.' },
-    ],
-  },
-  'act-science': {
-    intro: `ACT Science is a reading-and-reasoning test built around charts, experiments, and competing viewpoints. You do not need outside science knowledge for most questions. Your job is to read the figure labels carefully, identify what changes, and compare claims using the data provided.`,
-    concepts: [
-      { title: 'Start with titles, axes, and units', body: 'Before answering anything, read what each graph or table measures. Many wrong answers come from mixing up the x-axis, y-axis, or units.', type: 'rule' },
-      { title: 'Compare the exact rows or trials asked about', body: 'Science questions often test whether you can isolate one condition from several. Find the correct study, then read only the relevant row, column, or point.', type: 'tip' },
-      { title: 'Conflicting viewpoints = claim matching', body: 'When two students or scientists disagree, focus on what each one would predict. You usually do not need to know who is “scientifically right”; you need to know whose view matches the statement.', type: 'rule' },
-      { title: 'Estimate trends when exact values are unnecessary', body: 'If the graph is asking for increase, decrease, or greatest difference, estimate visually before doing any detailed reading. Trend first, exact number second.', type: 'tip' },
-    ],
-    problems: [
-      { q: 'A graph shows temperature on the x-axis and reaction rate on the y-axis. As temperature rises from 10°C to 30°C, the reaction rate also rises. Which statement is supported?', choices: { A: 'Reaction rate decreases as temperature rises.', B: 'Reaction rate stays constant.', C: 'Reaction rate increases as temperature rises.', D: 'Temperature and reaction rate are unrelated.' }, correct: 'C', exp: 'The graph directly shows both values increasing over that interval.' },
-      { q: 'In Experiment 2, Trial A used 5 mL of water and Trial B used 10 mL. If Trial B produced more gas, the data suggest that increasing water volume may:', choices: { A: 'reduce gas production', B: 'increase gas production', C: 'have no measurable effect', D: 'change the color of the gas only' }, correct: 'B', exp: 'Because the higher water-volume trial produced more gas, the supported conclusion is that more water may increase gas production.' },
-      { q: 'Student 1 claims the sample is made of copper. Student 2 claims it is made of aluminum. Which new result would most strongly support Student 1?', choices: { A: 'The sample has the density shown for copper in the table.', B: 'The sample is shiny.', C: 'The sample was found in a lab.', D: 'The sample can be cut with scissors.' }, correct: 'A', exp: 'A measured density matching copper is the strongest direct evidence for Student 1’s claim.' },
-      { q: 'According to the table, Species X grew 2 cm in low light and 6 cm in high light. What is the best conclusion?', choices: { A: 'Species X grows more in high light than in low light.', B: 'Species X cannot survive in low light.', C: 'Species X always grows exactly 4 cm.', D: 'Light has no effect on growth.' }, correct: 'A', exp: 'The table shows higher growth in high light, so that is the supported conclusion.' },
-      { q: 'A researcher wants to test whether fertilizer type affects plant height. Which variable should stay constant?', choices: { A: 'fertilizer type', B: 'plant height after growth', C: 'amount of sunlight', D: 'the conclusion' }, correct: 'C', exp: 'To isolate fertilizer type, other growing conditions such as sunlight should be held constant.' },
-      { q: 'If a line on a graph slopes downward from left to right, the relationship between the two variables is best described as:', choices: { A: 'positive', B: 'negative', C: 'constant', D: 'cyclical' }, correct: 'B', exp: 'A downward slope means one variable decreases as the other increases, which is a negative relationship.' },
-      { q: 'Scientist A says the planet formed quickly. Scientist B says it formed slowly over millions of years. Which finding would support Scientist B?', choices: { A: 'The surface shows layers built up over long periods.', B: 'The planet is round.', C: 'The planet has gravity.', D: 'The planet reflects sunlight.' }, correct: 'A', exp: 'Evidence of layers building up gradually supports slow formation over time.' },
-      { q: 'A chart shows that solution pH changed from 3 to 7 after treatment. The solution became:', choices: { A: 'more acidic', B: 'less acidic', C: 'unchanged', D: 'radioactive' }, correct: 'B', exp: 'A higher pH means lower acidity, so the solution became less acidic.' },
-    ],
-  },
-}
+import { ACT_GUIDE_MODULES } from './actGuideCatalog.js'
+
+export const ACT_GUIDE_CONTENT = Object.fromEntries(
+  ACT_GUIDE_MODULES.map((module) => [
+    module.id,
+    {
+      intro: module.intro,
+      concepts: module.concepts,
+      problems: module.problems,
+    },
+  ])
+)

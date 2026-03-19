@@ -689,7 +689,7 @@ export default function TestTaking() {
   })()
 
   return (
-    <div className="test-layout">
+    <div className={`test-layout${examConfig.exam === 'act' ? ' test-layout-act' : ''}`}>
       {/* Header */}
       <div className="test-header">
 	        <div className="test-header-left">
@@ -899,7 +899,7 @@ export default function TestTaking() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${choices.length >= 5 ? 5 : 2}, minmax(0, 1fr))`, gap: 10 }}>
+              <div className={`choice-grid ${examConfig.exam === 'act' ? 'act' : 'sat'}`}>
                 {choices.map(letter => (
                   <button
                     key={letter}

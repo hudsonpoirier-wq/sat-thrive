@@ -61,7 +61,7 @@ export default function PasswordInput({
           fontFamily: "'DM Sans', sans-serif",
           fontSize: 14,
           color: isEmpty ? '#94a3b8' : '#1a2744',
-          cursor: 'text',
+          cursor: 'default',
           opacity: reveal ? 0 : 1,
         }}
         title={reveal && !isEmpty ? 'Password (revealed while hovering dots)' : undefined}

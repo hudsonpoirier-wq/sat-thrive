@@ -165,8 +165,9 @@ export default function CalendarPage() {
       hasTakenPretest: true,
       prefs: studyPrefs,
       testDate: satDate,
+      exam,
     })
-  }, [latestCompleted, hasTakenPretest, studiedForExam, reviewTodoCount, studyPrefs, satDate, mistakes])
+  }, [latestCompleted, hasTakenPretest, studiedForExam, reviewTodoCount, studyPrefs, satDate, mistakes, exam])
 
   const homeHref = withViewUser(withExam('/dashboard', exam), viewUserId, isAdminPreview)
   const guideHref = withViewUser(withExam('/guide', exam), viewUserId, isAdminPreview)

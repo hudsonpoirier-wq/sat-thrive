@@ -1,9 +1,6 @@
 import { ACT_ANSWER_KEYS, ACT_SECTION_PAGE_RANGES } from './actGenerated.js'
+import { ACT_GUIDE_MODULES } from './actGuideCatalog.js'
 export { ACT_ANSWER_KEYS, ACT_SECTION_PAGE_RANGES }
-
-function mapAllQuestions(total, chapterId) {
-  return Object.fromEntries(Array.from({ length: total }, (_, index) => [index + 1, chapterId]))
-}
 
 function interpolateScore(score, table) {
   const sorted = [...table].sort((a, b) => a.score - b.score)
@@ -29,42 +26,48 @@ export const ACT_MODULES = {
 
 export const ACT_MODULE_ORDER = ['act_english', 'act_math', 'act_reading', 'act_science']
 
-export const ACT_CHAPTERS = {
-  'act-english': {
-    name: 'English: Usage & Rhetoric',
-    page: 'ACT English',
-    domain: 'ACT English',
-    subject: 'English',
-    color: '#3b82f6',
-  },
-  'act-math': {
-    name: 'Math: Algebra, Geometry & Trig',
-    page: 'ACT Math',
-    domain: 'ACT Math',
-    subject: 'Math',
-    color: '#10b981',
-  },
-  'act-reading': {
-    name: 'Reading: Passage Analysis',
-    page: 'ACT Reading',
-    domain: 'ACT Reading',
-    subject: 'Reading',
-    color: '#8b5cf6',
-  },
-  'act-science': {
-    name: 'Science: Data, Experiments & Viewpoints',
-    page: 'ACT Science',
-    domain: 'ACT Science',
-    subject: 'Science',
-    color: '#f97316',
-  },
+export const ACT_CHAPTERS = Object.fromEntries(
+  ACT_GUIDE_MODULES.map((module) => [
+    module.id,
+    {
+      name: module.name,
+      page: '',
+      domain: module.domain,
+      subject: module.subject,
+      color: module.color,
+      code: module.code,
+    },
+  ])
+)
+
+function buildQuestionMap(sectionId, total) {
+  const relevant = ACT_GUIDE_MODULES
+    .filter((module) => module.sectionId === sectionId)
+    .sort((a, b) => Number(a.questions?.[0] || 0) - Number(b.questions?.[0] || 0))
+
+  const map = {}
+  for (const module of relevant) {
+    const [start, end] = module.questions || []
+    for (let q = Number(start || 0); q <= Number(end || 0); q += 1) {
+      if (map[q]) {
+        throw new Error(`Duplicate ACT chapter mapping for ${sectionId} question ${q}`)
+      }
+      map[q] = module.id
+    }
+  }
+  for (let q = 1; q <= total; q += 1) {
+    if (!map[q]) {
+      throw new Error(`Missing ACT chapter mapping for ${sectionId} question ${q}`)
+    }
+  }
+  return map
 }
 
 export const ACT_QUESTION_CHAPTER_MAP = {
-  act_english: mapAllQuestions(75, 'act-english'),
-  act_math: mapAllQuestions(60, 'act-math'),
-  act_reading: mapAllQuestions(40, 'act-reading'),
-  act_science: mapAllQuestions(40, 'act-science'),
+  act_english: buildQuestionMap('act_english', 75),
+  act_math: buildQuestionMap('act_math', 60),
+  act_reading: buildQuestionMap('act_reading', 40),
+  act_science: buildQuestionMap('act_science', 40),
 }
 
 export const ACT_TESTS = [
@@ -74,7 +77,7 @@ export const ACT_TESTS = [
     label: 'ACT Pre Test',
     shortLabel: 'Pre Test',
     pdfUrl: '/act-tests/ACT_Practice_Test_1.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_1_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act1.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_1_Answer_Key_and_Explanations.pdf',
     kind: 'official',
   },
@@ -84,7 +87,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 2',
     shortLabel: 'Practice 2',
     pdfUrl: '/act-tests/ACT_Practice_Test_2.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_2_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act2.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_2_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -94,7 +97,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 3',
     shortLabel: 'Practice 3',
     pdfUrl: '/act-tests/ACT_Practice_Test_3.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_3_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act3.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_3_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -104,7 +107,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 4',
     shortLabel: 'Practice 4',
     pdfUrl: '/act-tests/ACT_Practice_Test_4.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_4_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act4.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_4_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -114,7 +117,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 5',
     shortLabel: 'Practice 5',
     pdfUrl: '/act-tests/ACT_Practice_Test_5.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_5_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act5.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_5_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -124,7 +127,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 6',
     shortLabel: 'Practice 6',
     pdfUrl: '/act-tests/ACT_Practice_Test_6.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_6_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act6.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_6_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -134,7 +137,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 7',
     shortLabel: 'Practice 7',
     pdfUrl: '/act-tests/ACT_Practice_Test_7.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_7_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act7.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_7_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -144,7 +147,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 8',
     shortLabel: 'Practice 8',
     pdfUrl: '/act-tests/ACT_Practice_Test_8.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_8_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act8.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_8_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -154,7 +157,7 @@ export const ACT_TESTS = [
     label: 'ACT Practice Test 9',
     shortLabel: 'Practice 9',
     pdfUrl: '/act-tests/ACT_Practice_Test_9.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_9_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act9.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_9_Answer_Key_and_Explanations.pdf',
     kind: 'extra',
   },
@@ -164,7 +167,7 @@ export const ACT_TESTS = [
     label: 'ACT Final Test',
     shortLabel: 'Final Test',
     pdfUrl: '/act-tests/ACT_Practice_Test_10.pdf',
-    akUrl: '/act-tests/ACT_Practice_Test_10_Answer_Key_and_Explanations.pdf',
+    akUrl: '/answer-keys/act10.html',
     explanationUrl: '/act-tests/ACT_Practice_Test_10_Answer_Key_and_Explanations.pdf',
     kind: 'final',
   },

@@ -1,5 +1,6 @@
 import { getExamFromTestId } from '../data/tests.js'
-import { scoreToPercentile } from '../data/examData.js'
+import { getQuestionCountForTest, scoreAttemptFromKey } from '../data/examData.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 
 export function normalizeExam(value, fallback = 'sat') {
   const exam = String(value || '').toLowerCase()
@@ -33,20 +34,33 @@ export function getInitialPreferredExam(user) {
   return getUserPreferredExam(user) || loadLocalPreferredExam(user?.id) || 'sat'
 }
 
-function extractAttemptScore(attempt, exam) {
-  const scores = attempt?.scores || {}
-  if (exam === 'act') return Number(scores?.composite || scores?.total || 0)
-  return Number(scores?.total || 0)
+function completedAttempt(attempt) {
+  return Boolean(attempt?.completed_at || attempt?.scores?.total)
 }
 
-export function bestPercentileByExam(attempts = []) {
+function attemptPercentCorrect(attempt) {
+  const testId = attempt?.test_id
+  const totalQuestions = Math.max(1, Number(getQuestionCountForTest(testId) || 0))
+  const storedRaw = Number(attempt?.scores?.raw || 0)
+  if (storedRaw > 0) return storedRaw / totalQuestions
+
+  const keyBySection = getAnswerKeyBySection(testId)
+  if (keyBySection && attempt?.answers && Object.keys(attempt.answers || {}).length) {
+    const rescored = scoreAttemptFromKey(testId, attempt.answers, keyBySection)
+    const raw = Number(rescored?.raw || 0)
+    if (raw > 0) return raw / totalQuestions
+  }
+
+  return 0
+}
+
+export function bestAccuracyByExam(attempts = []) {
   const out = { sat: 0, act: 0 }
   for (const attempt of attempts || []) {
-    if (!(attempt?.completed_at || attempt?.scores?.total)) continue
+    if (!completedAttempt(attempt)) continue
     const exam = getExamFromTestId(attempt?.test_id)
-    const score = extractAttemptScore(attempt, exam)
-    if (!score) continue
-    out[exam] = Math.max(out[exam], scoreToPercentile(exam, score))
+    const pct = attemptPercentCorrect(attempt)
+    out[exam] = Math.max(out[exam], pct)
   }
   return out
 }
@@ -55,9 +69,9 @@ export function chooseDashboardExam({ user, attempts = [], explicitExam = '' }) 
   const picked = normalizeExam(explicitExam || '', '')
   if (picked) return picked
 
-  const percentiles = bestPercentileByExam(attempts)
-  if (percentiles.act > percentiles.sat) return 'act'
-  if (percentiles.sat > percentiles.act && percentiles.sat > 0) return 'sat'
+  const accuracy = bestAccuracyByExam(attempts)
+  if (accuracy.act > accuracy.sat) return 'act'
+  if (accuracy.sat > accuracy.act && accuracy.sat > 0) return 'sat'
 
   const fromUser = getUserPreferredExam(user)
   if (fromUser) return fromUser
@@ -65,7 +79,8 @@ export function chooseDashboardExam({ user, attempts = [], explicitExam = '' }) 
   const fromLocal = loadLocalPreferredExam(user?.id)
   if (fromLocal) return fromLocal
 
-  if (percentiles.sat > 0 || percentiles.act === 0) return 'sat'
+  if (accuracy.sat > 0) return 'sat'
+  if (accuracy.act > 0) return 'act'
   return 'sat'
 }
 

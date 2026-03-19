@@ -52,6 +52,11 @@ function SectionBreakdown({ answers, keyBySection, moduleOrder, modules }) {
   )
 }
 
+function chapterDisplay(ch, chapters) {
+  const meta = chapters?.[ch] || {}
+  return meta.code || ch
+}
+
 function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules, questionChapterMap, chapters }) {
   const [expanded, setExpanded] = useState(null)
 
@@ -97,7 +102,7 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
                 {wrongs.map(({ q, given, right, ch }) => {
                   const chData = chapters?.[ch]
                   const hint = chData
-                    ? `Hint: revisit Chapter ${ch} and solve the problem again using the core rule from ${chData.name}. Focus on the setup before checking any final answer.`
+                    ? `Hint: revisit ${chData.code ? `ACT Module ${chData.code}` : `Chapter ${ch}`} and solve the problem again using the core rule from ${chData.name}. Focus on the setup before checking any final answer.`
                     : 'Hint: slow down the setup, identify what the question is really asking for, and try the problem again before checking anything else.'
                   return (
                     <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
@@ -114,7 +119,7 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
                             <Icon name="guide" size={13} />
                             <span>Study Guide:</span>
                             <Link to={guideHref(ch)} style={{ color: '#1a2744', fontWeight: 800 }}>
-                              Chapter {ch} — {chData.name}
+                              {chData.code ? `ACT Module ${chapterDisplay(ch, chapters)}` : `Chapter ${chapterDisplay(ch, chapters)}`} — {chData.name}
                             </Link>
                           </div>
                         )}
@@ -246,7 +251,8 @@ export default function Results() {
     hasTakenPretest: true,
     prefs,
     testDate: satDate,
-  }), [weakTopics, reviewCount, prefs, satDate])
+    exam,
+  }), [weakTopics, reviewCount, prefs, satDate, exam])
 
   const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
 
@@ -365,7 +371,7 @@ export default function Results() {
                     </div>
                     <div className="ch-page" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Icon name="guide" size={13} />
-                      <span>Chapter {t.ch}{t.page ? ` · Guide page ${t.page}` : ''}</span>
+                      <span>{t.code ? `ACT Module ${t.code}` : `Chapter ${t.ch}`}{t.page ? ` · Guide page ${t.page}` : ''}</span>
                     </div>
                   </div>
                 </div>
