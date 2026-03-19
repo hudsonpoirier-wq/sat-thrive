@@ -84,8 +84,6 @@ export default function CalendarPage() {
   const [selectedDayKey, setSelectedDayKey] = useState('')
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
-  const [draftSatDate, setDraftSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
-  const [draftStudyPrefs, setDraftStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
   const availabilityLabels = dayLabels()
 
   useEffect(() => {
@@ -93,8 +91,6 @@ export default function CalendarPage() {
     const nextPrefs = loadStudyPrefs(viewUserId, exam)
     setSatDate(nextDate)
     setStudyPrefs(nextPrefs)
-    setDraftSatDate(nextDate)
-    setDraftStudyPrefs(nextPrefs)
   }, [viewUserId, exam])
 
   useEffect(() => {
@@ -207,18 +203,20 @@ export default function CalendarPage() {
   }, [schedule, selectedDayKey])
 
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
-  const settingsChanged = useMemo(() => {
-    const currentDays = JSON.stringify(studyPrefs?.days || [])
-    const draftDays = JSON.stringify(draftStudyPrefs?.days || [])
-    return String(satDate || '') !== String(draftSatDate || '') || currentDays !== draftDays
-  }, [satDate, draftSatDate, studyPrefs, draftStudyPrefs])
-
-  function applyJourneySettings() {
+  function updateJourneyDate(nextDate) {
     if (isAdminPreview) return
-    setSatDate(draftSatDate)
-    setStudyPrefs(draftStudyPrefs)
-    saveSatTestDate(viewUserId, draftSatDate, exam)
-    try { saveStudyPrefs(viewUserId, draftStudyPrefs, exam) } catch {}
+    setSatDate(nextDate)
+    saveSatTestDate(viewUserId, nextDate, exam)
+  }
+
+  function toggleJourneyDay(index) {
+    if (isAdminPreview) return
+    const fallback = loadStudyPrefs(viewUserId, exam)
+    const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...fallback.days]
+    days[index] = !days[index]
+    const next = { ...(studyPrefs || fallback), days }
+    setStudyPrefs(next)
+    try { saveStudyPrefs(viewUserId, next, exam) } catch {}
   }
 
   if (loading) {
@@ -288,9 +286,9 @@ export default function CalendarPage() {
                 Test date:
                 <input
                   type="date"
-                  value={draftSatDate || ''}
+                  value={satDate || ''}
                   onChange={(e) => {
-                    setDraftSatDate(e.target.value)
+                    updateJourneyDate(e.target.value)
                   }}
                   disabled={isAdminPreview}
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
@@ -301,19 +299,14 @@ export default function CalendarPage() {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
               <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
               {availabilityLabels.map((label, index) => {
-                const enabled = Boolean(draftStudyPrefs?.days?.[index])
+                const enabled = Boolean(studyPrefs?.days?.[index])
                 return (
                   <button
                     key={label}
                     type="button"
                     className="btn btn-outline"
                     disabled={isAdminPreview}
-                    onClick={() => {
-                      const days = Array.isArray(draftStudyPrefs?.days) ? [...draftStudyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
-                      days[index] = !days[index]
-                      const next = { ...(draftStudyPrefs || loadStudyPrefs(viewUserId)), days }
-                      setDraftStudyPrefs(next)
-                    }}
+                    onClick={() => toggleJourneyDay(index)}
                     style={{
                       padding: '7px 12px',
                       fontSize: 12,
@@ -329,7 +322,7 @@ export default function CalendarPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
               <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
-                Change your settings, then hit <b>Update Track</b> to rebuild the calendar and your dashboard to-dos.
+                Your Smart Journey updates automatically each time you change your test date or available days.
                 {schedule?.needsMoreTime ? (
                   <>
                     {' '}To stay on track, plan for about <b>{schedule.requiredMinutesPerDay} minutes on each study day</b>. If that feels too heavy, add more available days or move your test date back.
@@ -338,13 +331,6 @@ export default function CalendarPage() {
                   <> Missed work automatically moves into the next available study day.</>
                 )}
               </div>
-              <button
-                className="btn btn-primary"
-                onClick={applyJourneySettings}
-                disabled={isAdminPreview || !settingsChanged}
-              >
-                Update Track
-              </button>
             </div>
           </div>
         )}

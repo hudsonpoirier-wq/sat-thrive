@@ -828,14 +828,14 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="dashboard-practice-grid" style={{ '--practice-count': extraTests.length }}>
+                <div className={`dashboard-practice-grid${exam === 'act' ? ' act' : ''}`} style={{ '--practice-count': extraTests.length }}>
                   {extraTests.map((t) => {
                     const done = completed.some((a) => a.test_id === t.id && (a.completed_at || a.scores?.total))
                     const prog = inProgress.find((a) => a.test_id === t.id)
                     return (
-                      <div key={t.id} className="dashboard-practice-tile">
+                      <div key={t.id} className={`dashboard-practice-tile${confirmExtraTestId === t.id ? ' expanded' : ''}`}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, overflowWrap: 'anywhere' }}>{t.label}</div>
+                          <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, lineHeight: 1.35, overflowWrap: 'break-word' }}>{t.label}</div>
                           <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>
                             {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
                           </div>

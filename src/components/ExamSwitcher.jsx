@@ -1,6 +1,11 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function ExamSwitcher({ currentExam = 'sat', satHref = '/dashboard?exam=sat', actHref = '/dashboard?exam=act' }) {
+  const location = useLocation()
+  const searchExam = String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase()
+  const normalizedExam = searchExam === 'act' || searchExam === 'sat'
+    ? searchExam
+    : (currentExam === 'act' ? 'act' : 'sat')
   const tabs = [
     { id: 'sat', label: 'SAT', sub: 'Dashboard', href: satHref },
     { id: 'act', label: 'ACT', sub: 'Dashboard', href: actHref },
@@ -8,7 +13,7 @@ export default function ExamSwitcher({ currentExam = 'sat', satHref = '/dashboar
   return (
     <div className="exam-switcher" role="tablist" aria-label="Switch exam dashboard">
       {tabs.map((tab) => {
-        const active = tab.id === currentExam
+        const active = tab.id === normalizedExam
         return (
           <Link
             key={tab.id}

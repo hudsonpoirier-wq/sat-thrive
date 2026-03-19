@@ -301,7 +301,7 @@ export default function Mistakes() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                    Use zoom if the page is hard to read. <span style={{ color: '#1a2744', fontWeight: 900 }}>Scroll down</span> to answer and check.
+                    Use zoom if the page is hard to read. <span style={{ color: '#1a2744', fontWeight: 900 }}>Your answer box stays visible below</span> while you scroll the question.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.25) * 100) / 100))}>− Zoom</button>
@@ -330,7 +330,7 @@ export default function Mistakes() {
                   )}
                 </div>
 
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                <div className={`mistake-answer-box${exam === 'act' ? ' act-sticky' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
                     <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
