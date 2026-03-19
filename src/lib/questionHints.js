@@ -44,6 +44,16 @@ function detectPhrases(questionText = '') {
   }
 }
 
+function extractQuestionAnchors(questionText = '') {
+  const cleaned = String(questionText || '').replace(/\s+/g, ' ').trim()
+  const numbers = [...new Set(cleaned.match(/\b\d+(?:\.\d+)?(?:\/\d+)?%?\b/g) || [])].slice(0, 4)
+  const refs = [...new Set(cleaned.match(/\b(?:figure|table|graph|experiment|paragraph|sentence|lines?)\s+\d+\b/gi) || [])].slice(0, 3)
+  const variables = [...new Set(cleaned.match(/\b[a-z](?:\([^)]+\))?\b/gi) || [])]
+    .filter((token) => token.length <= 6)
+    .slice(0, 4)
+  return { numbers, refs, variables }
+}
+
 function inferSignals({ questionText = '', chapterName = '', section = '', exam = '' }) {
   const haystack = `${questionText} ${chapterName} ${section} ${exam}`.toLowerCase()
   return {
@@ -119,10 +129,11 @@ function buildCheckHint({ exam, section, isMC, signals }) {
   return 'After narrowing it down, test your answer against the original problem one more time. The correct choice should satisfy every condition in the question.'
 }
 
-function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases }) {
+function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors }) {
   const family = sectionFamily(exam, section)
   const moduleLabel = chapterCode ? `${chapterCode} — ${chapterName}` : chapterName
   if (family === 'math') {
+    if (anchors.numbers.length) return `For Q${qNum}, focus on what the prompt is doing with ${anchors.numbers.join(', ')}. Decide how those values relate before you calculate anything.`
     if (signals.graph) return `For Q${qNum}, start with the visual before the algebra. Read the labels, units, and what each axis or entry represents, then decide which relationship the question is asking you to use${phrases.relationship ? ` (${phrases.relationship})` : ''}.`
     if (signals.geometry) return `For Q${qNum}, sketch or relabel the figure with every given value first. Then mark the exact part you need to find so you do not solve for an intermediate quantity by mistake.`
     if (signals.percent) return `For Q${qNum}, translate the wording into a ratio or percent equation before calculating. Be careful about what is the base amount and what is the change.`
@@ -130,19 +141,23 @@ function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode
     return `For Q${qNum}, write the setup before doing arithmetic. If the choices are close, the setup matters more than the computation speed.`
   }
   if (family === 'english') {
+    if (anchors.refs.length) return `For Q${qNum}, reread ${anchors.refs[0]} and the sentence around the underlined part. Choose the option that keeps the grammar clean and the paragraph moving logically.`
     if (signals.transition) return `For Q${qNum}, ignore the answer choices for a second and decide how the sentence should connect to the ideas around it—continuation, contrast, cause/effect, or conclusion. Then pick the choice that does exactly that.`
     if (signals.punctuation) return `For Q${qNum}, check whether the sentence has one complete thought or two. Use that to decide if the punctuation should join, separate, or set off information.`
     return `For Q${qNum}, reread the sentence before and after the underlined part. The correct ACT English answer has to be grammatically correct and fit the paragraph’s flow.`
   }
   if (family === 'reading-writing') {
+    if (anchors.refs.length) return `For Q${qNum}, go back to ${anchors.refs[0]} and decide exactly what that sentence needs—clarity, support, or a better transition—before comparing choices.`
     if (signals.transition) return `For Q${qNum}, decide what the sentence or paragraph needs next—support, contrast, continuation, or conclusion—before comparing the choices.`
     if (signals.punctuation) return `For Q${qNum}, test the structure of the sentence first. Ask whether the punctuation changes meaning, separates full ideas, or simply adds extra detail.`
     return `For Q${qNum}, go back to the exact sentence and ask what job the correct answer must do there: clarify, connect ideas, or improve precision.`
   }
   if (family === 'reading') {
+    if (anchors.refs.length) return `For Q${qNum}, start at ${anchors.refs[0]} and locate the exact phrase that answers the question. The best choice should match the passage wording more precisely than the others.`
     return `For Q${qNum}, find the exact part of the passage that answers the question${phrases.readingTask ? ` about ${phrases.readingTask}` : ''}. Do not choose until you can point to the supporting words in the text.`
   }
   if (family === 'science') {
+    if (anchors.refs.length) return `For Q${qNum}, use ${anchors.refs[0]} first. Read the labels and units there, then pull only the data needed for this question before comparing choices.`
     if (signals.graph || phrases.scienceTask) return `For Q${qNum}, begin with ${phrases.scienceTask || 'the relevant figure or table'}. Read the labels and units, then trace only the data needed for this question before looking at the answer choices.`
     return `For Q${qNum}, decide whether the question is asking about a trend, a comparison, or an experimental setup. Then use the data first and the science vocabulary second.`
   }
@@ -151,12 +166,13 @@ function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode
     : `For Q${qNum}, write down the exact value or expression the question wants, solve for only that, and make sure your final response is in the right format.`
 }
 
-function buildProcessHint({ exam, section, qNum, isMC, signals, phrases }) {
+function buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices }) {
   const family = sectionFamily(exam, section)
   if (family === 'math') {
+    if (anchors.variables.length) return `Track what each symbol means in Q${qNum} (${anchors.variables.join(', ')}). Solve for only the quantity the question asks for, then compare that to the choices.`
     if (signals.graph) return 'Use a two-step process: first identify the relationship from the graph/table, then calculate only after you know which values belong in the equation.'
     return isMC
-      ? 'Try working the problem without the choices first. Once you get a result or estimate, compare it to the choices and eliminate anything that cannot match your setup.'
+      ? `Try working Q${qNum} without the choices first. Once you have a result or estimate, compare it against ${answerChoices?.join(', ') || 'the answer choices'} and eliminate anything that cannot match your setup.`
       : 'Check each transformation in your work line by line. Most misses here come from one setup slip that carries through the rest of the problem.'
   }
   if (family === 'english' || family === 'reading-writing') {
@@ -164,9 +180,21 @@ function buildProcessHint({ exam, section, qNum, isMC, signals, phrases }) {
       ? `This is a ${phrases.grammarTask} style question. Explain out loud why each wrong choice fails—grammar, logic, repetition, or flow—before you settle on the final answer.`
       : 'Eliminate answer choices with a specific reason, not a feeling. The best choice should improve both correctness and flow.'
   }
-  if (family === 'reading') return 'Prove the answer directly from the passage. If two choices seem plausible, the better one will be supported more precisely by the wording on the page.'
+  if (family === 'reading') return anchors.refs.length
+    ? `Stay inside ${anchors.refs[0]} while you decide. If two choices seem plausible, the better one will match the passage wording more exactly.`
+    : 'Prove the answer directly from the passage. If two choices seem plausible, the better one will be supported more precisely by the wording on the page.'
   if (family === 'science') return 'Identify exactly which figure, table, or experiment the question belongs to, then narrow your attention to that one source before comparing answer choices.'
   return buildSectionHint({ exam, section, isMC, qNum, signals })
+}
+
+function distinctHints(hints = []) {
+  const out = []
+  for (const hint of hints) {
+    const cleaned = String(hint || '').replace(/\s+/g, ' ').trim()
+    if (!cleaned) continue
+    if (!out.some((existing) => existing.toLowerCase() === cleaned.toLowerCase())) out.push(cleaned)
+  }
+  return out
 }
 
 export function buildQuestionHintLadder({
@@ -178,22 +206,24 @@ export function buildQuestionHintLadder({
   chapterCode = '',
   concepts = [],
   questionText = '',
+  answerChoices = [],
 } = {}) {
   const conceptBodies = (concepts || []).map((concept) => concept?.body).filter(Boolean)
   const conceptLead = firstSentence(conceptBodies[0] || '')
   const signals = inferSignals({ questionText, chapterName, section, exam })
   const phrases = detectPhrases(questionText)
+  const anchors = extractQuestionAnchors(questionText)
   const seed = hashString(`${exam}:${section}:${chapterCode || chapterName}:${qNum}:${questionText}`)
   const shuffledConcepts = conceptBodies.length ? seededShuffle(conceptBodies, seed) : []
   const sectionHint = buildSectionHint({ exam, section, isMC, qNum, signals })
   const checkHint = buildCheckHint({ exam, section, isMC, signals })
 
-  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases })
+  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors })
   const conceptHint = shuffledConcepts[0] ? firstSentence(shuffledConcepts[0]) : ''
-  const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases })}${conceptHint ? ` ${conceptHint}` : ''}`
+  const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices })}${conceptHint ? ` ${conceptHint}` : ''}`
   const step3 = checkHint
 
-  return [step1, step2, step3]
+  return distinctHints([step1, step2, step3, conceptLead ? `Key concept reminder: ${conceptLead}` : '', sectionHint]).slice(0, 3)
 }
 
 export function buildQuestionHintSummary(options = {}) {

@@ -1,28 +1,35 @@
 import { useEffect, useRef } from 'react'
 import PDFPage from './PDFPage.jsx'
 
-export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zoom = 1, initialPageIndex = null }) {
+export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zoom = 1, initialPageIndex = null, initialScrollRatio = 0 }) {
   const start = Math.max(0, Number(startPage || 0))
   const end = Math.max(start, Number(endPage || start))
   const pages = Array.from({ length: end - start + 1 }, (_, index) => start + index)
+  const rootRef = useRef(null)
   const pageRefs = useRef({})
 
   useEffect(() => {
     const targetPage = Number(initialPageIndex)
     if (!Number.isFinite(targetPage)) return
     const node = pageRefs.current?.[targetPage]
-    if (!node) return
-    requestAnimationFrame(() => {
+    const root = rootRef.current
+    if (!node || !root) return
+    const scrollRatio = Math.max(0, Math.min(0.95, Number(initialScrollRatio || 0)))
+    const scrollToTarget = () => {
       try {
-        node.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        const top = node.offsetTop + ((node.offsetHeight || 0) * scrollRatio)
+        root.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' })
       } catch {
-        node.scrollIntoView()
+        root.scrollTop = Math.max(0, node.offsetTop + ((node.offsetHeight || 0) * scrollRatio) - 24)
       }
-    })
-  }, [initialPageIndex, pdfUrl, startPage, endPage])
+    }
+    requestAnimationFrame(scrollToTarget)
+    const timeout = setTimeout(scrollToTarget, 350)
+    return () => clearTimeout(timeout)
+  }, [initialPageIndex, initialScrollRatio, pdfUrl, startPage, endPage, zoom])
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div ref={rootRef} style={{ display: 'grid', gap: 12 }}>
       {pages.map((pageIndex) => (
         <div
           key={pageIndex}

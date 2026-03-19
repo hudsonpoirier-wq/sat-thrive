@@ -7,6 +7,7 @@ import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import TopResourceNav from '../components/TopResourceNav.jsx'
 import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import {
@@ -32,11 +33,15 @@ function Navbar({ viewUserId, isAdminPreview, currentExam }) {
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
+  const calendarHref = withViewUser(withExam('/calendar', currentExam), viewUserId, isAdminPreview)
+  const guideHref = withViewUser(withExam('/guide', currentExam), viewUserId, isAdminPreview)
+  const mistakesHref = withViewUser(withExam('/mistakes', currentExam), viewUserId, isAdminPreview)
   return (
     <nav className="nav">
       <BrandLink to={withViewUser(withExam('/dashboard', currentExam), viewUserId, isAdminPreview)} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
+        <TopResourceNav calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         {isAdmin && (
           <Link
             to="/admin"

@@ -6,18 +6,20 @@ import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapter
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import TopResourceNav from '../components/TopResourceNav.jsx'
 import { getChaptersForExam, getGuideContentForExam } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
 
-function Navbar({ homeHref, guideHref, currentExam, satHref, actHref }) {
+function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
+        <TopResourceNav current="guide" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -26,9 +28,6 @@ function Navbar({ homeHref, guideHref, currentExam, satHref, actHref }) {
         >
           ← Back
         </button>
-        <Link to={guideHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
-          Study Guide
-        </Link>
         <Link to={homeHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
@@ -511,7 +510,15 @@ export default function Guide() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar homeHref={viewHref('/dashboard')} guideHref={viewHref('/guide')} currentExam={exam} satHref={satHref} actHref={actHref} />
+      <Navbar
+        homeHref={viewHref('/dashboard')}
+        guideHref={viewHref('/guide')}
+        mistakesHref={viewHref('/mistakes')}
+        calendarHref={viewHref('/calendar')}
+        currentExam={exam}
+        satHref={satHref}
+        actHref={actHref}
+      />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>

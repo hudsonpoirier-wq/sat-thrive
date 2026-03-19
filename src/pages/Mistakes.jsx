@@ -10,6 +10,7 @@ import PDFSectionStack from '../components/PDFSectionStack.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import TopResourceNav from '../components/TopResourceNav.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
 import { getChoiceOptionsForQuestion, getExamConfigForTest, getGuideContentForExam, getPdfViewerModeForTest, getSectionPageRangesForTest } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
@@ -27,13 +28,14 @@ const ALL_GUIDE_CONTENT = {
   ...getGuideContentForExam('act'),
 }
 
-function Navbar({ dashboardHref, currentExam, satHref, actHref }) {
+function Navbar({ dashboardHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={dashboardHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
+        <TopResourceNav current="mistakes" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -57,15 +59,32 @@ function parseItemKey(k) {
   return { test_id: parts[0], section: parts[1], q_num: q }
 }
 
+function estimateActQuestionTarget(testId, section, qNum) {
+  const range = getSectionPageRangesForTest(testId)?.[section]
+  const totalQuestions = Number(getExamConfigForTest(testId)?.modules?.[section]?.questions || 0)
+  if (!Array.isArray(range) || range.length < 2 || !totalQuestions) return { pageIndex: 0, scrollRatio: 0 }
+  const start = Number(range[0] || 0)
+  const end = Math.max(start, Number(range[1] || start))
+  const pageCount = Math.max(1, end - start + 1)
+  const progress = Math.max(0, Math.min(0.999, (Number(qNum || 1) - 1) / totalQuestions))
+  const offset = progress * pageCount
+  const pageOffset = Math.min(pageCount - 1, Math.floor(offset))
+  return {
+    pageIndex: start + pageOffset,
+    scrollRatio: Math.max(0, Math.min(0.92, offset - pageOffset)),
+  }
+}
+
 function pdfPageFor(testId, section, qNum) {
   const map = (testId === 'pre_test')
     ? (PDF_PAGE_MAP?.[section] || {})
     : (EXTRA_PDF_PAGE_MAPS?.[testId]?.[section] || {})
-  if (Number.isFinite(Number(map?.[qNum]))) return map[qNum]
+  if (String(testId || '').startsWith('act')) return estimateActQuestionTarget(testId, section, qNum)
+  if (Number.isFinite(Number(map?.[qNum]))) return { pageIndex: map[qNum], scrollRatio: 0 }
   for (let q = qNum - 1; q >= 1; q--) {
-    if (Number.isFinite(Number(map?.[q]))) return map[q]
+    if (Number.isFinite(Number(map?.[q]))) return { pageIndex: map[q], scrollRatio: 0 }
   }
-  return 0
+  return { pageIndex: 0, scrollRatio: 0 }
 }
 
 function buildMistakeHints(mistake, isMC, questionText = '') {
@@ -79,6 +98,7 @@ function buildMistakeHints(mistake, isMC, questionText = '') {
     chapterCode: chapterMeta?.code || '',
     concepts: chapterMeta?.concepts || [],
     questionText,
+    answerChoices: isMC ? getChoiceOptionsForQuestion(mistake?.test_id, mistake?.section, mistake?.q_num) : [],
   })
 }
 
@@ -103,6 +123,45 @@ async function loadPdfTextRange(pdfUrl, startPageIndex, endPageIndex) {
     parts.push(line)
   }
   return parts.join(' ')
+}
+
+async function findQuestionPageInSection(pdfUrl, startPageIndex, endPageIndex, qNum, preferredPageIndex = null) {
+  const url = String(pdfUrl || '').trim()
+  if (!url || !Number.isFinite(Number(qNum))) return null
+  if (!textCache[url]) {
+    const task = pdfjsLib.getDocument(url)
+    textCache[url] = task.promise.catch((error) => {
+      delete textCache[url]
+      throw error
+    })
+  }
+  const pdf = await textCache[url]
+  const start = Math.max(0, Number(startPageIndex || 0))
+  const end = Math.max(start, Number(endPageIndex || start))
+  const pages = Array.from({ length: end - start + 1 }, (_, index) => start + index)
+  const orderedPages = pages.slice().sort((a, b) => {
+    const pa = preferredPageIndex == null ? Number.MAX_SAFE_INTEGER : Math.abs(a - preferredPageIndex)
+    const pb = preferredPageIndex == null ? Number.MAX_SAFE_INTEGER : Math.abs(b - preferredPageIndex)
+    return pa - pb
+  })
+  const patterns = [
+    new RegExp(`\\b${qNum}[\\.):]`),
+    new RegExp(`Question\\s*${qNum}\\b`, 'i'),
+    new RegExp(`\\b${qNum}\\b`),
+  ]
+  let best = null
+  for (const pageIndex of orderedPages) {
+    const page = await pdf.getPage(pageIndex + 1)
+    const text = await page.getTextContent()
+    const joined = (text?.items || []).map((item) => item?.str || '').join(' ')
+    let score = 0
+    for (const pattern of patterns) {
+      if (pattern.test(joined)) score += 1
+    }
+    if (score > 0 && (!best || score > best.score)) best = { pageIndex, score }
+    if (score >= 2) return pageIndex
+  }
+  return best?.pageIndex ?? null
 }
 
 export default function Mistakes() {
@@ -168,7 +227,7 @@ export default function Mistakes() {
   const selectedModule = selectedExamConfig?.modules?.[selected?.section]
   const selectedViewerMode = selected ? getPdfViewerModeForTest(selected.test_id) : 'single'
   const selectedSectionRange = selected ? getSectionPageRangesForTest(selected.test_id)?.[selected.section] : null
-  const selectedPdfPage = selected ? pdfPageFor(selected.test_id, selected.section, selected.q_num) : 0
+  const [resolvedPdfTarget, setResolvedPdfTarget] = useState({ pageIndex: 0, scrollRatio: 0 })
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
   const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
@@ -186,11 +245,42 @@ export default function Mistakes() {
   }, [selectedItemKey])
 
   useEffect(() => {
+    if (!selected) {
+      setResolvedPdfTarget({ pageIndex: 0, scrollRatio: 0 })
+      return
+    }
+    setResolvedPdfTarget(pdfPageFor(selected.test_id, selected.section, selected.q_num))
+  }, [selectedItemKey, selected?.test_id, selected?.section, selected?.q_num])
+
+  useEffect(() => {
+    let cancelled = false
+    async function refineTarget() {
+      if (!selectedCfg?.pdfUrl || selectedViewerMode !== 'stack' || !Array.isArray(selectedSectionRange)) return
+      try {
+        const pageIndex = await findQuestionPageInSection(
+          selectedCfg.pdfUrl,
+          selectedSectionRange[0],
+          selectedSectionRange[1],
+          selected?.q_num,
+          resolvedPdfTarget.pageIndex
+        )
+        if (!cancelled && Number.isFinite(Number(pageIndex))) {
+          setResolvedPdfTarget((prev) => ({ ...prev, pageIndex }))
+        }
+      } catch {}
+    }
+    refineTarget()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedItemKey, selectedCfg?.pdfUrl, selectedViewerMode, selectedSectionRange, selected?.q_num])
+
+  useEffect(() => {
     let cancelled = false
     async function loadContext() {
       if (!selected || !selectedCfg?.pdfUrl) return
       try {
-        const start = selectedPdfPage
+        const start = resolvedPdfTarget.pageIndex
         const end = selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange)
           ? Math.min(selectedSectionRange[1], start + 1)
           : start
@@ -204,7 +294,7 @@ export default function Mistakes() {
     return () => {
       cancelled = true
     }
-  }, [selected, selectedCfg?.pdfUrl, selectedPdfPage, selectedViewerMode, selectedSectionRange])
+  }, [selected, selectedCfg?.pdfUrl, resolvedPdfTarget.pageIndex, selectedViewerMode, selectedSectionRange])
 
   if (loading) {
     return (
@@ -223,7 +313,15 @@ export default function Mistakes() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar dashboardHref={viewHref('/dashboard')} currentExam={exam} satHref={satHref} actHref={actHref} />
+      <Navbar
+        dashboardHref={viewHref('/dashboard')}
+        guideHref={viewHref('/guide')}
+        mistakesHref={viewHref('/mistakes')}
+        calendarHref={viewHref('/calendar')}
+        currentExam={exam}
+        satHref={satHref}
+        actHref={actHref}
+      />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -339,12 +437,13 @@ export default function Mistakes() {
                       startPage={selectedSectionRange[0]}
                       endPage={selectedSectionRange[1]}
                       zoom={zoom}
-                      initialPageIndex={selectedPdfPage}
+                      initialPageIndex={resolvedPdfTarget.pageIndex}
+                      initialScrollRatio={resolvedPdfTarget.scrollRatio}
                     />
                   ) : (
                     <PDFPage
                       pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
-                      pageIndex={selectedPdfPage}
+                      pageIndex={resolvedPdfTarget.pageIndex}
                       zoom={zoom}
                       maxScale={6}
                     />

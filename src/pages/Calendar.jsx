@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import TopResourceNav from '../components/TopResourceNav.jsx'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels } from '../lib/studyPlan.js'
 import { getChaptersForExam, getExamConfig } from '../data/examData.js'
 import { getExamFromTestId, getTestsForExam } from '../data/tests.js'
@@ -11,13 +12,14 @@ import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 
-function Navbar({ homeHref, guideHref, isAdminPreview, currentExam, satHref, actHref }) {
+function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, isAdminPreview, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
+        <TopResourceNav current="calendar" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -26,9 +28,6 @@ function Navbar({ homeHref, guideHref, isAdminPreview, currentExam, satHref, act
         >
           ← Back
         </button>
-        <Link to={guideHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
-          Study Guide
-        </Link>
         {isAdminPreview && (
           <Link to="/admin" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
             Admin
@@ -222,7 +221,16 @@ export default function CalendarPage() {
   if (loading) {
     return (
       <>
-        <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} currentExam={exam} satHref={satHref} actHref={actHref} />
+        <Navbar
+          homeHref={homeHref}
+          guideHref={guideHref}
+          mistakesHref={viewHref('/mistakes')}
+          calendarHref={viewHref('/calendar')}
+          isAdminPreview={isAdminPreview}
+          currentExam={exam}
+          satHref={satHref}
+          actHref={actHref}
+        />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
           Loading calendar…
         </div>
@@ -232,7 +240,16 @@ export default function CalendarPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} currentExam={exam} satHref={satHref} actHref={actHref} />
+      <Navbar
+        homeHref={homeHref}
+        guideHref={guideHref}
+        mistakesHref={viewHref('/mistakes')}
+        calendarHref={viewHref('/calendar')}
+        isAdminPreview={isAdminPreview}
+        currentExam={exam}
+        satHref={satHref}
+        actHref={actHref}
+      />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -283,7 +300,7 @@ export default function CalendarPage() {
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Test date:
+                Official or estimated test date:
                 <input
                   type="date"
                   value={satDate || ''}

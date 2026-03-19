@@ -9,6 +9,7 @@ import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import TopResourceNav from '../components/TopResourceNav.jsx'
 import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
@@ -293,6 +294,7 @@ export default function Results() {
         <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
           <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
+          <TopResourceNav calendarHref={viewHref('/calendar')} guideHref={viewHref('/guide')} mistakesHref={viewHref('/mistakes')} />
           <button
             className="btn btn-outline"
             onClick={() => navigate(-1)}

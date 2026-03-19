@@ -10,7 +10,7 @@ import Icon from '../components/AppIcons.jsx'
 import { TESTS, getExamFromTestId } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
-import { calcWeakTopicsForTest, getExamConfig, getExamConfigForTest, getScoreColumnsForExam, scoreAttemptFromKey } from '../data/examData.js'
+import { calcWeakTopicsForTest, getExamConfig, getExamConfigForTest, getQuestionCountForTest, getScoreColumnsForExam, scoreAttemptFromKey } from '../data/examData.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -80,6 +80,31 @@ function attemptTotalScore(attempt) {
   return Number(attempt?.scores?.composite || attempt?.scores?.total || 0)
 }
 
+function attemptAccuracyRecord(attempt) {
+  const testId = normalizeTestId(attempt?.test_id)
+  const exam = getExamFromTestId(testId)
+  const totalQuestions = Math.max(1, Number(getQuestionCountForTest(testId) || 0))
+  let raw = Number(attempt?.scores?.raw || 0)
+  const total = attemptTotalScore(attempt)
+  if (!raw && attempt?.answers) {
+    try {
+      const rescored = scoreAttemptFromKey(testId, attempt.answers, getAnswerKeyBySection(testId) || {})
+      raw = Number(rescored?.raw || 0)
+    } catch {
+      raw = 0
+    }
+  }
+  const percent = raw > 0 ? raw / totalQuestions : 0
+  return {
+    exam,
+    raw,
+    total,
+    totalQuestions,
+    percent,
+    display: percent > 0 ? `${Math.round(percent * 100)}% · ${String(exam || 'sat').toUpperCase()} ${total || '—'}` : null,
+  }
+}
+
 function formatAttemptBreakdown(attempt) {
   const exam = getExamFromTestId(attempt?.test_id)
   const columns = getScoreColumnsForExam(exam).filter((column) => column.key !== 'total')
@@ -90,6 +115,32 @@ function formatAttemptBreakdown(attempt) {
     })
     .filter(Boolean)
     .join(' · ')
+}
+
+function computeAttemptWeakTopics(attempt) {
+  try {
+    if (Array.isArray(attempt?.weak_topics) && attempt.weak_topics.length) return attempt.weak_topics
+    const tid = normalizeTestId(attempt?.test_id)
+    const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
+    if (!keyBySection) return []
+    return calcWeakTopicsForTest(tid, attempt?.answers || {}, keyBySection)
+  } catch {
+    return []
+  }
+}
+
+function formatTopWeakness(attempt) {
+  const weakTopics = computeAttemptWeakTopics(attempt)
+  const topWeak = weakTopics?.[0]
+  if (!topWeak) return '—'
+  const exam = getExamFromTestId(attempt?.test_id)
+  const cfg = getExamConfig(exam)
+  const chapterMeta = cfg?.chapters?.[topWeak.ch] || {}
+  const label = topWeak.name || chapterMeta?.name || topWeak.ch || 'Weak area'
+  const domain = topWeak.domain || chapterMeta?.domain || ''
+  const moduleCode = chapterMeta?.code ? `${chapterMeta.code} · ` : ''
+  const page = Number.isFinite(Number(topWeak.page ?? chapterMeta?.page)) ? ` (p.${Number(topWeak.page ?? chapterMeta?.page)})` : ''
+  return `${moduleCode}${label}${domain ? ` · ${domain}` : ''}${page}`
 }
 
 function pairedTTest(pairs) {
@@ -342,9 +393,13 @@ export default function Admin() {
       const list = attemptsByUser.get(a.user_id) || []
       list.push(a)
       attemptsByUser.set(a.user_id, list)
-      const totalAny = attemptTotalScore(a)
-      const prevBest = bestByUser.get(a.user_id) || 0
-      if (totalAny > prevBest) bestByUser.set(a.user_id, totalAny)
+      const totalAny = attemptAccuracyRecord(a)
+      const prevBest = bestByUser.get(a.user_id)
+      if (
+        !prevBest ||
+        totalAny.percent > prevBest.percent ||
+        (totalAny.percent === prevBest.percent && totalAny.total > prevBest.total)
+      ) bestByUser.set(a.user_id, totalAny)
       const isPre = a.test_id === 'pre_test' || a.test_id === 'practice_test_11' || !a.test_id
       if (isPre) {
         const total = attemptTotalScore(a)
@@ -469,17 +524,6 @@ export default function Admin() {
     const activeUsers7 = new Set()
     const activeUsers30 = new Set()
 
-    const computeWeakTopicsFromAnswers = (attempt) => {
-      try {
-        const tid = normalizeTestId(attempt?.test_id)
-        const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
-        if (!keyBySection) return []
-        return calcWeakTopicsForTest(tid, attempt?.answers || {}, keyBySection)
-      } catch {
-        return []
-      }
-    }
-
     const computeScaledFromAnswers = (attempt) => {
       try {
         const tid = normalizeTestId(attempt?.test_id)
@@ -543,9 +587,7 @@ export default function Admin() {
       if (dayStarted) attemptsByDay.set(dayStarted, (attemptsByDay.get(dayStarted) || 0) + 1)
       if (dayCompleted) completesByDay.set(dayCompleted, (completesByDay.get(dayCompleted) || 0) + 1)
 
-      const wt = Array.isArray(a.weak_topics) && a.weak_topics.length
-        ? a.weak_topics
-        : computeWeakTopicsFromAnswers(a)
+      const wt = computeAttemptWeakTopics(a)
       for (const t of wt) {
         const domain = t?.domain || 'Other'
         const ch = t?.ch || null
@@ -809,7 +851,9 @@ export default function Admin() {
                       </td>
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td style={{ padding: '12px' }}>{userAttempts.length}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }}>{best || '—'}</td>
+                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }} title={best ? `${best.raw}/${best.totalQuestions} correct` : undefined}>
+                        {best?.display || '—'}
+                      </td>
                       <td style={{ padding: '12px' }}>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                           <button
@@ -867,7 +911,6 @@ export default function Admin() {
                   const exam = getExamFromTestId(a.test_id)
                   const total = attemptTotalScore(a)
                   const gain = post ? post.post_score - total : null
-                  const topWeak = a.weak_topics?.[0]
                   return (
                     <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px', fontWeight: 700 }}>
@@ -889,7 +932,7 @@ export default function Admin() {
                         {gain !== null ? `${gain > 0 ? '+' : ''}${gain}` : '—'}
                       </td>
                       <td style={{ padding: '12px', fontSize: 12, color: '#475569' }}>
-                        {topWeak ? `${topWeak.name} (p.${topWeak.page})` : '—'}
+                        {formatTopWeakness(a)}
                       </td>
                       <td style={{ padding: '12px' }}>
                         <Link to={`/results/${a.id}?user=${encodeURIComponent(a.user_id)}`} style={{ fontSize: 12, color: '#1a2744', fontWeight: 600 }}>View →</Link>

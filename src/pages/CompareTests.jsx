@@ -29,15 +29,30 @@ export default function CompareTests() {
       <nav className="nav">
         <BrandLink to="/dashboard" />
       </nav>
-      <div className="page fade-up" style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <div className="card" style={{ padding: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-            <span style={{ width: 44, height: 44, borderRadius: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,165,233,.10)', color: '#1a2744' }}>
+      <div className="page fade-up exam-choice-page" style={{ maxWidth: 1160, margin: '0 auto' }}>
+        <div className="card exam-choice-card">
+          <div className="exam-choice-hero">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+              <span style={{ width: 52, height: 52, borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(14,165,233,.10)', color: '#1a2744' }}>
               <Icon name="chart" size={22} />
-            </span>
-            <div>
-              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 26, fontWeight: 900, color: '#1a2744' }}>SAT vs ACT</div>
-              <div style={{ color: '#64748b', marginTop: 4, fontSize: 14 }}>Here’s the quick difference so you can choose which dashboard to try first.</div>
+              </span>
+              <div>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 30, fontWeight: 900, color: '#1a2744' }}>Not sure which test fits you best?</div>
+                <div style={{ color: '#64748b', marginTop: 4, fontSize: 15, lineHeight: 1.7 }}>Here’s a quick side-by-side comparison. Pick the one that feels like the better starting point—then we’ll build the right dashboard for it.</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="exam-compare-grid" style={{ marginBottom: 20 }}>
+            <div className="exam-compare-highlight">
+              <div className="exam-choice-badge">SAT</div>
+              <div className="exam-choice-title" style={{ marginTop: 10 }}>Best if you want a steadier pace</div>
+              <div className="exam-choice-copy">SAT gives you a little more time per question and leans heavily on algebra, data, and concise reading/writing tasks.</div>
+            </div>
+            <div className="exam-compare-highlight">
+              <div className="exam-choice-badge">ACT</div>
+              <div className="exam-choice-title" style={{ marginTop: 10 }}>Best if you move quickly</div>
+              <div className="exam-choice-copy">ACT rewards speed, endurance, and quick interpretation across English, Math, Reading, and Science.</div>
             </div>
           </div>
 

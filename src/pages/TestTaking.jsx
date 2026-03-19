@@ -64,18 +64,22 @@ function BreakScreen({ nextModule, onContinue, modules }) {
   const secs = breakTime % 60
   return (
     <div className="break-screen">
-      <div style={{ fontSize: 32, fontWeight: 900, color: '#1a2744', marginBottom: 16 }}>Break</div>
-      <div className="break-title">Section Break</div>
-      <div className="break-sub">
-        Take a 10-minute break. Next up: {modules?.[nextModule]?.label} – {modules?.[nextModule]?.module}
+      <div className="break-panel">
+        <div className="break-chip">Break</div>
+        <div className="break-title">Section Break</div>
+        <div className="break-sub">
+          Take your 10-minute reset. Next up: <b>{modules?.[nextModule]?.label}</b> — {modules?.[nextModule]?.module}
+        </div>
+        <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
+          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+        </div>
+        <div className="break-actions">
+          <button className="btn btn-primary" style={{ padding: '14px 40px', fontSize: 16 }} onClick={onContinue}>
+            Start Next Module →
+          </button>
+        </div>
+        <p className="break-footnote">You can wait for the timer or start early whenever you feel ready.</p>
       </div>
-      <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
-        {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-      </div>
-      <button className="btn btn-primary" style={{ marginTop: 32, padding: '14px 40px', fontSize: 16 }} onClick={onContinue}>
-        Start Next Module →
-      </button>
-      <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>You can also start early by clicking the button above</p>
     </div>
   )
 }
