@@ -289,6 +289,7 @@ button,
   margin-top: 14px;
   flex: 1;
   align-content: start;
+  align-items: start;
 }
 
 .dashboard-practice-grid.act {
@@ -302,7 +303,8 @@ button,
 
 .dashboard-practice-tile {
   min-width: 0;
-  height: 100%;
+  height: auto;
+  align-self: start;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -317,7 +319,7 @@ button,
 }
 
 .dashboard-practice-actions {
-  margin-top: auto;
+  margin-top: 12px;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
