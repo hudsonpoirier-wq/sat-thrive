@@ -319,6 +319,7 @@ export default function Mistakes() {
                       startPage={selectedSectionRange[0]}
                       endPage={selectedSectionRange[1]}
                       zoom={zoom}
+                      initialPageIndex={selectedPdfPage}
                     />
                   ) : (
                     <PDFPage

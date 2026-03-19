@@ -259,7 +259,7 @@ button,
 
 .dashboard-practice-grid.act {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: minmax(230px, 1fr);
+  grid-auto-rows: minmax(172px, auto);
 }
 
 .dashboard-practice-tile {
@@ -267,7 +267,7 @@ button,
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 16px;
@@ -279,7 +279,7 @@ button,
 }
 
 .dashboard-practice-actions {
-  margin-top: 12px;
+  margin-top: auto;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
