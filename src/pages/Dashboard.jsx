@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
-import { loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule, dayLabels } from '../lib/studyPlan.js'
+import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
@@ -50,9 +50,9 @@ function Navbar({ viewUserId, isAdminPreview }) {
   )
 }
 
-function ScoreOverviewCard({ label, value, sub, icon, dark = false }) {
-  return (
-    <div className={`stat-box${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
+  const content = (
+    <div className={`stat-box${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', height: '100%' }}>
       <div style={{
         width: 42,
         height: 42,
@@ -71,6 +71,13 @@ function ScoreOverviewCard({ label, value, sub, icon, dark = false }) {
         <div className="stat-sub">{sub}</div>
       </div>
     </div>
+  )
+
+  if (!to) return content
+  return (
+    <Link to={to} style={{ textDecoration: 'none', display: 'block', height: '100%' }}>
+      {content}
+    </Link>
   )
 }
 
@@ -137,7 +144,6 @@ export default function Dashboard() {
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
   const [targetProfile, setTargetProfile] = useState(null)
-  const availabilityLabels = dayLabels()
 
   useEffect(() => {
     setSatDate(loadSatTestDate(viewUserId))
@@ -300,7 +306,15 @@ export default function Dashboard() {
   const completedWithScores = completed
     .map((attempt) => ({ attempt, scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}) }))
     .filter((entry) => entry.scores?.total)
+  const fullLengthRecords = completedWithScores.filter(({ attempt }) => {
+    const cfg = TESTS.find((t) => t.id === (attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id))
+    return cfg && cfg.kind !== 'extra'
+  })
   const bestSatRecord = completedWithScores.reduce((best, entry) => {
+    if (!best) return entry
+    return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
+  }, null)
+  const highestTestRecord = fullLengthRecords.reduce((best, entry) => {
     if (!best) return entry
     return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
   }, null)
@@ -442,18 +456,21 @@ export default function Dashboard() {
               sub={bestSatRecord ? `${TESTS.find((t) => t.id === (bestSatRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : bestSatRecord.attempt.test_id))?.label || 'Completed test'}` : 'All-time high'}
               icon="sparkle"
               dark={Boolean(bestSatRecord?.scores?.total)}
+              to={bestSatRecord ? viewHref(`/results/${bestSatRecord.attempt.id}`) : ''}
             />
             <ScoreOverviewCard
               label="Highest Test"
-              value={bestScore || '—'}
-              sub={bestScore ? 'Highest full-length practice score' : 'No pre test recorded yet'}
+              value={highestTestRecord?.scores?.total || '—'}
+              sub={highestTestRecord ? `${TESTS.find((t) => t.id === (highestTestRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : highestTestRecord.attempt.test_id))?.label || 'Highest full-length test'}` : 'No full-length test recorded yet'}
               icon="test"
+              to={highestTestRecord ? viewHref(`/results/${highestTestRecord.attempt.id}`) : ''}
             />
             <ScoreOverviewCard
               label="Most Recent Test"
               value={mostRecentRecord?.scores?.total || '—'}
               sub={mostRecentRecord ? `${TESTS.find((t) => t.id === (mostRecentRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : mostRecentRecord.attempt.test_id))?.label || 'Latest test'} · ${new Date(mostRecentRecord.attempt.started_at).toLocaleDateString()}` : 'No completed attempt yet'}
               icon="results"
+              to={mostRecentRecord ? viewHref(`/results/${mostRecentRecord.attempt.id}`) : ''}
             />
             <ScoreOverviewCard
               label="Total Improvement"
@@ -512,7 +529,7 @@ export default function Dashboard() {
 
         {/* Today / work-ahead */}
         {hasTakenPretest && journeySchedule && (
-          <div className="card" style={{ marginBottom: 24 }}>
+          <div id="today-tasks-card" className="card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -530,10 +547,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   className="btn btn-outline"
-                  onClick={() => {
-                    const el = document.getElementById('journey-settings')
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }}
+                  onClick={() => navigate(viewHref('/calendar'))}
                   style={{ padding: '8px 12px', fontSize: 12 }}
                 >
                   Edit Test Date &amp; Availability
@@ -625,115 +639,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div
-            id="journey-settings"
-            style={{
-              marginTop: 16,
-              border: '1px solid #e2e8f0',
-              borderRadius: 16,
-              background: '#f8fafc',
-              padding: 16,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="calendar" size={16} />
-                  Journey Settings
-                </div>
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Update your test date, daily study time, and available days right here. The Smart Journey calendar will rebalance automatically.
-                </div>
-              </div>
-              <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ padding: '8px 12px', fontSize: 12 }}>
-                View Full Calendar →
-              </Link>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Test date:
-                <input
-                  type="date"
-                  value={satDate || ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setSatDate(v)
-                    saveSatTestDate(viewUserId, v)
-                  }}
-                  disabled={readOnlyView}
-                  style={{
-                    padding: '7px 10px',
-                    borderRadius: 10,
-                    border: '1px solid #e2e8f0',
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: '#0f172a',
-                    background: 'white',
-                  }}
-                />
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Min/day:
-                <input
-                  type="number"
-                  min={20}
-                  max={180}
-                  value={studyPrefs?.minutesPerDay ?? 45}
-                  onChange={(e) => {
-                    const v = Number(String(e.target.value || '').trim())
-                    const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
-                    const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
-                    setStudyPrefs(next)
-                    try { saveStudyPrefs(viewUserId, next) } catch {}
-                  }}
-                  disabled={readOnlyView}
-                  style={{
-                    width: 86,
-                    padding: '7px 10px',
-                    borderRadius: 10,
-                    border: '1px solid #e2e8f0',
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: '#0f172a',
-                    background: 'white',
-                  }}
-                />
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
-              {availabilityLabels.map((label, index) => {
-                const enabled = Boolean(studyPrefs?.days?.[index])
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={readOnlyView}
-                    onClick={() => {
-                      const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
-                      days[index] = !days[index]
-                      const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
-                      setStudyPrefs(next)
-                      try { saveStudyPrefs(viewUserId, next) } catch {}
-                    }}
-                    style={{
-                      padding: '7px 12px',
-                      fontSize: 12,
-                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
-                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
-                      color: enabled ? '#0f172a' : '#64748b',
-                    }}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           <div className="journey-grid" style={{ marginTop: 16 }}>
             {(() => {
               const toReview = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
@@ -752,10 +657,7 @@ export default function Dashboard() {
                   title: '2) Study Plan',
                   status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
                   desc: 'Set your SAT date (or best estimate) and use the plan for guidance (updates after each test).',
-                  onClick: () => {
-                    const el = document.getElementById('journey-settings')
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  },
+                  onClick: () => navigate(viewHref('/calendar')),
                 },
                 {
                   title: '3) Review Results',
@@ -820,6 +722,20 @@ export default function Dashboard() {
           </div>
 
 	          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {hasTakenPretest && latestCompleted && (
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const el = document.getElementById('today-tasks-card')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                >
+                  Generate Today / Tomorrow / The Day After
+                </button>
+              )}
+              <Link className="btn btn-outline" to={viewHref('/calendar')}>
+                View Full Calendar →
+              </Link>
 	            <button className="btn btn-outline" onClick={() => navigate(viewHref('/report'))} disabled={!hasTakenPretest}>
 	              Progress Report →
 	            </button>

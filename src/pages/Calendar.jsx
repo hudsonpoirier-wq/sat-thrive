@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
+import { TESTS } from '../data/tests.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 
@@ -71,6 +72,14 @@ export default function CalendarPage() {
   const [reviewItems, setReviewItems] = useState({})
   const [targetProfile, setTargetProfile] = useState(null)
   const [selectedDayKey, setSelectedDayKey] = useState('')
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
+  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const availabilityLabels = dayLabels()
+
+  useEffect(() => {
+    setSatDate(loadSatTestDate(viewUserId))
+    setStudyPrefs(loadStudyPrefs(viewUserId))
+  }, [viewUserId])
 
   useEffect(() => {
     if (!viewUserId) return
@@ -135,16 +144,18 @@ export default function CalendarPage() {
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
       studiedMap: studied,
       reviewCount: reviewTodoCount,
-      hasViewedResults: false,
       hasTakenPretest: true,
-      prefs: loadStudyPrefs(viewUserId),
-      testDate: loadSatTestDate(viewUserId),
+      prefs: studyPrefs,
+      testDate: satDate,
     })
-  }, [latestCompleted, hasTakenPretest, studied, reviewTodoCount, viewUserId, mistakes])
+  }, [latestCompleted, hasTakenPretest, studied, reviewTodoCount, studyPrefs, satDate, mistakes])
 
   const homeHref = withViewUser('/dashboard', viewUserId, isAdminPreview)
   const guideHref = withViewUser('/guide', viewUserId, isAdminPreview)
   const resultsHref = latestCompleted ? withViewUser(`/results/${latestCompleted.id}`, viewUserId, isAdminPreview) : homeHref
+  const latestResultsLabel = latestCompleted
+    ? `${TESTS.find((t) => t.id === (latestCompleted.test_id === 'practice_test_11' ? 'pre_test' : latestCompleted.test_id))?.label || 'Latest Test'} Results`
+    : 'Latest Results'
 
   const calendarCells = useMemo(() => {
     if (!schedule?.days?.length) return []
@@ -222,9 +233,92 @@ export default function CalendarPage() {
               Dashboard
             </Link>
             <Link className="btn btn-outline" to={guideHref}>Open Study Guide →</Link>
-            <Link className="btn btn-outline" to={resultsHref}>Latest Results →</Link>
+            <Link className="btn btn-outline" to={resultsHref}>{latestResultsLabel} →</Link>
           </div>
         </div>
+
+        {hasTakenPretest && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="calendar" size={16} />
+                  Journey Settings
+                </div>
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  Edit your test date, daily study time, and available days here. Your Smart Journey tasks update from your latest test results.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Test date:
+                <input
+                  type="date"
+                  value={satDate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSatDate(value)
+                    saveSatTestDate(viewUserId, value)
+                  }}
+                  disabled={isAdminPreview}
+                  style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Min/day:
+                <input
+                  type="number"
+                  min={20}
+                  max={180}
+                  value={studyPrefs?.minutesPerDay || 45}
+                  onChange={(e) => {
+                    if (isAdminPreview) return
+                    const value = Number(String(e.target.value || '').trim())
+                    const minutesPerDay = Number.isFinite(value) ? Math.max(20, Math.min(180, value)) : 45
+                    const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
+                    setStudyPrefs(next)
+                    try { saveStudyPrefs(viewUserId, next) } catch {}
+                  }}
+                  disabled={isAdminPreview}
+                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
+              {availabilityLabels.map((label, index) => {
+                const enabled = Boolean(studyPrefs?.days?.[index])
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={isAdminPreview}
+                    onClick={() => {
+                      const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
+                      days[index] = !days[index]
+                      const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
+                      setStudyPrefs(next)
+                      try { saveStudyPrefs(viewUserId, next) } catch {}
+                    }}
+                    style={{
+                      padding: '7px 12px',
+                      fontSize: 12,
+                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
+                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
+                      color: enabled ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {!schedule ? (
           <div className="card" style={{ padding: 18 }}>

@@ -193,7 +193,6 @@ export function buildAdaptiveSchedule({
   weakTopics,
   studiedMap,
   reviewCount = 0,
-  hasViewedResults = false,
   hasTakenPretest = false,
   prefs,
   testDate,
@@ -229,25 +228,12 @@ export function buildAdaptiveSchedule({
   const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
   let reviewBlocks = Math.ceil(pendingReviewCount / 5)
   let reviewLeft = pendingReviewCount
-  let needsResults = Boolean(hasTakenPretest && !hasViewedResults)
-  const totalUnits = reading.length + math.length + reviewBlocks + (needsResults ? 1 : 0)
+  const totalUnits = reading.length + math.length + reviewBlocks
   const tasksPerDay = Math.max(1, Math.min(3, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
   let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
 
   for (const day of usableDays) {
     const tasks = []
-
-    if (needsResults && tasks.length < tasksPerDay) {
-      tasks.push({
-        id: `results-${day.key}`,
-        type: 'results',
-        subject: 'Mixed',
-        title: 'Review latest results',
-        subtitle: 'Open your score report and identify the biggest weak spots.',
-        href: '/results',
-      })
-      needsResults = false
-    }
 
     if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
       const amount = Math.min(5, Math.max(1, reviewLeft || 5))
