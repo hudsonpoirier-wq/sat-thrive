@@ -262,6 +262,10 @@ button,
   grid-auto-rows: minmax(172px, auto);
 }
 
+.dashboard-practice-grid.act .dashboard-practice-tile {
+  justify-content: flex-start;
+}
+
 .dashboard-practice-tile {
   min-width: 0;
   height: 100%;
@@ -288,6 +292,10 @@ button,
 
 .dashboard-practice-grid.act .dashboard-practice-actions > * {
   flex: 1 1 140px;
+}
+
+.dashboard-practice-grid.act .dashboard-practice-actions {
+  margin-top: 10px;
 }
 
 .study-rich-text .study-exp {
