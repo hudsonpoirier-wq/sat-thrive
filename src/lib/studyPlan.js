@@ -190,6 +190,13 @@ function buildChapterQueues(weakTopics, studiedMap) {
   return { reading, math }
 }
 
+function takeNextTask(queue, blockedChapterIds = new Set()) {
+  if (!Array.isArray(queue) || !queue.length) return null
+  const index = queue.findIndex((task) => !blockedChapterIds.has(String(task.chapterId || '')))
+  if (index === -1) return null
+  return queue.splice(index, 1)[0]
+}
+
 export function buildAdaptiveSchedule({
   weakTopics,
   studiedMap,
@@ -243,6 +250,7 @@ export function buildAdaptiveSchedule({
   for (const day of usableDays) {
     const tasks = []
     let usedMinutes = 0
+    const chapterIdsUsedToday = new Set()
 
     if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
       const amount = Math.min(5, Math.max(1, reviewLeft || 5))
@@ -266,15 +274,17 @@ export function buildAdaptiveSchedule({
     while (tasks.length < tasksPerDay && (reading.length || math.length)) {
       const preferredQueue = nextSubject === 'Reading' ? reading : math
       const fallbackQueue = nextSubject === 'Reading' ? math : reading
-      const queue = preferredQueue.length ? preferredQueue : fallbackQueue
-      if (!queue.length) break
-      const task = queue.shift()
+      let task = takeNextTask(preferredQueue, chapterIdsUsedToday)
+      if (!task) task = takeNextTask(fallbackQueue, chapterIdsUsedToday)
+      if (!task) break
       const estimatedMinutes = Number(task.estimatedMinutes || 20)
       if (tasks.length > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
-        queue.unshift(task)
+        if (task.subject === 'Reading') reading.unshift(task)
+        else math.unshift(task)
         break
       }
       tasks.push(task)
+      if (task.chapterId) chapterIdsUsedToday.add(String(task.chapterId))
       usedMinutes += estimatedMinutes
       if (reading.length && math.length) {
         nextSubject = task.subject === 'Reading' ? 'Math' : 'Reading'
