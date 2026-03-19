@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { rawToScaled, freeResponseMatches } from '../data/testData.js'
+import { rawToScaled, answerMatches } from '../data/testData.js'
 import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
@@ -171,10 +171,6 @@ export default function Dashboard() {
       const keyBySection = getAnswerKeyBySection(attempt?.test_id) || null
       if (!keyBySection) return null
       const ans = attempt?.answers || {}
-      const isChoiceLetter = (v) => {
-        const s = String(v || '').trim().toUpperCase()
-        return s === 'A' || s === 'B' || s === 'C' || s === 'D'
-      }
       const scoreMod = (section, sectionAnswers) => {
         const key = keyBySection?.[section] || {}
         const total = Object.keys(key).length
@@ -182,9 +178,7 @@ export default function Dashboard() {
         for (const [qStr, right] of Object.entries(key)) {
           const given = sectionAnswers?.[qStr]
           if (right == null) continue
-          const ok = isChoiceLetter(right)
-            ? String(given || '').toUpperCase() === String(right).toUpperCase()
-            : freeResponseMatches(given, right)
+          const ok = answerMatches(given, right)
           if (ok) correct++
         }
         return { correct, total }

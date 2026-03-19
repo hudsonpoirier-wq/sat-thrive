@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase.js'
 import PDFPage from '../components/PDFPage.jsx'
 import {
   MODULES, MODULE_ORDER, PDF_PAGE_MAP,
-  ANSWER_KEY, QUESTION_CHAPTER_MAP, CHAPTERS, rawToScaled, freeResponseMatches
+  ANSWER_KEY, QUESTION_CHAPTER_MAP, CHAPTERS, rawToScaled, answerMatches, isMultipleChoiceAnswer
 } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
@@ -14,11 +14,6 @@ import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { saveMistakes, ensureReviewItems } from '../lib/mistakesStore.js'
 import { buildWeeklyStudyPlan, loadStudyPrefs } from '../lib/studyPlan.js'
 
-function isChoiceLetter(v) {
-  const s = String(v || '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
-}
-
 function scoreFromKey(section, sectionAnswers, sectionKey) {
   const total = MODULES[section]?.questions || 0
   let correct = 0
@@ -26,9 +21,7 @@ function scoreFromKey(section, sectionAnswers, sectionKey) {
     const right = sectionKey?.[q]
     if (right == null) continue
     const given = sectionAnswers?.[q]
-    const ok = isChoiceLetter(right)
-      ? String(given || '').toUpperCase() === String(right).toUpperCase()
-      : freeResponseMatches(given, right)
+    const ok = answerMatches(given, right)
     if (ok) correct++
   }
   return { correct, total, wrong: total - correct }
@@ -47,9 +40,7 @@ function calcWeakTopicsFromKey(allAnswers, keyBySection) {
       if (right == null) continue
       const ch = chMap?.[q]
       if (!ch) continue
-      const ok = isChoiceLetter(right)
-        ? String(given || '').toUpperCase() === String(right).toUpperCase()
-        : freeResponseMatches(given, right)
+      const ok = answerMatches(given, right)
       if (!ok) counts[ch] = (counts[ch] || 0) + 1
     }
   })
@@ -529,9 +520,7 @@ export default function TestTaking() {
           const given = sectionAnswers?.[q]
           const attempted = String(given ?? '').trim().length > 0
           if (attempted) attemptedTotal += 1
-          const ok = isChoiceLetter(right)
-            ? String(given).toUpperCase() === String(right).toUpperCase()
-            : freeResponseMatches(given, right)
+          const ok = answerMatches(given, right)
           if (ok) continue
           if (!attempted) continue
           mistakes.push({
@@ -595,9 +584,7 @@ export default function TestTaking() {
           stats[ch].total += 1
           const given = sectionAnswers[q]
           const attempted = String(given ?? '').trim().length > 0
-          const ok = attempted && (isChoiceLetter(right)
-            ? String(given).toUpperCase() === String(right).toUpperCase()
-            : freeResponseMatches(given, right))
+          const ok = attempted && answerMatches(given, right)
           if (ok) stats[ch].correct += 1
           else stats[ch].allCorrect = false
         }
@@ -706,7 +693,7 @@ export default function TestTaking() {
   const markedList = markedForReview[currentModule] || []
   const isMarked = markedList.includes(currentQ)
   const right = keyBySection?.[currentModule]?.[currentQ]
-  const isFR = right != null && !isChoiceLetter(right)
+  const isFR = right != null && !isMultipleChoiceAnswer(right)
   const isLastQ = currentQ === totalQ
   const isLastModule = MODULE_ORDER.indexOf(currentModule) === MODULE_ORDER.length - 1
   const choices = ['A', 'B', 'C', 'D']

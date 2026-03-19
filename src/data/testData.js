@@ -32,7 +32,7 @@ export const ANSWER_KEY = {
     8:'A',9:'B',10:'D',11:'C',12:'A',
     13:'45',14:'13',
     15:'B',16:'C',17:'D',18:'B',19:'A',
-    20:'.5061',21:'302.4',
+    20:'.5061|41/81',21:'302.4',
     22:'C',23:'A',24:'B',25:'B',26:'D',
     27:'157.8'
   }
@@ -196,9 +196,26 @@ function splitAcceptedAnswers(value) {
     .filter(Boolean)
 }
 
+export function isChoiceLetter(value) {
+  const s = String(value ?? '').trim().toUpperCase()
+  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+}
+
+export function isMultipleChoiceAnswer(correct) {
+  const rawCorrect = String(correct ?? '').trim()
+  if (!rawCorrect) return false
+  const options = splitAcceptedAnswers(rawCorrect)
+  const list = options.length ? options : [rawCorrect]
+  return list.some(isChoiceLetter)
+}
+
 function parseFreeResponse(value) {
   const raw = String(value ?? '').trim()
   if (!raw) return { kind: 'empty', raw: '' }
+  const tupleRaw = raw.replace(/[−–—]/g, '-')
+  if (/^\(\s*[+-]?\d+(?:\.\d+)?(?:\s*,\s*[+-]?\d+(?:\.\d+)?)+\s*\)$/.test(tupleRaw)) {
+    return { kind: 'text', raw: tupleRaw.replace(/\s/g, '') }
+  }
   const normalized = normalizeFreeResponseInput(raw)
   const mixedFrac = normalized.match(/^([+-]?\d+)\s+(\d+)\/(\d+)$/)
   if (mixedFrac) {
@@ -384,17 +401,37 @@ export function freeResponseMatches(given, correct) {
   return false
 }
 
+export function answerMatches(given, correct) {
+  const rawCorrect = String(correct ?? '').trim()
+  if (!rawCorrect) return false
+  const rawGiven = String(given ?? '').trim()
+  if (!rawGiven) return false
+
+  const options = splitAcceptedAnswers(rawCorrect)
+  const list = options.length ? options : [rawCorrect]
+
+  for (const opt of list) {
+    if (isChoiceLetter(opt) && rawGiven.toUpperCase() === String(opt).trim().toUpperCase()) {
+      return true
+    }
+  }
+
+  for (const opt of list) {
+    if (isChoiceLetter(opt)) continue
+    if (freeResponseMatches(rawGiven, opt)) return true
+  }
+
+  return false
+}
+
 // Score individual section from answers
 export function scoreSection(section, answers) {
   const key = ANSWER_KEY[section]
-  const fr = FREE_RESPONSE[section] || []
   let correct = 0, total = Object.keys(key).length
   Object.entries(answers || {}).forEach(([qNum, given]) => {
     const rightAnswer = key[qNum]
     if (!rightAnswer) return
-    const isCorrect = fr.includes(Number(qNum))
-      ? freeResponseMatches(given, rightAnswer)
-      : String(given).toUpperCase() === String(rightAnswer).toUpperCase()
+    const isCorrect = answerMatches(given, rightAnswer)
     if (isCorrect) correct++
   })
   return { correct, total, wrong: total - correct }

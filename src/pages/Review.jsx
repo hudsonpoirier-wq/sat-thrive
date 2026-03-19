@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import PDFPage from '../components/PDFPage.jsx'
-import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
+import { MODULES, PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -42,11 +42,6 @@ function Navbar() {
       </div>
     </nav>
   )
-}
-
-function isChoiceLetter(v) {
-  const s = String(v || '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
 }
 
 function pdfPageFor(testId, section, qNum) {
@@ -198,7 +193,7 @@ export default function Review() {
 
   const mod = MODULES?.[current.section]
   const correct = current.correct
-  const isFR = correct != null && !isChoiceLetter(correct)
+  const isFR = correct != null && !isMultipleChoiceAnswer(correct)
 
   const ok = (() => {
     if (feedback?.result == null) return null
@@ -333,9 +328,7 @@ export default function Review() {
                   className="btn btn-primary"
                   onClick={async () => {
                     if (!answer.trim()) return
-                    const isCorrect = isChoiceLetter(correct)
-                      ? String(answer || '').trim().toUpperCase() === String(correct).trim().toUpperCase()
-                      : freeResponseMatches(answer, correct)
+                    const isCorrect = answerMatches(answer, correct)
                     setFeedback({ result: isCorrect })
                     const next = applyReviewResult(reviewItems?.[current.itemKey], isCorrect)
                     await saveReviewItem(user.id, current.itemKey, next)

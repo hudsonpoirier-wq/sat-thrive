@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
+import { MODULES, PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
@@ -156,7 +156,7 @@ export default function Mistakes() {
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
   const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
-  const selectedIsMC = selected ? ['A', 'B', 'C', 'D'].includes(String(selectedCorrect || '').trim().toUpperCase()) : false
+  const selectedIsMC = selected ? isMultipleChoiceAnswer(selectedCorrect) : false
 
   useEffect(() => {
     setZoom(1)
@@ -363,9 +363,8 @@ export default function Mistakes() {
                             onClick={async () => {
                               if (isAdminPreview || !selectedItemKey) return
                               const right = String(selectedCorrect || '').trim()
-                              const ok = selectedIsMC
-                                ? (String(redoChoice || '').toUpperCase() === right.toUpperCase())
-                                : freeResponseMatches(redoText, right)
+                              const submitted = selectedIsMC ? redoChoice : redoText
+                              const ok = answerMatches(submitted, right)
 
                               setRedoFeedback(ok ? { ok: true, msg: 'Correct — nice work.' } : { ok: false, msg: 'Not quite — try the hints and check again.' })
                               if (!ok) setHintStep((step) => Math.max(step, 1))

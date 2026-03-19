@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
+import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, answerMatches } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
@@ -30,8 +30,7 @@ function SectionBreakdown({ answers, keyBySection }) {
         Object.entries(sAnswers).forEach(([q, v]) => {
           const right = key?.[q]
           if (!right) return
-          const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
-          const ok = isFR ? freeResponseMatches(v, right) : String(v).toUpperCase() === String(right).toUpperCase()
+          const ok = answerMatches(v, right)
           if (ok) correct++
         })
         const answered = Object.keys(sAnswers).length
@@ -70,10 +69,7 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
           const given = modAnswers[q]
           const right = key?.[q]
           if (!right) continue
-          const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
-          const isCorrect = isFR
-            ? given && freeResponseMatches(given, right)
-            : given && String(given).toUpperCase() === String(right).toUpperCase()
+          const isCorrect = given && answerMatches(given, right)
           if (!isCorrect) wrongs.push({ q, given, right, ch: chMap[q] })
         }
         if (wrongs.length === 0) return (
@@ -222,8 +218,7 @@ export default function Results() {
       for (const [q, right] of Object.entries(key || {})) {
         const given = answers?.[section]?.[q]
         if (given == null || String(given).trim() === '') continue
-        const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
-        const ok = isFR ? freeResponseMatches(given, right) : String(given).toUpperCase() === String(right).toUpperCase()
+        const ok = answerMatches(given, right)
         if (!ok) wrong += 1
       }
     }
@@ -443,9 +438,9 @@ export default function Results() {
                 )
               })}
             </div>
-            <div style={{ marginTop: 12, fontSize: 12, color: resultSchedule?.needsMoreTime ? '#92400e' : '#64748b', lineHeight: 1.6 }}>
-              {resultSchedule?.needsMoreTime
-                ? <>Plan for about <b>{resultSchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.</>
+            <div style={{ marginTop: 12, fontSize: 12, color: journeySchedule?.needsMoreTime ? '#92400e' : '#64748b', lineHeight: 1.6 }}>
+              {journeySchedule?.needsMoreTime
+                ? <>Plan for about <b>{journeySchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.</>
                 : <>This plan updates from your latest results, and any missed day rolls forward into the next available study day automatically.</>}
             </div>
           </div>

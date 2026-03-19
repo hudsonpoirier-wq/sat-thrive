@@ -8,7 +8,7 @@ import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import { TESTS } from '../data/tests.js'
-import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, freeResponseMatches, rawToScaled } from '../data/testData.js'
+import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, answerMatches, rawToScaled } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
@@ -439,11 +439,6 @@ export default function Admin() {
     const activeUsers7 = new Set()
     const activeUsers30 = new Set()
 
-    const isChoiceLetter = (v) => {
-      const s = String(v || '').trim().toUpperCase()
-      return s === 'A' || s === 'B' || s === 'C' || s === 'D'
-    }
-
     const computeWeakTopicsFromAnswers = (attempt) => {
       try {
         const tid = normalizeTestId(attempt?.test_id)
@@ -461,9 +456,7 @@ export default function Admin() {
             const chapterId = chapterMap?.[qStr]
             if (!chapterId || right == null) continue
             const given = sectionAnswers?.[qStr]
-            const ok = isChoiceLetter(right)
-              ? String(given || '').toUpperCase() === String(right).toUpperCase()
-              : freeResponseMatches(given, right)
+            const ok = answerMatches(given, right)
             if (!ok) counts.set(chapterId, (counts.get(chapterId) || 0) + 1)
           }
         }
@@ -493,9 +486,7 @@ export default function Admin() {
             const right = key?.[q]
             if (right == null) continue
             const given = sectionAnswers?.[q]
-            const ok = isChoiceLetter(right)
-              ? String(given || '').toUpperCase() === String(right).toUpperCase()
-              : freeResponseMatches(given, right)
+            const ok = answerMatches(given, right)
             if (ok) correct++
           }
           return correct
