@@ -210,8 +210,10 @@ export default function Results() {
 
   useEffect(() => {
     if (!supabase || !viewUserId) return
+    let cancelled = false
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', viewUserId).single()
       .then(({ data }) => {
+        if (cancelled) return
         const resultExam = getExamConfigForTest(data?.test_id || 'pre_test').exam
         const toDashboard = withViewUser(withExam('/dashboard', resultExam), viewUserId, isAdminPreview)
         if (!data) { navigate(toDashboard); return }
@@ -228,7 +230,16 @@ export default function Results() {
         }
         setLoading(false)
       })
-  }, [attemptId, viewUserId, navigate, readOnlyView])
+      .catch(() => {
+        if (!cancelled) {
+          setLoading(false)
+          navigate(withViewUser(withExam('/dashboard', exam), viewUserId, isAdminPreview))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [attemptId, viewUserId, navigate, readOnlyView, exam, isAdminPreview])
 
   const scores = attempt?.scores || {}
   const currentTestConfig = getTestConfig(attempt?.test_id)

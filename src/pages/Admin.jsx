@@ -193,19 +193,26 @@ export default function Admin() {
       navigate('/dashboard')
       return
     }
+    let cancelled = false
     async function load() {
       setLoading(true)
-      const [p, a, ps] = await Promise.all([
+      const [p, a, ps] = await Promise.allSettled([
         supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
         supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
         supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
       ])
-      setStudents(p.data || [])
-      setAttempts(a.data || [])
-      setPostScores(ps.data || [])
+      if (cancelled) return
+      setStudents(p.status === 'fulfilled' ? (p.value.data || []) : [])
+      setAttempts(a.status === 'fulfilled' ? (a.value.data || []) : [])
+      setPostScores(ps.status === 'fulfilled' ? (ps.value.data || []) : [])
       setLoading(false)
     }
-    load().catch(() => setLoading(false))
+    load().catch(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [profile, isAdmin, navigate])
 
   async function resetStudentData(userId, email) {

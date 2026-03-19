@@ -206,8 +206,10 @@ export default function TestTaking() {
 
   useEffect(() => {
     if (!supabase || !user?.id) return
+    let cancelled = false
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', user.id).single()
       .then(({ data, error }) => {
+        if (cancelled) return
         if (error || !data) {
           // Offline fallback: open the locally saved draft (answers + timing), but disable submit.
           const draft = readDraft()
@@ -247,10 +249,41 @@ export default function TestTaking() {
         setModuleTimeLeft(data.module_time_remaining || getDefaultModuleTimeRemaining(data.test_id || cfg?.id || 'pre_test'))
         setLoading(false)
       })
+      .catch(() => {
+        if (cancelled) return
+        const draft = readDraft()
+        if (!draft) {
+          setLoading(false)
+          navigate('/dashboard')
+          return
+        }
+        const cfg = getTestConfig(draft.test_id) || getTestConfig('pre_test')
+        const cfgId = draft.test_id || cfg?.id || 'pre_test'
+        const defaultModule = getExamConfigForTest(cfgId).moduleOrder[0]
+        setAttempt({
+          id: attemptId,
+          user_id: user.id,
+          test_id: cfgId,
+          current_section: draft.current_section || defaultModule,
+          answers: draft.answers || {},
+          module_time_remaining: draft.module_time_remaining || getDefaultModuleTimeRemaining(cfgId),
+          completed_at: null,
+        })
+        setTestConfig(cfg)
+        setCurrentModule(draft.current_section || defaultModule)
+        setCurrentQ(1)
+        setAnswers(draft.answers || {})
+        setModuleTimeLeft(draft.module_time_remaining || getDefaultModuleTimeRemaining(cfgId))
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [attemptId, user?.id, navigate])
 
   useEffect(() => {
     if (!supabase || !attempt?.test_id) return
+    let cancelled = false
     const cfg = getTestConfig(attempt.test_id) || getTestConfig('pre_test')
     const builtIn = getAnswerKeyBySection(cfg?.id)
     if (builtIn) {
@@ -258,14 +291,20 @@ export default function TestTaking() {
       if (cfg?.id && cfg.id !== 'pre_test' && builtIn) {
         const total = Object.values(builtIn || {}).reduce((sum, sectionKey) => sum + Object.keys(sectionKey || {}).length, 0)
         if (total < 110) {
-          setKeyBySection(null)
-          setKeyStatus({ loading: false, msg: 'Answer key is incomplete for this test build. Please contact the admin.' })
+          if (!cancelled) {
+            setKeyBySection(null)
+            setKeyStatus({ loading: false, msg: 'Answer key is incomplete for this test build. Please contact the admin.' })
+          }
           return
         }
       }
-      setKeyBySection(builtIn)
-      setKeyStatus({ loading: false, msg: '' })
-      return
+      if (!cancelled) {
+        setKeyBySection(builtIn)
+        setKeyStatus({ loading: false, msg: '' })
+      }
+      return () => {
+        cancelled = true
+      }
     }
 
     const CACHE_KEY = 'agora_answer_keys_cache_v1'
@@ -289,9 +328,13 @@ export default function TestTaking() {
 
     const cached = readCache(cfg.id)
     if (cached) {
-      setKeyBySection(cached)
-      setKeyStatus({ loading: false, msg: '' })
-      return
+      if (!cancelled) {
+        setKeyBySection(cached)
+        setKeyStatus({ loading: false, msg: '' })
+      }
+      return () => {
+        cancelled = true
+      }
     }
 
     setKeyStatus({ loading: true, msg: 'Loading answer key…' })
@@ -300,6 +343,7 @@ export default function TestTaking() {
       try {
         const { data } = await supabase.from('test_answer_keys').select('*').eq('test_id', cfg.id).single()
         if (data?.answer_key) {
+          if (cancelled) return
           setKeyBySection(data.answer_key)
           writeCache(cfg.id, data.answer_key)
           setKeyStatus({ loading: false, msg: '' })
@@ -314,20 +358,26 @@ export default function TestTaking() {
           if (!res.ok) throw new Error('Could not fetch bundled answer key.')
           const buf = new Uint8Array(await res.arrayBuffer())
           const parsed = await extractAnswerKeyFromPdf(buf)
+          if (cancelled) return
           setKeyBySection(parsed)
           writeCache(cfg.id, parsed)
           setKeyStatus({ loading: false, msg: '' })
           return
         } catch (e) {
+          if (cancelled) return
           setKeyBySection(null)
           setKeyStatus({ loading: false, msg: `Could not load answer key: ${e?.message || 'unknown error'}` })
           return
         }
       }
 
+      if (cancelled) return
       setKeyBySection(null)
       setKeyStatus({ loading: false, msg: 'Missing answer key.' })
     })()
+    return () => {
+      cancelled = true
+    }
   }, [attempt?.test_id])
 
   const saveProgress = useCallback(async (updatedAnswers, mod, timeRemaining) => {

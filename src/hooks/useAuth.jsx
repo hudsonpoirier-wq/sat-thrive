@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       if (!supabase || !userId) return
       const requestId = ++latestProfileRequest
       try {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
         if (cancelled || requestId !== latestProfileRequest) return
         setProfile(data || null)
       } catch {

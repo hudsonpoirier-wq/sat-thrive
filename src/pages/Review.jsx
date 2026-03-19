@@ -77,14 +77,21 @@ export default function Review() {
 
   useEffect(() => {
     if (!user?.id) return
+    let cancelled = false
     setLoading(true)
-    Promise.all([loadMistakes(user.id), loadReviewItems(user.id)])
+    Promise.allSettled([loadMistakes(user.id), loadReviewItems(user.id)])
       .then(([m, r]) => {
-        setMistakes(m.items || [])
-        setReviewItems(r.items || {})
+        if (cancelled) return
+        setMistakes(m.status === 'fulfilled' ? (m.value.items || []) : [])
+        setReviewItems(r.status === 'fulfilled' ? (r.value.items || {}) : {})
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [user?.id])
 
   const dueCount = useMemo(() => computeDueCount(reviewItems), [reviewItems])

@@ -97,24 +97,18 @@ export default function CalendarPage() {
     let cancelled = false
     setLoading(true)
 
-    Promise.all([
+    Promise.allSettled([
       loadDashboardViewData(viewUserId),
       isAdminPreview ? loadProfileSafe(viewUserId) : Promise.resolve(null),
-    ]).then(([data, previewProfile]) => {
+    ]).then(([dataRes, previewRes]) => {
       if (cancelled) return
-      setAttempts(data.attempts || [])
-      setStudied(data.studiedMap || {})
-      setMistakes(data.mistakes || [])
-      setReviewItems(data.reviewItems || {})
+      const data = dataRes.status === 'fulfilled' ? dataRes.value : null
+      const previewProfile = previewRes.status === 'fulfilled' ? previewRes.value : null
+      setAttempts(data?.attempts || [])
+      setStudied(data?.studiedMap || {})
+      setMistakes(data?.mistakes || [])
+      setReviewItems(data?.reviewItems || {})
       setTargetProfile(previewProfile || null)
-      setLoading(false)
-    }).catch(() => {
-      if (cancelled) return
-      setAttempts([])
-      setStudied({})
-      setMistakes([])
-      setReviewItems({})
-      setTargetProfile(null)
       setLoading(false)
     })
 

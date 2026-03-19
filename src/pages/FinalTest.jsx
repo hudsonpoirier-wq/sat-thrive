@@ -56,6 +56,7 @@ export default function FinalTest() {
 
   useEffect(() => {
     if (!supabase || !user?.id) return
+    let cancelled = false
     setLoading(true)
     supabase.from('test_attempts')
       .select('*')
@@ -66,26 +67,50 @@ export default function FinalTest() {
       .limit(1)
       .maybeSingle()
       .then(({ data }) => {
+        if (cancelled) return
         setInProgress(data || null)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [user?.id, finalTestId])
 
   async function startFinal() {
-    if (!supabase || !user?.id) return
+    if (!supabase || !user?.id || starting) return
     setStarting(true)
-    const payload = {
-      user_id: user.id,
-      test_id: finalTestId,
-      current_section: examConfig.moduleOrder[0],
-      answers: {},
-      module_time_remaining: getDefaultModuleTimeRemaining(finalTestId),
-    }
-    const res = await supabase.from('test_attempts').insert(payload).select().single()
-    if (!res.error && res.data) navigate(`/test/${res.data.id}`)
-    else {
-      alert(res.error?.message || 'Could not start final test. Please try again.')
+    try {
+      const existing = await supabase.from('test_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('test_id', finalTestId)
+        .is('completed_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (existing?.data?.id) {
+        navigate(`/test/${existing.data.id}`)
+        return
+      }
+
+      const payload = {
+        user_id: user.id,
+        test_id: finalTestId,
+        current_section: examConfig.moduleOrder[0],
+        answers: {},
+        module_time_remaining: getDefaultModuleTimeRemaining(finalTestId),
+      }
+      const res = await supabase.from('test_attempts').insert(payload).select().single()
+      if (!res.error && res.data) navigate(`/test/${res.data.id}`)
+      else {
+        alert(res.error?.message || 'Could not start final test. Please try again.')
+      }
+    } catch (error) {
+      alert(error?.message || 'Could not start final test. Please try again.')
+    } finally {
       setStarting(false)
     }
   }

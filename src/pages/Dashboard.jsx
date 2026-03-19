@@ -282,23 +282,43 @@ export default function Dashboard() {
   }, [user, loading, attempts, requestedExam, exam, navigate, viewHref])
 
   async function startNewTest(testId = examConfig.preTestId) {
-    if (readOnlyView) return
+    if (readOnlyView || startingTest || !supabase || !user?.id) return
     if (testId === examConfig.preTestId) {
       if (!confirmStart) { setConfirmStart(true); return }
       setConfirmStart(false)
     }
     setStartingTest(true)
-    const payload = {
-      user_id: user.id,
-      test_id: testId,
-      current_section: examConfig.moduleOrder[0],
-      answers: {},
-      module_time_remaining: getDefaultModuleTimeRemaining(testId)
-    }
-    const res = await supabase.from('test_attempts').insert(payload).select().single()
-    if (!res.error && res.data) navigate(`/test/${res.data.id}`)
-    else {
-      alert(res.error?.message || 'Could not start test. Please try again.')
+    try {
+      const existing = await supabase
+        .from('test_attempts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('test_id', testId)
+        .is('completed_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.data?.id) {
+        navigate(`/test/${existing.data.id}`)
+        return
+      }
+
+      const payload = {
+        user_id: user.id,
+        test_id: testId,
+        current_section: examConfig.moduleOrder[0],
+        answers: {},
+        module_time_remaining: getDefaultModuleTimeRemaining(testId)
+      }
+      const res = await supabase.from('test_attempts').insert(payload).select().single()
+      if (!res.error && res.data) navigate(`/test/${res.data.id}`)
+      else {
+        alert(res.error?.message || 'Could not start test. Please try again.')
+      }
+    } catch (error) {
+      alert(error?.message || 'Could not start test. Please try again.')
+    } finally {
       setStartingTest(false)
     }
   }

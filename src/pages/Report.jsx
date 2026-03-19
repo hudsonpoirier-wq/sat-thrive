@@ -74,8 +74,9 @@ export default function Report() {
 
   useEffect(() => {
     if (!supabase || !targetUser || !canView) return
+    let cancelled = false
     setLoading(true)
-    Promise.all([
+    Promise.allSettled([
       supabase.from('test_attempts').select('*').eq('user_id', targetUser).order('started_at', { ascending: false }),
       supabase.from('post_scores').select('*').eq('user_id', targetUser).order('recorded_at', { ascending: false }),
       getStudiedTopics(targetUser),
@@ -83,14 +84,20 @@ export default function Report() {
       loadReviewItems(targetUser),
       supabase.from('profiles').select('*').eq('id', targetUser).maybeSingle(),
     ]).then(([a, p, st, m, r, pr]) => {
-      setAttempts(a.data || [])
-      setPostScores(p.data || [])
-      setStudiedRows(st.rows || [])
-      setMistakes(m.items || [])
-      setReviewItems(r.items || {})
-      setTargetProfile(pr.data || null)
+      if (cancelled) return
+      setAttempts(a.status === 'fulfilled' ? (a.value.data || []) : [])
+      setPostScores(p.status === 'fulfilled' ? (p.value.data || []) : [])
+      setStudiedRows(st.status === 'fulfilled' ? (st.value.rows || []) : [])
+      setMistakes(m.status === 'fulfilled' ? (m.value.items || []) : [])
+      setReviewItems(r.status === 'fulfilled' ? (r.value.items || {}) : {})
+      setTargetProfile(pr.status === 'fulfilled' ? (pr.value.data || null) : null)
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [targetUser, canView])
 
   const report = useMemo(() => {
