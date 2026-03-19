@@ -377,6 +377,157 @@ export default function Mistakes() {
     return filtered[idx + 1] || filtered[0] || null
   })()
 
+  const answerPanel = selected ? (
+    <div className={`mistake-answer-box${exam === 'act' ? ' act-floating' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
+        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+          {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
+        </div>
+      </div>
+
+      {selectedCorrect == null ? (
+        <div style={{ marginTop: 10, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+          This question can’t be validated yet because the answer key isn’t loaded.
+        </div>
+      ) : (
+        <>
+          {selectedIsMC ? (
+            <div
+              className={`mistake-choice-grid${exam === 'act' ? ' act' : ''}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: exam === 'act'
+                  ? 'repeat(auto-fit, minmax(72px, 1fr))'
+                  : `repeat(${selectedChoices.length >= 5 ? 5 : 4}, minmax(0, 1fr))`,
+                gap: 10,
+                marginTop: 12,
+              }}
+            >
+              {selectedChoices.map((c) => (
+                <button
+                  key={c}
+                  className="btn btn-outline"
+                  style={{
+                    padding: '10px 12px',
+                    fontWeight: 900,
+                    borderColor: redoChoice === c ? '#1a2744' : '#e2e8f0',
+                    background: redoChoice === c ? 'rgba(26,39,68,.08)' : 'white',
+                  }}
+                  onClick={() => {
+                    setRedoChoice(c)
+                    setRedoFeedback(null)
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                Open response: enter only the value/expression. Equivalent fractions and comma-formatted numbers count. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
+              </div>
+              <input
+                type="text"
+                className="free-response-input"
+                placeholder="Your answer"
+                value={redoText}
+                onChange={(e) => {
+                  setRedoText(e.target.value)
+                  setRedoFeedback(null)
+                }}
+                autoComplete="off"
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              disabled={isAdminPreview || redoSaving || (selectedIsMC ? !redoChoice : !redoText.trim())}
+              onClick={async () => {
+                if (isAdminPreview || !selectedItemKey) return
+                const right = String(selectedCorrect || '').trim()
+                const submitted = selectedIsMC ? redoChoice : redoText
+                const ok = answerMatches(submitted, right)
+
+                setRedoFeedback(ok ? { ok: true, msg: 'Correct — nice work.' } : { ok: false, msg: 'Not quite — try the hints and check again.' })
+                if (!ok) setHintStep((step) => Math.max(step, 1))
+                if (!ok) return
+
+                setRedoSaving(true)
+                try {
+                  const currentItem = reviewItems?.[selectedItemKey] || { due_at: new Date().toISOString() }
+                  const next = applyReviewResult(currentItem, true)
+                  await saveReviewItem(viewUserId, selectedItemKey, next)
+                  setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
+                  setItems(prev => (prev || []).filter(m => m.id !== selected.id))
+                } finally {
+                  setRedoSaving(false)
+                }
+              }}
+            >
+              {redoSaving ? 'Saving…' : 'Check →'}
+            </button>
+            {redoFeedback && (
+              <div style={{ fontSize: 12, fontWeight: 900, color: redoFeedback.ok ? '#10b981' : '#ef4444' }}>
+                {redoFeedback.msg}
+              </div>
+            )}
+          </div>
+
+          {redoFeedback && !redoFeedback.ok && (
+            <div style={{ marginTop: 14, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ fontWeight: 900, color: '#9a3412' }}>Hints (optional)</div>
+                <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 700 }}>
+                  Use these before checking again.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    className="btn btn-outline"
+                    style={{ padding: '7px 12px', fontSize: 12, background: 'white' }}
+                    onClick={() => setHintStep((step) => Math.max(step, n))}
+                  >
+                    Hint {n}
+                  </button>
+                ))}
+              </div>
+              <ul style={{ marginTop: 10, marginLeft: 18, color: '#7c2d12', fontSize: 13, lineHeight: 1.65 }}>
+                {buildMistakeHints(selected, selectedIsMC, questionContextText).slice(0, hintStep).map((hint, index) => (
+                  <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 6 }}>{hint}</li>
+                ))}
+                {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
+              </ul>
+            </div>
+          )}
+
+          {redoFeedback?.ok && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+              <button className="btn btn-outline" onClick={() => setSelected(null)}>
+                <Icon name="back" size={16} />
+                Back to list
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!nextMistake || nextMistake?.id === selected.id}
+                onClick={() => {
+                  if (nextMistake) setSelected(nextMistake)
+                }}
+              >
+                Next question →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  ) : null
+
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar
@@ -497,6 +648,8 @@ export default function Mistakes() {
                   </div>
                 </div>
 
+                {exam === 'act' && answerPanel}
+
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: 'white', marginBottom: 14 }}>
                   {selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange) ? (
                     <PDFSectionStack
@@ -506,7 +659,9 @@ export default function Mistakes() {
                       zoom={zoom}
                       initialPageIndex={resolvedPdfTarget.pageIndex}
                       initialScrollRatio={resolvedPdfTarget.scrollRatio}
-                      containerStyle={{ maxHeight: '62vh', padding: 10 }}
+                      containerStyle={exam === 'act'
+                        ? { maxHeight: 'none', height: 'auto', overflowY: 'visible', padding: 10, paddingTop: 0 }
+                        : { maxHeight: '62vh', padding: 10 }}
                     />
                   ) : (
                     <PDFPage
@@ -518,156 +673,9 @@ export default function Mistakes() {
                   )}
                 </div>
 
-                <div className={`mistake-answer-box${exam === 'act' ? ' act-sticky' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
-                    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                      {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
-                    </div>
-                  </div>
+                {exam !== 'act' && answerPanel}
 
-                    {selectedCorrect == null ? (
-                      <div style={{ marginTop: 10, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                        This question can’t be validated yet because the answer key isn’t loaded.
-                      </div>
-                    ) : (
-                      <>
-                        {selectedIsMC ? (
-                          <div
-                            className={`mistake-choice-grid${exam === 'act' ? ' act' : ''}`}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: exam === 'act'
-                                ? 'repeat(auto-fit, minmax(72px, 1fr))'
-                                : `repeat(${selectedChoices.length >= 5 ? 5 : 4}, minmax(0, 1fr))`,
-                              gap: 10,
-                              marginTop: 12,
-                            }}
-                          >
-                            {selectedChoices.map((c) => (
-                              <button
-                                key={c}
-                                className="btn btn-outline"
-                                style={{
-                                  padding: '10px 12px',
-                                  fontWeight: 900,
-                                  borderColor: redoChoice === c ? '#1a2744' : '#e2e8f0',
-                                  background: redoChoice === c ? 'rgba(26,39,68,.08)' : 'white',
-                                }}
-                                onClick={() => {
-                                  setRedoChoice(c)
-                                  setRedoFeedback(null)
-                                }}
-                              >
-                                {c}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: 12 }}>
-                            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-                              Open response: enter only the value/expression. Equivalent fractions and comma-formatted numbers count. Examples: <code>75</code>, <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>, <code>2^3</code>.
-                            </div>
-                            <input
-                              type="text"
-                              className="free-response-input"
-                              placeholder="Your answer"
-                              value={redoText}
-                              onChange={(e) => {
-                                setRedoText(e.target.value)
-                                setRedoFeedback(null)
-                              }}
-                              autoComplete="off"
-                            />
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-                          <button
-                            className="btn btn-primary"
-                            disabled={isAdminPreview || redoSaving || (selectedIsMC ? !redoChoice : !redoText.trim())}
-                            onClick={async () => {
-                              if (isAdminPreview || !selectedItemKey) return
-                              const right = String(selectedCorrect || '').trim()
-                              const submitted = selectedIsMC ? redoChoice : redoText
-                              const ok = answerMatches(submitted, right)
-
-                              setRedoFeedback(ok ? { ok: true, msg: 'Correct — nice work.' } : { ok: false, msg: 'Not quite — try the hints and check again.' })
-                              if (!ok) setHintStep((step) => Math.max(step, 1))
-                              if (!ok) return
-
-                              setRedoSaving(true)
-                              try {
-                                const currentItem = reviewItems?.[selectedItemKey] || { due_at: new Date().toISOString() }
-                                const next = applyReviewResult(currentItem, true)
-                                await saveReviewItem(viewUserId, selectedItemKey, next)
-                                setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
-                                // Remove from list immediately.
-                                setItems(prev => (prev || []).filter(m => m.id !== selected.id))
-                              } finally {
-                                setRedoSaving(false)
-                              }
-                            }}
-                          >
-                            {redoSaving ? 'Saving…' : 'Check →'}
-                          </button>
-                          {redoFeedback && (
-                            <div style={{ fontSize: 12, fontWeight: 900, color: redoFeedback.ok ? '#10b981' : '#ef4444' }}>
-                              {redoFeedback.msg}
-                            </div>
-                          )}
-                        </div>
-
-                        {redoFeedback && !redoFeedback.ok && (
-                        <div style={{ marginTop: 14, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: 14 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <div style={{ fontWeight: 900, color: '#9a3412' }}>Hints (optional)</div>
-                            <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 700 }}>
-                              Use these before checking again.
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                            {[1, 2, 3].map((n) => (
-                              <button
-                                key={n}
-                                className="btn btn-outline"
-                                style={{ padding: '7px 12px', fontSize: 12, background: 'white' }}
-                                onClick={() => setHintStep((step) => Math.max(step, n))}
-                              >
-                                Hint {n}
-                              </button>
-                            ))}
-                          </div>
-                          <ul style={{ marginTop: 10, marginLeft: 18, color: '#7c2d12', fontSize: 13, lineHeight: 1.65 }}>
-                            {buildMistakeHints(selected, selectedIsMC, questionContextText).slice(0, hintStep).map((hint, index) => (
-                              <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 6 }}>{hint}</li>
-                            ))}
-                            {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
-                          </ul>
-                        </div>
-                        )}
-
-                        {redoFeedback?.ok && (
-                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-                            <button className="btn btn-outline" onClick={() => setSelected(null)}>
-                              <Icon name="back" size={16} />
-                              Back to list
-                            </button>
-                            <button
-                              className="btn btn-primary"
-                              disabled={!nextMistake || nextMistake?.id === selected.id}
-                              onClick={() => {
-                                if (nextMistake) setSelected(nextMistake)
-                              }}
-                            >
-                              Next question →
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
+                {exam !== 'act' && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 900, color: '#64748b', marginBottom: 6 }}>Optional explanation (save what you learned)</div>
                     <textarea
@@ -708,6 +716,7 @@ export default function Mistakes() {
                       </button>
                     </div>
                   </div>
+                )}
               </div>
             )}
           </>

@@ -706,10 +706,10 @@ button,
   background: white;
 }
 
-.mistake-answer-box.act-sticky {
+.mistake-answer-box.act-floating {
   position: sticky;
-  bottom: 8px;
-  z-index: 4;
+  top: 92px;
+  z-index: 6;
   box-shadow: 0 16px 30px rgba(15,23,42,.12);
 }
 
@@ -1106,8 +1106,8 @@ button,
     .calendar-layout {
       grid-template-columns: 1fr;
     }
-    .mistake-answer-box.act-sticky {
-      bottom: 8px;
+    .mistake-answer-box.act-floating {
+      top: 72px;
       padding: 8px !important;
     }
     .mistake-choice-grid.act {
