@@ -26,6 +26,24 @@ function firstSentence(text = '') {
   return (match?.[0] || cleaned).trim()
 }
 
+function detectPhrases(questionText = '') {
+  const text = String(questionText || '').replace(/\s+/g, ' ').trim()
+  const lower = text.toLowerCase()
+  const phrase = (...patterns) => {
+    for (const pattern of patterns) {
+      const match = lower.match(pattern)
+      if (match?.[0]) return match[0]
+    }
+    return ''
+  }
+  return {
+    relationship: phrase(/linear relationship/, /proportional relationship/, /exponential relationship/, /system of equations/, /quadratic function/, /probability/, /percent increase/, /mean|median/, /circle|triangle|angle/, /slope/, /intercept/),
+    readingTask: phrase(/main idea/, /author'?s purpose/, /most nearly means/, /best supports/, /primarily serves to/, /based on the passage/, /the passage suggests/),
+    scienceTask: phrase(/according to figure \d+/, /according to table \d+/, /based on the data/, /experiment \d+/, /scientist \d+/, /study \d+/),
+    grammarTask: phrase(/which choice/, /most effectively/, /sentence placement/, /punctuation/, /transition/),
+  }
+}
+
 function inferSignals({ questionText = '', chapterName = '', section = '', exam = '' }) {
   const haystack = `${questionText} ${chapterName} ${section} ${exam}`.toLowerCase()
   return {
@@ -101,6 +119,56 @@ function buildCheckHint({ exam, section, isMC, signals }) {
   return 'After narrowing it down, test your answer against the original problem one more time. The correct choice should satisfy every condition in the question.'
 }
 
+function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases }) {
+  const family = sectionFamily(exam, section)
+  const moduleLabel = chapterCode ? `${chapterCode} — ${chapterName}` : chapterName
+  if (family === 'math') {
+    if (signals.graph) return `For Q${qNum}, start with the visual before the algebra. Read the labels, units, and what each axis or entry represents, then decide which relationship the question is asking you to use${phrases.relationship ? ` (${phrases.relationship})` : ''}.`
+    if (signals.geometry) return `For Q${qNum}, sketch or relabel the figure with every given value first. Then mark the exact part you need to find so you do not solve for an intermediate quantity by mistake.`
+    if (signals.percent) return `For Q${qNum}, translate the wording into a ratio or percent equation before calculating. Be careful about what is the base amount and what is the change.`
+    if (moduleLabel) return `For Q${qNum}, treat this as a ${moduleLabel} question. Write the relationship you expect from that skill first, then use the choices only to confirm your setup.`
+    return `For Q${qNum}, write the setup before doing arithmetic. If the choices are close, the setup matters more than the computation speed.`
+  }
+  if (family === 'english') {
+    if (signals.transition) return `For Q${qNum}, ignore the answer choices for a second and decide how the sentence should connect to the ideas around it—continuation, contrast, cause/effect, or conclusion. Then pick the choice that does exactly that.`
+    if (signals.punctuation) return `For Q${qNum}, check whether the sentence has one complete thought or two. Use that to decide if the punctuation should join, separate, or set off information.`
+    return `For Q${qNum}, reread the sentence before and after the underlined part. The correct ACT English answer has to be grammatically correct and fit the paragraph’s flow.`
+  }
+  if (family === 'reading-writing') {
+    if (signals.transition) return `For Q${qNum}, decide what the sentence or paragraph needs next—support, contrast, continuation, or conclusion—before comparing the choices.`
+    if (signals.punctuation) return `For Q${qNum}, test the structure of the sentence first. Ask whether the punctuation changes meaning, separates full ideas, or simply adds extra detail.`
+    return `For Q${qNum}, go back to the exact sentence and ask what job the correct answer must do there: clarify, connect ideas, or improve precision.`
+  }
+  if (family === 'reading') {
+    return `For Q${qNum}, find the exact part of the passage that answers the question${phrases.readingTask ? ` about ${phrases.readingTask}` : ''}. Do not choose until you can point to the supporting words in the text.`
+  }
+  if (family === 'science') {
+    if (signals.graph || phrases.scienceTask) return `For Q${qNum}, begin with ${phrases.scienceTask || 'the relevant figure or table'}. Read the labels and units, then trace only the data needed for this question before looking at the answer choices.`
+    return `For Q${qNum}, decide whether the question is asking about a trend, a comparison, or an experimental setup. Then use the data first and the science vocabulary second.`
+  }
+  return isMC
+    ? `For Q${qNum}, predict what the correct answer should do before reading the choices. That will make it easier to eliminate choices that only sound right.`
+    : `For Q${qNum}, write down the exact value or expression the question wants, solve for only that, and make sure your final response is in the right format.`
+}
+
+function buildProcessHint({ exam, section, qNum, isMC, signals, phrases }) {
+  const family = sectionFamily(exam, section)
+  if (family === 'math') {
+    if (signals.graph) return 'Use a two-step process: first identify the relationship from the graph/table, then calculate only after you know which values belong in the equation.'
+    return isMC
+      ? 'Try working the problem without the choices first. Once you get a result or estimate, compare it to the choices and eliminate anything that cannot match your setup.'
+      : 'Check each transformation in your work line by line. Most misses here come from one setup slip that carries through the rest of the problem.'
+  }
+  if (family === 'english' || family === 'reading-writing') {
+    return phrases.grammarTask
+      ? `This is a ${phrases.grammarTask} style question. Explain out loud why each wrong choice fails—grammar, logic, repetition, or flow—before you settle on the final answer.`
+      : 'Eliminate answer choices with a specific reason, not a feeling. The best choice should improve both correctness and flow.'
+  }
+  if (family === 'reading') return 'Prove the answer directly from the passage. If two choices seem plausible, the better one will be supported more precisely by the wording on the page.'
+  if (family === 'science') return 'Identify exactly which figure, table, or experiment the question belongs to, then narrow your attention to that one source before comparing answer choices.'
+  return buildSectionHint({ exam, section, isMC, qNum, signals })
+}
+
 export function buildQuestionHintLadder({
   exam = 'sat',
   section = '',
@@ -114,17 +182,15 @@ export function buildQuestionHintLadder({
   const conceptBodies = (concepts || []).map((concept) => concept?.body).filter(Boolean)
   const conceptLead = firstSentence(conceptBodies[0] || '')
   const signals = inferSignals({ questionText, chapterName, section, exam })
+  const phrases = detectPhrases(questionText)
   const seed = hashString(`${exam}:${section}:${chapterCode || chapterName}:${qNum}:${questionText}`)
   const shuffledConcepts = conceptBodies.length ? seededShuffle(conceptBodies, seed) : []
   const sectionHint = buildSectionHint({ exam, section, isMC, qNum, signals })
   const checkHint = buildCheckHint({ exam, section, isMC, signals })
 
-  const step1 = chapterName
-    ? `This question is testing ${chapterCode ? `${chapterCode} — ` : ''}${chapterName}. Before solving, say the rule or idea you expect to use.${conceptLead ? ` ${conceptLead}` : ''}`
-    : sectionHint
-  const step2 = shuffledConcepts[1]
-    ? `${sectionHint} ${firstSentence(shuffledConcepts[1])}`
-    : sectionHint
+  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases })
+  const conceptHint = shuffledConcepts[0] ? firstSentence(shuffledConcepts[0]) : ''
+  const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases })}${conceptHint ? ` ${conceptHint}` : ''}`
   const step3 = checkHint
 
   return [step1, step2, step3]

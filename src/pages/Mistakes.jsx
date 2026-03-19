@@ -15,6 +15,12 @@ import { getChoiceOptionsForQuestion, getExamConfigForTest, getGuideContentForEx
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
+import * as pdfjsLib from 'pdfjs-dist'
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
+
+const textCache = {}
 
 const ALL_GUIDE_CONTENT = {
   ...getGuideContentForExam('sat'),
@@ -62,7 +68,7 @@ function pdfPageFor(testId, section, qNum) {
   return 0
 }
 
-function buildMistakeHints(mistake, isMC) {
+function buildMistakeHints(mistake, isMC, questionText = '') {
   const chapterMeta = ALL_GUIDE_CONTENT?.[mistake?.chapter_id] || {}
   return buildQuestionHintLadder({
     exam: String(mistake?.test_id || '').startsWith('act') ? 'act' : 'sat',
@@ -72,8 +78,31 @@ function buildMistakeHints(mistake, isMC) {
     chapterName: chapterMeta?.name || '',
     chapterCode: chapterMeta?.code || '',
     concepts: chapterMeta?.concepts || [],
-    questionText: '',
+    questionText,
   })
+}
+
+async function loadPdfTextRange(pdfUrl, startPageIndex, endPageIndex) {
+  const url = String(pdfUrl || '').trim()
+  if (!url) return ''
+  if (!textCache[url]) {
+    const task = pdfjsLib.getDocument(url)
+    textCache[url] = task.promise.catch((error) => {
+      delete textCache[url]
+      throw error
+    })
+  }
+  const pdf = await textCache[url]
+  const parts = []
+  const start = Math.max(0, Number(startPageIndex || 0))
+  const end = Math.max(start, Number(endPageIndex || start))
+  for (let pageIndex = start; pageIndex <= end; pageIndex += 1) {
+    const page = await pdf.getPage(pageIndex + 1)
+    const text = await page.getTextContent()
+    const line = (text?.items || []).map((item) => item?.str || '').join(' ')
+    parts.push(line)
+  }
+  return parts.join(' ')
 }
 
 export default function Mistakes() {
@@ -97,6 +126,7 @@ export default function Mistakes() {
   const [redoFeedback, setRedoFeedback] = useState(null)
   const [redoSaving, setRedoSaving] = useState(false)
   const [hintStep, setHintStep] = useState(0)
+  const [questionContextText, setQuestionContextText] = useState('')
 
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
@@ -152,7 +182,29 @@ export default function Mistakes() {
     setRedoFeedback(null)
     setRedoSaving(false)
     setHintStep(0)
+    setQuestionContextText('')
   }, [selectedItemKey])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadContext() {
+      if (!selected || !selectedCfg?.pdfUrl) return
+      try {
+        const start = selectedPdfPage
+        const end = selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange)
+          ? Math.min(selectedSectionRange[1], start + 1)
+          : start
+        const text = await loadPdfTextRange(selectedCfg.pdfUrl, start, end)
+        if (!cancelled) setQuestionContextText(text)
+      } catch {
+        if (!cancelled) setQuestionContextText('')
+      }
+    }
+    loadContext()
+    return () => {
+      cancelled = true
+    }
+  }, [selected, selectedCfg?.pdfUrl, selectedPdfPage, selectedViewerMode, selectedSectionRange])
 
   if (loading) {
     return (
@@ -419,7 +471,7 @@ export default function Mistakes() {
                             ))}
                           </div>
                           <ul style={{ marginTop: 10, marginLeft: 18, color: '#7c2d12', fontSize: 13, lineHeight: 1.65 }}>
-                            {buildMistakeHints(selected, selectedIsMC).slice(0, hintStep).map((hint, index) => (
+                            {buildMistakeHints(selected, selectedIsMC, questionContextText).slice(0, hintStep).map((hint, index) => (
                               <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 6 }}>{hint}</li>
                             ))}
                             {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
