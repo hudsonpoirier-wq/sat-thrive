@@ -371,7 +371,20 @@ export default function Dashboard() {
     }
   }, [hasTakenPretest, latestCompleted, studied, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes, viewHref])
 
-  const scheduleDayCards = journeySchedule?.days?.slice(0, 3) || []
+  const scheduleDayCards = useMemo(() => {
+    const days = journeySchedule?.days || []
+    if (!days.length) return []
+    const primary = days.filter((day) => day.isActive && day.tasks.length > 0)
+    const fallback = days.filter((day) => day.isActive || day.tasks.length > 0)
+    return (primary.length ? primary : fallback).slice(0, 3)
+  }, [journeySchedule])
+
+  function scheduleCardTitle(day, idx) {
+    if (idx === 0 && day?.isToday) return 'Today'
+    if (idx === 0) return 'Next Study Day'
+    if (idx === 1) return 'Following Study Day'
+    return 'Coming Up'
+  }
 
   useEffect(() => {
     setConfirmExtraTestId(null)
@@ -558,6 +571,12 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {journeySchedule.needsMoreTime && (
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.28)', color: '#92400e', fontSize: 13, lineHeight: 1.6 }}>
+                You need to spend <b>at least {journeySchedule.requiredMinutesPerDay} minutes/day</b> on your available days to be ready by your test date. Your current setting is {journeySchedule.selectedMinutesPerDay} minutes/day.
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
               {scheduleDayCards.map((day, idx) => (
                 <div
@@ -582,7 +601,7 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                     <div>
                       <div style={{ fontWeight: 900, color: '#1a2744' }}>
-                        {idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : 'The Day After'}
+                        {scheduleCardTitle(day, idx)}
                       </div>
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
                     </div>
@@ -598,7 +617,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
-                    Click this card to open the full day plan.
+                    {day.estimatedMinutes ? `Planned for about ${day.estimatedMinutes} minutes · ` : ''}Click this card to open the full day plan.
                   </div>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {day.tasks.length ? day.tasks.map((task) => (
@@ -722,20 +741,6 @@ export default function Dashboard() {
           </div>
 
 	          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {hasTakenPretest && latestCompleted && (
-                <button
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const el = document.getElementById('today-tasks-card')
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }}
-                >
-                  Generate Today / Tomorrow / The Day After
-                </button>
-              )}
-              <Link className="btn btn-outline" to={viewHref('/calendar')}>
-                View Full Calendar →
-              </Link>
 	            <button className="btn btn-outline" onClick={() => navigate(viewHref('/report'))} disabled={!hasTakenPretest}>
 	              Progress Report →
 	            </button>

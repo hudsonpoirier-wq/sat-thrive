@@ -174,6 +174,7 @@ function buildChapterQueues(weakTopics, studiedMap) {
       href: `/guide?chapter=${encodeURIComponent(String(topic.ch))}`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
+      estimatedMinutes: Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
     }
     for (let i = 0; i < units; i++) {
       const task = units > 1
@@ -228,23 +229,36 @@ export function buildAdaptiveSchedule({
   const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
   let reviewBlocks = Math.ceil(pendingReviewCount / 5)
   let reviewLeft = pendingReviewCount
+  const reviewMinutes = Array.from({ length: reviewBlocks }, (_, index) => {
+    const amount = Math.min(5, Math.max(1, pendingReviewCount - index * 5 || 5))
+    return Math.max(12, amount * 3)
+  }).reduce((sum, value) => sum + value, 0)
   const totalUnits = reading.length + math.length + reviewBlocks
-  const tasksPerDay = Math.max(1, Math.min(3, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
+  const totalMinutes = [...reading, ...math].reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
+  const requiredMinutesPerDay = Math.max(20, Math.ceil((totalMinutes / Math.max(1, usableDays.length)) / 5) * 5)
+  const effectiveMinutesPerDay = Math.max(Number(p.minutesPerDay || 45), requiredMinutesPerDay)
+  const tasksPerDay = Math.max(1, Math.min(4, Math.ceil(totalUnits / Math.max(1, usableDays.length))))
   let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
 
   for (const day of usableDays) {
     const tasks = []
+    let usedMinutes = 0
 
     if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
       const amount = Math.min(5, Math.max(1, reviewLeft || 5))
-      tasks.push({
+      const reviewTask = {
         id: `review-${day.key}`,
         type: 'mistakes',
         subject: 'Mixed',
         title: `Review ${amount} missed question${amount === 1 ? '' : 's'}`,
         subtitle: 'Use the Mistake Notebook and validate each one you fix.',
         href: '/mistakes',
-      })
+        estimatedMinutes: Math.max(12, amount * 3),
+      }
+      if (!tasks.length || usedMinutes + reviewTask.estimatedMinutes <= effectiveMinutesPerDay) {
+        tasks.push(reviewTask)
+        usedMinutes += reviewTask.estimatedMinutes
+      }
       reviewLeft = Math.max(0, reviewLeft - amount)
       reviewBlocks -= 1
     }
@@ -255,14 +269,22 @@ export function buildAdaptiveSchedule({
       const queue = preferredQueue.length ? preferredQueue : fallbackQueue
       if (!queue.length) break
       const task = queue.shift()
+      const estimatedMinutes = Number(task.estimatedMinutes || 20)
+      if (tasks.length > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
+        queue.unshift(task)
+        break
+      }
       tasks.push(task)
+      usedMinutes += estimatedMinutes
       if (reading.length && math.length) {
         nextSubject = task.subject === 'Reading' ? 'Math' : 'Reading'
       }
     }
 
     day.tasks = tasks
-    day.focus = tasks.find((task) => task.subject === 'Reading' || task.subject === 'Math')?.subject || (tasks.length ? 'Mixed' : 'Rest')
+    const subjects = new Set(tasks.map((task) => task.subject).filter((subject) => subject === 'Reading' || subject === 'Math'))
+    day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((task) => task.subject === 'Reading' || task.subject === 'Math')?.subject || (tasks.length ? 'Mixed' : 'Rest')
+    day.estimatedMinutes = usedMinutes
   }
 
   return {
@@ -272,7 +294,12 @@ export function buildAdaptiveSchedule({
     days,
     activeDays: usableDays,
     totalTasks: totalUnits,
+    totalMinutes,
     hasTestDate: Boolean(target),
+    requiredMinutesPerDay,
+    selectedMinutesPerDay: Number(p.minutesPerDay || 45),
+    effectiveMinutesPerDay,
+    needsMoreTime: Number(p.minutesPerDay || 45) < requiredMinutesPerDay,
   }
 }
 

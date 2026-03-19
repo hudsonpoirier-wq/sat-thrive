@@ -74,11 +74,17 @@ export default function CalendarPage() {
   const [selectedDayKey, setSelectedDayKey] = useState('')
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const [draftSatDate, setDraftSatDate] = useState(() => loadSatTestDate(viewUserId))
+  const [draftStudyPrefs, setDraftStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
   const availabilityLabels = dayLabels()
 
   useEffect(() => {
-    setSatDate(loadSatTestDate(viewUserId))
-    setStudyPrefs(loadStudyPrefs(viewUserId))
+    const nextDate = loadSatTestDate(viewUserId)
+    const nextPrefs = loadStudyPrefs(viewUserId)
+    setSatDate(nextDate)
+    setStudyPrefs(nextPrefs)
+    setDraftSatDate(nextDate)
+    setDraftStudyPrefs(nextPrefs)
   }, [viewUserId])
 
   useEffect(() => {
@@ -188,6 +194,19 @@ export default function CalendarPage() {
   }, [schedule, selectedDayKey])
 
   const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const settingsChanged = useMemo(() => {
+    const currentDays = JSON.stringify(studyPrefs?.days || [])
+    const draftDays = JSON.stringify(draftStudyPrefs?.days || [])
+    return String(satDate || '') !== String(draftSatDate || '') || Number(studyPrefs?.minutesPerDay || 45) !== Number(draftStudyPrefs?.minutesPerDay || 45) || currentDays !== draftDays
+  }, [satDate, draftSatDate, studyPrefs, draftStudyPrefs])
+
+  function applyJourneySettings() {
+    if (isAdminPreview) return
+    setSatDate(draftSatDate)
+    setStudyPrefs(draftStudyPrefs)
+    saveSatTestDate(viewUserId, draftSatDate)
+    try { saveStudyPrefs(viewUserId, draftStudyPrefs) } catch {}
+  }
 
   if (loading) {
     return (
@@ -256,11 +275,9 @@ export default function CalendarPage() {
                 Test date:
                 <input
                   type="date"
-                  value={satDate || ''}
+                  value={draftSatDate || ''}
                   onChange={(e) => {
-                    const value = e.target.value
-                    setSatDate(value)
-                    saveSatTestDate(viewUserId, value)
+                    setDraftSatDate(e.target.value)
                   }}
                   disabled={isAdminPreview}
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
@@ -272,14 +289,13 @@ export default function CalendarPage() {
                   type="number"
                   min={20}
                   max={180}
-                  value={studyPrefs?.minutesPerDay || 45}
+                  value={draftStudyPrefs?.minutesPerDay || 45}
                   onChange={(e) => {
                     if (isAdminPreview) return
                     const value = Number(String(e.target.value || '').trim())
                     const minutesPerDay = Number.isFinite(value) ? Math.max(20, Math.min(180, value)) : 45
-                    const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
-                    setStudyPrefs(next)
-                    try { saveStudyPrefs(viewUserId, next) } catch {}
+                    const next = { ...(draftStudyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
+                    setDraftStudyPrefs(next)
                   }}
                   disabled={isAdminPreview}
                   style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
@@ -290,7 +306,7 @@ export default function CalendarPage() {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
               <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
               {availabilityLabels.map((label, index) => {
-                const enabled = Boolean(studyPrefs?.days?.[index])
+                const enabled = Boolean(draftStudyPrefs?.days?.[index])
                 return (
                   <button
                     key={label}
@@ -298,11 +314,10 @@ export default function CalendarPage() {
                     className="btn btn-outline"
                     disabled={isAdminPreview}
                     onClick={() => {
-                      const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
+                      const days = Array.isArray(draftStudyPrefs?.days) ? [...draftStudyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
                       days[index] = !days[index]
-                      const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
-                      setStudyPrefs(next)
-                      try { saveStudyPrefs(viewUserId, next) } catch {}
+                      const next = { ...(draftStudyPrefs || loadStudyPrefs(viewUserId)), days }
+                      setDraftStudyPrefs(next)
                     }}
                     style={{
                       padding: '7px 12px',
@@ -316,6 +331,23 @@ export default function CalendarPage() {
                   </button>
                 )
               })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+                Change your settings, then hit <b>Update Track</b> to rebuild the calendar and your dashboard to-dos.
+                {schedule?.needsMoreTime ? (
+                  <>
+                    {' '}You need at least <b>{schedule.requiredMinutesPerDay} minutes/day</b> on your available days to be ready by your test date.
+                  </>
+                ) : ''}
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={applyJourneySettings}
+                disabled={isAdminPreview || !settingsChanged}
+              >
+                Update Track
+              </button>
             </div>
           </div>
         )}
@@ -375,6 +407,9 @@ export default function CalendarPage() {
                       </div>
                       <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#1a2744' }}>
                         {selectedDay.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                        {selectedDay.estimatedMinutes ? `About ${selectedDay.estimatedMinutes} minutes planned` : 'Light review day'}
                       </div>
                     </div>
                     <div style={{
