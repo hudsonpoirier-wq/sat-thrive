@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { answerMatches } from '../data/testData.js'
+import { answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
@@ -12,6 +12,7 @@ import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
+import { buildQuestionHintSummary } from '../lib/questionHints.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
@@ -101,9 +102,15 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {wrongs.map(({ q, given, right, ch }) => {
                   const chData = chapters?.[ch]
-                  const hint = chData
-                    ? `Hint: revisit ${chData.code ? `ACT Module ${chData.code}` : `Chapter ${ch}`} and solve the problem again using the core rule from ${chData.name}. Focus on the setup before checking any final answer.`
-                    : 'Hint: slow down the setup, identify what the question is really asking for, and try the problem again before checking anything else.'
+                  const hint = buildQuestionHintSummary({
+                    exam: String(mod).startsWith('act') ? 'act' : 'sat',
+                    section: mod,
+                    qNum: q,
+                    isMC: isMultipleChoiceAnswer(right),
+                    chapterName: chData?.name || '',
+                    chapterCode: chData?.code || '',
+                    concepts: chData?.concepts || [],
+                  })
                   return (
                     <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
                       <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#dc2626', minWidth: 28 }}>Q{q}</div>

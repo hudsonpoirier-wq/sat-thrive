@@ -14,6 +14,7 @@ import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, appl
 import { getChoiceOptionsForQuestion, getExamConfigForTest, getGuideContentForExam, getPdfViewerModeForTest, getSectionPageRangesForTest } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
+import { buildQuestionHintLadder } from '../lib/questionHints.js'
 
 const ALL_GUIDE_CONTENT = {
   ...getGuideContentForExam('sat'),
@@ -61,51 +62,18 @@ function pdfPageFor(testId, section, qNum) {
   return 0
 }
 
-function hashString(s) {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
-  return h >>> 0
-}
-
-function seededShuffle(arr, seed) {
-  const out = arr.slice()
-  let x = seed || 1
-  for (let i = out.length - 1; i > 0; i--) {
-    x ^= x << 13
-    x ^= x >>> 17
-    x ^= x << 5
-    const j = Math.abs(x) % (i + 1)
-    const tmp = out[i]
-    out[i] = out[j]
-    out[j] = tmp
-  }
-  return out
-}
-
 function buildMistakeHints(mistake, isMC) {
-  const chapterConcepts = ALL_GUIDE_CONTENT?.[mistake?.chapter_id]?.concepts || []
-  const conceptBodies = chapterConcepts.map((concept) => concept.body).filter(Boolean)
-  const defaults = isMC
-    ? [
-        'Pause before choosing. Predict what the correct choice should do, then compare the choices to that prediction.',
-        'Eliminate at least two choices with a reason. Focus on the wording, logic, or evidence that makes them wrong.',
-        'After narrowing it down, plug the final choice back into the sentence or passage and read it all the way through.',
-      ]
-    : [
-        'Write what the question is asking for in one short phrase, then solve only for that final value.',
-        'Check your setup before your arithmetic. Most misses come from setting up the equation or expression incorrectly.',
-        'Make sure your final answer is in a valid SAT format such as a simplified fraction, decimal, or expression.',
-      ]
-
-  if (!conceptBodies.length) return defaults
-
-  const seed = hashString(`${mistake?.test_id || ''}:${mistake?.section || ''}:${mistake?.q_num || ''}`)
-  const shuffled = seededShuffle(conceptBodies, seed)
-  return [
-    shuffled[0] || defaults[0],
-    shuffled[1] || defaults[1],
-    defaults[2],
-  ]
+  const chapterMeta = ALL_GUIDE_CONTENT?.[mistake?.chapter_id] || {}
+  return buildQuestionHintLadder({
+    exam: String(mistake?.test_id || '').startsWith('act') ? 'act' : 'sat',
+    section: mistake?.section || '',
+    qNum: mistake?.q_num || 0,
+    isMC,
+    chapterName: chapterMeta?.name || '',
+    chapterCode: chapterMeta?.code || '',
+    concepts: chapterMeta?.concepts || [],
+    questionText: '',
+  })
 }
 
 export default function Mistakes() {

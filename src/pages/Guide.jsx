@@ -9,6 +9,7 @@ import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import { getChaptersForExam, getGuideContentForExam } from '../data/examData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
+import { buildQuestionHintLadder } from '../lib/questionHints.js'
 
 function Navbar({ homeHref, guideHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
@@ -142,27 +143,6 @@ function seededShuffle(arr, seed) {
   return out
 }
 
-function buildHintLadder(concepts, seed, isMC) {
-  const bodies = (concepts || []).map(c => c.body).filter(Boolean)
-  const defaults = isMC
-    ? [
-      'Re-read the question and predict what the correct answer should DO before looking at choices.',
-      'Eliminate 2 choices by matching the logic and tone of the sentence, then re-check the remaining two.',
-    ]
-    : [
-      'Write down what the question is asking for (the exact value/expression). Keep units and words out of your final answer.',
-      'Check your algebra carefully, then verify with a quick plug-in or estimate to see if your answer makes sense.',
-    ]
-
-  const shuffled = bodies.length ? seededShuffle(bodies, seed) : defaults
-  const step1 = shuffled[0] || defaults[0]
-  const step2 = shuffled[1] || defaults[1]
-  const step3 = isMC
-    ? 'Example workflow: (1) Underline the contrast/continuation words, (2) eliminate two choices with one-sentence reasons, (3) plug the remaining choice back into the sentence/passage and read it aloud.'
-    : 'Example format: give a simplified value like `3/2`, `0.75`, or `pi/4`. Use `pi` (or `π`) for π, and use `^` for exponents (e.g., `2^3`).'
-  return [step1, step2, step3]
-}
-
 function extractGuideMap(practice) {
   if (!practice || typeof practice !== 'object') return {}
   if (practice.guide && typeof practice.guide === 'object') return practice.guide
@@ -270,7 +250,7 @@ function renderStudyMathText(text, keyPrefix = 'study') {
   ))
 }
 
-function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
+function PracticeProblem({ problem, idx, onAnswered, answered, concepts, exam, chapter }) {
   const [choice, setChoice] = useState(null)
   const [text, setText] = useState('')
   const [show, setShow] = useState(false)
@@ -304,7 +284,16 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
       ? (choice && shuffledChoices?.correctLabel && choice === shuffledChoices.correctLabel)
       : (text.trim().length > 0 && freeResponseMatches(text, problem?.correct))
   )
-  const ladder = useMemo(() => buildHintLadder(concepts, qSeed, isMC), [concepts, qSeed, isMC])
+  const ladder = useMemo(() => buildQuestionHintLadder({
+    exam,
+    section: chapter?.sectionId || chapter?.subject || '',
+    qNum: idx + 1,
+    isMC,
+    chapterName: chapter?.name || '',
+    chapterCode: chapter?.code || '',
+    concepts,
+    questionText: problem?.q || '',
+  }), [exam, chapter, concepts, idx, isMC, problem?.q])
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
@@ -644,6 +633,8 @@ export default function Guide() {
 	                      idx={idx}
 	                      problem={p}
 	                      concepts={content.concepts}
+                        exam={exam}
+                        chapter={ch}
 	                      answered={Boolean(selectedGuideMap[idx])}
 	                      onAnswered={async (correct) => {
 	                        if (isAdminPreview) return
