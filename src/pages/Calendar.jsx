@@ -318,16 +318,6 @@ export default function CalendarPage() {
                       </div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-                    <Link className="btn btn-outline" to={homeHref}>
-                      <Icon name="home" size={16} />
-                      Back to Dashboard
-                    </Link>
-                    <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                      <Icon name="back" size={16} />
-                      Previous page
-                    </button>
-                  </div>
                 </>
               ) : (
                 <div style={{ color: '#64748b', fontSize: 13 }}>Select a day to see its tasks.</div>

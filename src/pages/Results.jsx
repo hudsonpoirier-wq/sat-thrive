@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, freeResponseMatches } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
-import { buildPlanFromAttempt, loadStudyPrefs, saveStudyPrefs, dayLabels } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
@@ -133,6 +133,45 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
   )
 }
 
+function ResultScheduleTaskLink({ task, viewHref }) {
+  const accent = task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9'
+  const icon = task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results'
+  return (
+    <Link
+      to={viewHref(task.href)}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: '10px 12px',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        textDecoration: 'none',
+        color: '#0f172a',
+        background: 'white',
+      }}
+    >
+      <span style={{
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: `${accent}14`,
+        color: accent,
+        flexShrink: 0,
+      }}>
+        <Icon name={icon} size={15} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: '#1a2744', lineHeight: 1.35 }}>{task.title}</div>
+        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
+      </span>
+    </Link>
+  )
+}
+
 export default function Results() {
   const { attemptId } = useParams()
   const { user, profile } = useAuth()
@@ -141,14 +180,14 @@ export default function Results() {
   const navigate = useNavigate()
   const [attempt, setAttempt] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [plan, setPlan] = useState('')
-  const [generatingPlan, setGeneratingPlan] = useState(false)
   const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
   const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
   const readOnlyView = isAdminPreview
 
   useEffect(() => {
     setPrefs(loadStudyPrefs(viewUserId))
+    setSatDate(loadSatTestDate(viewUserId))
   }, [viewUserId])
 
   useEffect(() => {
@@ -167,42 +206,47 @@ export default function Results() {
             localStorage.setItem(key, JSON.stringify(obj))
           } catch {}
         }
-        if (data.study_plan) setPlan(data.study_plan)
-        else {
-          const txt = buildPlanFromAttempt(data, viewUserId)
-          setPlan(txt)
-          if (!readOnlyView) {
-            supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', viewUserId).catch(() => {})
-          }
-        }
         setLoading(false)
       })
   }, [attemptId, viewUserId, navigate, readOnlyView])
 
-  async function generatePlan() {
-    if (readOnlyView) return
-    setGeneratingPlan(true)
-    try {
-      const txt = buildPlanFromAttempt(attempt, viewUserId)
-      setPlan(txt)
-      await supabase.from('test_attempts').update({ study_plan: txt }).eq('id', attemptId).eq('user_id', viewUserId)
-    } catch (e) {
-      setPlan('Error generating plan. Please try again.')
+  const scores = attempt?.scores || {}
+  const weakTopics = normalizeWeakTopics(attempt?.weak_topics || [])
+  const answers = attempt?.answers || {}
+  const keyBySection = getAnswerKeyBySection(attempt?.test_id)
+  const isPreTest = attempt?.test_id === 'pre_test' || attempt?.test_id === 'practice_test_11' || !attempt?.test_id
+  const reviewCount = useMemo(() => {
+    if (!keyBySection) return 0
+    let wrong = 0
+    for (const [section, key] of Object.entries(keyBySection || {})) {
+      for (const [q, right] of Object.entries(key || {})) {
+        const given = answers?.[section]?.[q]
+        if (given == null || String(given).trim() === '') continue
+        const isFR = !['A', 'B', 'C', 'D'].includes(String(right).toUpperCase())
+        const ok = isFR ? freeResponseMatches(given, right) : String(given).toUpperCase() === String(right).toUpperCase()
+        if (!ok) wrong += 1
+      }
     }
-    setGeneratingPlan(false)
-  }
+    return wrong
+  }, [answers, keyBySection])
+
+  const journeySchedule = useMemo(() => buildAdaptiveSchedule({
+    weakTopics,
+    studiedMap: {},
+    reviewCount,
+    hasViewedResults: true,
+    hasTakenPretest: true,
+    prefs,
+    testDate: satDate,
+  }), [weakTopics, reviewCount, prefs, satDate])
+
+  const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>
       Loading results…
     </div>
   )
-
-  const scores = attempt.scores || {}
-  const weakTopics = attempt.weak_topics || []
-  const answers = attempt.answers || {}
-  const keyBySection = getAnswerKeyBySection(attempt?.test_id)
-  const isPreTest = attempt?.test_id === 'pre_test' || attempt?.test_id === 'practice_test_11' || !attempt?.test_id
 
   // Domain summary for chart
   const domainCounts = {}
@@ -334,46 +378,41 @@ export default function Results() {
           </div>
         )}
 
-        {/* Study Plan */}
+        {/* Smart Journey Planner */}
         <div className="card" style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16, flexWrap: 'wrap' }}>
             <div>
               <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Icon name="calendar" size={17} />
-                Weekly Study Plan
+                Smart Journey Planner
               </h3>
-              <p style={{ fontSize: 13, color: '#64748b' }}>Auto-built from your missed topics and your available days.</p>
+              <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target SAT date.
+              </p>
             </div>
-            <button className="btn btn-primary" onClick={generatePlan} disabled={generatingPlan || readOnlyView} style={{ flexShrink: 0 }}>
-              {generatingPlan ? <><span className="spinner" /> Updating…</> : plan ? 'Rebalance' : 'Build Plan'}
-            </button>
+            <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
+              Open Full Calendar →
+            </Link>
           </div>
 
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 10 }}>
-              Availability
-            </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              {dayLabels().map((d, i) => (
-                <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#1a2744', fontWeight: 900 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!prefs?.days?.[i]}
-                    onChange={(e) => {
-                      if (readOnlyView) return
-                      const next = { ...(prefs || loadStudyPrefs(viewUserId)) }
-                      next.days = (next.days || Array(7).fill(false)).map(Boolean)
-                      next.days[i] = e.target.checked
-                      setPrefs(next)
-                      try { saveStudyPrefs(viewUserId, next) } catch {}
-                    }}
-                    disabled={readOnlyView}
-                  />
-                  {d}
-                </label>
-              ))}
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Minutes/day</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Test date:
+                <input
+                  type="date"
+                  value={satDate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSatDate(value)
+                    saveSatTestDate(viewUserId, value)
+                  }}
+                  disabled={readOnlyView}
+                  style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Min/day:
                 <input
                   type="number"
                   min={20}
@@ -381,33 +420,91 @@ export default function Results() {
                   value={prefs?.minutesPerDay || 45}
                   onChange={(e) => {
                     if (readOnlyView) return
-                    const v = Number(e.target.value)
-                    const next = { ...(prefs || loadStudyPrefs(viewUserId)), minutesPerDay: v }
+                    const v = Number(String(e.target.value || '').trim())
+                    const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
+                    const next = { ...(prefs || loadStudyPrefs(viewUserId)), minutesPerDay }
                     setPrefs(next)
                     try { saveStudyPrefs(viewUserId, next) } catch {}
                   }}
                   disabled={readOnlyView}
-                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, background: 'white' }}
+                  style={{ width: 84, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
                 />
-              </div>
+              </label>
             </div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
-              Update your days/minutes, then tap “Rebalance”.
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
+              {dayLabels().map((d, i) => {
+                const enabled = !!prefs?.days?.[i]
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={readOnlyView}
+                    onClick={() => {
+                      const next = { ...(prefs || loadStudyPrefs(viewUserId)) }
+                      next.days = (next.days || Array(7).fill(false)).map(Boolean)
+                      next.days[i] = !next.days[i]
+                      setPrefs(next)
+                      try { saveStudyPrefs(viewUserId, next) } catch {}
+                    }}
+                    style={{
+                      padding: '7px 12px',
+                      fontSize: 12,
+                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
+                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
+                      color: enabled ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    {d}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {plan ? (
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.8, color: '#374151', background: '#ffffff', borderRadius: 12, padding: 18, border: '1px solid #e2e8f0' }}>
-              {plan}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '32px 24px', color: '#94a3b8' }}>
-              <div style={{ marginBottom: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 14, background: 'rgba(14,165,233,.10)', color: '#0ea5e9' }}>
-                <Icon name="guide" size={22} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+            {resultDayCards.map((day, idx) => (
+              <div
+                key={day.key}
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  background: idx === 0 ? 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.10))' : '#f8fafc',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontWeight: 900, color: '#1a2744' }}>
+                      {idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : 'The Day After'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
+                  </div>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    background: day.focus === 'Reading' ? 'rgba(59,130,246,.12)' : day.focus === 'Math' ? 'rgba(16,185,129,.12)' : 'rgba(148,163,184,.14)',
+                    color: day.focus === 'Reading' ? '#2563eb' : day.focus === 'Math' ? '#059669' : '#64748b',
+                  }}>
+                    {day.focus}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {day.tasks.length ? day.tasks.map((task) => (
+                    <ResultScheduleTaskLink key={task.id} task={task} viewHref={viewHref} />
+                  )) : (
+                    <div style={{ padding: '12px', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+                      No required tasks for this day. Use it as a catch-up or light review day.
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>Tap “Build Plan” to create your weekly schedule.</div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
 	        {/* Q-by-Q review */}

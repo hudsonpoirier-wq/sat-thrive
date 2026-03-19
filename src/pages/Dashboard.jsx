@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
-import { buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule, dayLabels } from '../lib/studyPlan.js'
+import { loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule, dayLabels } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
@@ -134,8 +134,6 @@ export default function Dashboard() {
   const [confirmExtraTestId, setConfirmExtraTestId] = useState(null)
   const [reviewItems, setReviewItems] = useState({})
   const [mistakes, setMistakes] = useState([])
-  const [planText, setPlanText] = useState('')
-  const [rebalancing, setRebalancing] = useState(false)
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
   const [targetProfile, setTargetProfile] = useState(null)
@@ -320,7 +318,7 @@ export default function Dashboard() {
     if (r?.practice?.meta?.guide_started_at) return true
     return g && typeof g === 'object' && Object.values(g).some(Boolean)
   })
-  const hasStudyPlan = completed.some(a => a.study_plan)
+  const hasStudyPlan = Boolean(satDate)
   const extraTests = TESTS.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
   const hasTakenPretest = completedPre.length > 0
@@ -368,46 +366,6 @@ export default function Dashboard() {
   useEffect(() => {
     setConfirmExtraTestId(null)
   }, [hasTakenPretest])
-
-  function rebuildStoredPlan(nextPrefs = studyPrefs, nextDate = satDate) {
-    if (!latestCompleted) return
-    try {
-      const txt = buildStudyPlanToTestDate({
-        scores: latestCompleted?.scores || {},
-        weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-        prefs: nextPrefs,
-        testDate: nextDate,
-      })
-      setPlanText(txt)
-      if (!readOnlyView) {
-        supabase
-          .from('test_attempts')
-          .update({ study_plan: txt })
-          .eq('id', latestCompleted.id)
-          .eq('user_id', user.id)
-          .catch(() => {})
-      }
-    } catch {}
-  }
-
-  // If the latest attempt doesn't have a stored plan, generate one locally from mistakes/weak-topics.
-  useEffect(() => {
-    if (!hasTakenPretest) return
-    if (!latestCompleted?.id) return
-    if (String(planText || '').trim()) return
-    try {
-      const prefs = studyPrefs
-      const weakTopics = deriveWeakTopicsForAttempt(latestCompleted)
-      const txt = buildStudyPlanToTestDate({
-        scores: latestCompleted?.scores || {},
-        weakTopics,
-        prefs,
-        testDate: satDate,
-      })
-      setPlanText(txt)
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasTakenPretest, latestCompleted?.id, satDate, studyPrefs, mistakes])
 
   function deriveWeakTopicsForAttempt(attempt) {
     const normalized = normalizeWeakTopics(attempt?.weak_topics || [])
@@ -577,7 +535,7 @@ export default function Dashboard() {
                 <button
                   className="btn btn-outline"
                   onClick={() => {
-                    const el = document.getElementById('study-plan-card')
+                    const el = document.getElementById('journey-settings')
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   }}
                   style={{ padding: '8px 12px', fontSize: 12 }}
@@ -671,6 +629,115 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <div
+            id="journey-settings"
+            style={{
+              marginTop: 16,
+              border: '1px solid #e2e8f0',
+              borderRadius: 16,
+              background: '#f8fafc',
+              padding: 16,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="calendar" size={16} />
+                  Journey Settings
+                </div>
+                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                  Update your test date, daily study time, and available days right here. The Smart Journey calendar will rebalance automatically.
+                </div>
+              </div>
+              <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ padding: '8px 12px', fontSize: 12 }}>
+                View Full Calendar →
+              </Link>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Test date:
+                <input
+                  type="date"
+                  value={satDate || ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setSatDate(v)
+                    saveSatTestDate(viewUserId, v)
+                  }}
+                  disabled={readOnlyView}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: 10,
+                    border: '1px solid #e2e8f0',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    background: 'white',
+                  }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
+                Min/day:
+                <input
+                  type="number"
+                  min={20}
+                  max={180}
+                  value={studyPrefs?.minutesPerDay ?? 45}
+                  onChange={(e) => {
+                    const v = Number(String(e.target.value || '').trim())
+                    const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
+                    const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
+                    setStudyPrefs(next)
+                    try { saveStudyPrefs(viewUserId, next) } catch {}
+                  }}
+                  disabled={readOnlyView}
+                  style={{
+                    width: 86,
+                    padding: '7px 10px',
+                    borderRadius: 10,
+                    border: '1px solid #e2e8f0',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    background: 'white',
+                  }}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
+              {availabilityLabels.map((label, index) => {
+                const enabled = Boolean(studyPrefs?.days?.[index])
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={readOnlyView}
+                    onClick={() => {
+                      const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
+                      days[index] = !days[index]
+                      const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
+                      setStudyPrefs(next)
+                      try { saveStudyPrefs(viewUserId, next) } catch {}
+                    }}
+                    style={{
+                      padding: '7px 12px',
+                      fontSize: 12,
+                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
+                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
+                      color: enabled ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="journey-grid" style={{ marginTop: 16 }}>
             {(() => {
               const toReview = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
@@ -690,7 +757,7 @@ export default function Dashboard() {
                   status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
                   desc: 'Set your SAT date (or best estimate) and use the plan for guidance (updates after each test).',
                   onClick: () => {
-                    const el = document.getElementById('study-plan-card')
+                    const el = document.getElementById('journey-settings')
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   },
                 },
@@ -786,187 +853,11 @@ export default function Dashboard() {
 	          )}
 	        </div>
 
-        {/* Study Plan + optional extra practice (side-by-side on desktop, stacked on mobile) */}
+        {/* Optional extra practice */}
         {hasTakenPretest && (
-          <div className="dashboard-plan-practice">
-            <div id="study-plan-card" className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Icon name="calendar" size={18} />
-                      Study Plan
-                    </h2>
-                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                    Add your SAT date (or your best estimate) to generate a plan from now until <b>3 days before</b> test day.
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                    Test date:
-                    <input
-                      type="date"
-                      value={satDate || ''}
-                      onChange={(e) => {
-                        const v = e.target.value
-                        setSatDate(v)
-                        saveSatTestDate(viewUserId, v)
-                        rebuildStoredPlan(studyPrefs, v)
-                      }}
-	                      disabled={readOnlyView}
-	                      style={{
-	                        padding: '7px 10px',
-                        borderRadius: 10,
-                        border: '1px solid #e2e8f0',
-                        fontSize: 12,
-                        fontWeight: 900,
-                        color: '#0f172a',
-                        background: 'white',
-                      }}
-                    />
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                    Min/day:
-                    <input
-                      type="number"
-                      min={20}
-                      max={180}
-                      value={studyPrefs?.minutesPerDay ?? 45}
-                      onChange={(e) => {
-                        const v = Number(String(e.target.value || '').trim())
-                        const minutesPerDay = Number.isFinite(v) ? Math.max(20, Math.min(180, v)) : 45
-                        const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
-                        setStudyPrefs(next)
-                        try { saveStudyPrefs(viewUserId, next) } catch {}
-                        rebuildStoredPlan(next, satDate)
-	                    }}
-	                      disabled={readOnlyView}
-	                      style={{
-	                        width: 86,
-                        padding: '7px 10px',
-                        borderRadius: 10,
-                        border: '1px solid #e2e8f0',
-                        fontSize: 12,
-                        fontWeight: 900,
-                        color: '#0f172a',
-                        background: 'white',
-                      }}
-                    />
-                  </label>
-                  <button
-                    className="btn btn-outline"
-                    disabled={!planText}
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(String(planText || ''))
-                      } catch {}
-                    }}
-                  >
-                    Copy
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    disabled={rebalancing || !latestCompleted || readOnlyView}
-                    onClick={async () => {
-                      if (!latestCompleted) return
-                      setRebalancing(true)
-                      rebuildStoredPlan(studyPrefs, satDate)
-                      setRebalancing(false)
-                    }}
-                  >
-                    {rebalancing ? 'Rebalancing…' : 'Rebalance now'}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, marginBottom: 2, alignItems: 'center' }}>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Availability:</div>
-                {availabilityLabels.map((label, index) => {
-                  const enabled = Boolean(studyPrefs?.days?.[index])
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      className="btn btn-outline"
-                      disabled={readOnlyView}
-                      onClick={() => {
-                        const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
-                        days[index] = !days[index]
-                        const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
-                        setStudyPrefs(next)
-                        try { saveStudyPrefs(viewUserId, next) } catch {}
-                        rebuildStoredPlan(next, satDate)
-                      }}
-                      style={{
-                        padding: '7px 12px',
-                        fontSize: 12,
-                        background: enabled ? 'rgba(14,165,233,.10)' : 'white',
-                        borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
-                        color: enabled ? '#0f172a' : '#64748b',
-                      }}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14, flex: 1 }}>
-                {journeySchedule && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 14 }}>
-                    {journeySchedule.days.map((day) => (
-                      <div
-                        key={day.key}
-                        style={{
-                          border: day.isToday ? '2px solid #0ea5e9' : '1px solid #e2e8f0',
-                          borderRadius: 12,
-                          padding: 10,
-                          background: day.isActive ? 'white' : '#f8fafc',
-                          opacity: day.isActive ? 1 : 0.65,
-                        }}
-                      >
-                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>
-                          {day.isToday ? 'Today' : day.date.toLocaleDateString(undefined, { weekday: 'short' })}
-                        </div>
-                        <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 8, fontSize: 13 }}>
-                          {day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </div>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                          {day.tasks.length ? day.tasks.map((task) => (
-                            <ScheduleTaskLink key={task.id} task={task} compact />
-                          )) : (
-                            <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
-                              {day.isActive ? 'Catch-up / light review' : 'Rest day'}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {planText ? (
-                  <div
-                    style={{
-                      margin: 0,
-                      whiteSpace: 'pre-wrap',
-                      overflowWrap: 'anywhere',
-                      fontFamily: 'DM Sans, system-ui, sans-serif',
-                      fontSize: 13,
-                      lineHeight: 1.7,
-                      color: '#0f172a',
-                    }}
-                  >
-                    {planText}
-                  </div>
-                ) : (
-                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                    Your study plan will appear here after you submit a test.
-                  </div>
-                )}
-              </div>
-            </div>
-
+          <>
             {extraTests.length > 0 && (
-              <div className="card dashboard-practice-card">
+              <div className="card dashboard-practice-card" style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1052,7 +943,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Completed tests */}
