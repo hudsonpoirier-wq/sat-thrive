@@ -14,10 +14,19 @@ export function resolveViewContext({ userId, profile, search = '' }) {
 
 export function withViewUser(path, viewUserId, isAdminPreview) {
   if (!path || !viewUserId || !isAdminPreview) return path
+  return withQueryParam(path, 'user', viewUserId)
+}
+
+export function withQueryParam(path, key, value) {
+  if (!path || !key || value == null || value === '') return path
   const [pathname, hash = ''] = String(path).split('#')
   const [base, query = ''] = pathname.split('?')
   const params = new URLSearchParams(query)
-  params.set('user', viewUserId)
+  params.set(key, value)
   const next = `${base}?${params.toString()}`
   return hash ? `${next}#${hash}` : next
+}
+
+export function withExam(path, exam) {
+  return withQueryParam(path, 'exam', exam)
 }

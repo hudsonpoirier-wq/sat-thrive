@@ -3,18 +3,21 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels } from '../lib/studyPlan.js'
-import { CHAPTERS } from '../data/testData.js'
-import { TESTS } from '../data/tests.js'
+import { getChaptersForExam, getExamConfig } from '../data/examData.js'
+import { getExamFromTestId, getTestsForExam } from '../data/tests.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 
-function Navbar({ homeHref, guideHref, isAdminPreview }) {
+function Navbar({ homeHref, guideHref, isAdminPreview, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -59,11 +62,18 @@ export default function CalendarPage() {
   const { user, profile } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
+  const examConfig = useMemo(() => getExamConfig(exam), [exam])
+  const examTests = useMemo(() => getTestsForExam(exam), [exam])
+  const chapters = useMemo(() => getChaptersForExam(exam), [exam])
   const { viewUserId, isAdminPreview } = useMemo(
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
   )
   const requestedDayKey = useMemo(() => new URLSearchParams(location.search || '').get('day') || '', [location.search])
+  const satHref = useMemo(() => withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
+  const actHref = useMemo(() => withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
 
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
@@ -72,20 +82,20 @@ export default function CalendarPage() {
   const [reviewItems, setReviewItems] = useState({})
   const [targetProfile, setTargetProfile] = useState(null)
   const [selectedDayKey, setSelectedDayKey] = useState('')
-  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
-  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
-  const [draftSatDate, setDraftSatDate] = useState(() => loadSatTestDate(viewUserId))
-  const [draftStudyPrefs, setDraftStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
+  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
+  const [draftSatDate, setDraftSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
+  const [draftStudyPrefs, setDraftStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
   const availabilityLabels = dayLabels()
 
   useEffect(() => {
-    const nextDate = loadSatTestDate(viewUserId)
-    const nextPrefs = loadStudyPrefs(viewUserId)
+    const nextDate = loadSatTestDate(viewUserId, exam)
+    const nextPrefs = loadStudyPrefs(viewUserId, exam)
     setSatDate(nextDate)
     setStudyPrefs(nextPrefs)
     setDraftSatDate(nextDate)
     setDraftStudyPrefs(nextPrefs)
-  }, [viewUserId])
+  }, [viewUserId, exam])
 
   useEffect(() => {
     if (!viewUserId) return
@@ -119,9 +129,11 @@ export default function CalendarPage() {
   }, [viewUserId, isAdminPreview])
 
   const displayProfile = isAdminPreview ? targetProfile : profile
-  const completed = attempts.filter(a => a.completed_at || a.scores?.total)
-  const latestCompleted = completed[0] || null
-  const hasTakenPretest = completed.some(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
+  const completed = attempts.filter(a => (a.completed_at || a.scores?.total))
+  const completedForExam = completed.filter((attempt) => getExamFromTestId(attempt?.test_id) === exam)
+  const studiedForExam = Object.fromEntries(Object.entries(studied || {}).filter(([chapterId]) => Boolean(chapters?.[chapterId])))
+  const latestCompleted = completedForExam[0] || null
+  const hasTakenPretest = completedForExam.some(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
   const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
   const latestValidated = latestMistakes.filter((m) => {
     const key = `${m.test_id}:${m.section}:${m.q_num}`
@@ -139,7 +151,7 @@ export default function CalendarPage() {
       counts[ch] = (counts[ch] || 0) + 1
     }
     return Object.entries(counts)
-      .map(([ch, count]) => ({ ...(CHAPTERS?.[ch] || {}), ch, count }))
+      .map(([ch, count]) => ({ ...(chapters?.[ch] || {}), ch, count }))
       .filter((t) => t.ch && Number(t.count) > 0)
       .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
   }
@@ -148,19 +160,19 @@ export default function CalendarPage() {
     if (!latestCompleted || !hasTakenPretest) return null
     return buildAdaptiveSchedule({
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-      studiedMap: studied,
+      studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
       hasTakenPretest: true,
       prefs: studyPrefs,
       testDate: satDate,
     })
-  }, [latestCompleted, hasTakenPretest, studied, reviewTodoCount, studyPrefs, satDate, mistakes])
+  }, [latestCompleted, hasTakenPretest, studiedForExam, reviewTodoCount, studyPrefs, satDate, mistakes])
 
-  const homeHref = withViewUser('/dashboard', viewUserId, isAdminPreview)
-  const guideHref = withViewUser('/guide', viewUserId, isAdminPreview)
-  const resultsHref = latestCompleted ? withViewUser(`/results/${latestCompleted.id}`, viewUserId, isAdminPreview) : homeHref
+  const homeHref = withViewUser(withExam('/dashboard', exam), viewUserId, isAdminPreview)
+  const guideHref = withViewUser(withExam('/guide', exam), viewUserId, isAdminPreview)
+  const resultsHref = latestCompleted ? withViewUser(withExam(`/results/${latestCompleted.id}`, exam), viewUserId, isAdminPreview) : homeHref
   const latestResultsLabel = latestCompleted
-    ? `${TESTS.find((t) => t.id === (latestCompleted.test_id === 'practice_test_11' ? 'pre_test' : latestCompleted.test_id))?.label || 'Latest Test'} Results`
+    ? `${examTests.find((t) => t.id === (latestCompleted.test_id === 'practice_test_11' ? 'pre_test' : latestCompleted.test_id))?.label || 'Latest Test'} Results`
     : 'Latest Results'
 
   const calendarCells = useMemo(() => {
@@ -193,7 +205,7 @@ export default function CalendarPage() {
     return schedule.days.find((day) => day.key === selectedDayKey) || schedule.days[0] || null
   }, [schedule, selectedDayKey])
 
-  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const settingsChanged = useMemo(() => {
     const currentDays = JSON.stringify(studyPrefs?.days || [])
     const draftDays = JSON.stringify(draftStudyPrefs?.days || [])
@@ -204,14 +216,14 @@ export default function CalendarPage() {
     if (isAdminPreview) return
     setSatDate(draftSatDate)
     setStudyPrefs(draftStudyPrefs)
-    saveSatTestDate(viewUserId, draftSatDate)
-    try { saveStudyPrefs(viewUserId, draftStudyPrefs) } catch {}
+    saveSatTestDate(viewUserId, draftSatDate, exam)
+    try { saveStudyPrefs(viewUserId, draftStudyPrefs, exam) } catch {}
   }
 
   if (loading) {
     return (
       <>
-        <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} />
+        <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} currentExam={exam} satHref={satHref} actHref={actHref} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
           Loading calendar…
         </div>
@@ -221,7 +233,7 @@ export default function CalendarPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} />
+      <Navbar homeHref={homeHref} guideHref={guideHref} isAdminPreview={isAdminPreview} currentExam={exam} satHref={satHref} actHref={actHref} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -239,7 +251,7 @@ export default function CalendarPage() {
               Smart Journey Calendar
             </h1>
             <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Click a day to see the exact study guide chapters and follow-up tasks assigned between now and the test window.
+              Click a day to see the exact study guide chapters and follow-up tasks assigned between now and your {examConfig.label} test window.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -339,9 +351,9 @@ export default function CalendarPage() {
         {!schedule ? (
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No calendar yet</div>
-            <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Take the Pre Test first, then the Smart Journey calendar will fill in with day-by-day study guide tasks.
-            </div>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+              Take the {examConfig.tests.find((test) => test.id === examConfig.preTestId)?.label || 'Pre Test'} first, then the Smart Journey calendar will fill in with day-by-day study guide tasks.
+              </div>
           </div>
         ) : (
           <div className="calendar-layout">

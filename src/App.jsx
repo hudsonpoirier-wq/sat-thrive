@@ -16,6 +16,8 @@ const loadCalendar = () => import('./pages/Calendar.jsx')
 const loadShare = () => import('./pages/Share.jsx')
 const loadAuthCallback = () => import('./pages/AuthCallback.jsx')
 const loadResetPassword = () => import('./pages/ResetPassword.jsx')
+const loadChooseTest = () => import('./pages/ChooseTest.jsx')
+const loadCompareTests = () => import('./pages/CompareTests.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -29,6 +31,8 @@ const Calendar = lazy(loadCalendar)
 const Share = lazy(loadShare)
 const AuthCallback = lazy(loadAuthCallback)
 const ResetPassword = lazy(loadResetPassword)
+const ChooseTest = lazy(loadChooseTest)
+const CompareTests = lazy(loadCompareTests)
 
 function RouteLoader() {
   return (
@@ -59,7 +63,7 @@ function AppWarmup() {
 
     const preload = () => {
       const loaders = user
-        ? [loadDashboard, loadGuide, loadMistakes, loadResults, loadReport, loadCalendar]
+        ? [loadDashboard, loadGuide, loadMistakes, loadResults, loadReport, loadCalendar, loadChooseTest, loadCompareTests]
         : [loadDashboard]
       loaders.forEach((load) => {
         try { load().catch(() => {}) } catch {}
@@ -90,6 +94,8 @@ export default function App() {
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/reset" element={<ResetPassword />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/choose-test" element={<ProtectedRoute><ChooseTest /></ProtectedRoute>} />
+              <Route path="/compare-tests" element={<ProtectedRoute><CompareTests /></ProtectedRoute>} />
               <Route path="/test/:attemptId" element={<ProtectedRoute><TestTaking /></ProtectedRoute>} />
               <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />

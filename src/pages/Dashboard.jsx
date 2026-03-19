@@ -2,29 +2,42 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { rawToScaled, answerMatches } from '../data/testData.js'
 import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
-import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { TESTS } from '../data/tests.js'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import {
+  formatDurationMinutes,
+  getDefaultModuleTimeRemaining,
+  getChaptersForExam,
+  getExamConfig,
+  getQuestionCountForTest,
+  getScoreColumnsForExam,
+  scoreAttemptFromKey,
+  scoreToPercentile,
+} from '../data/examData.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import { resolveViewContext, withViewUser, withExam } from '../lib/viewAs.js'
+import { chooseDashboardExam, saveLocalPreferredExam, userNeedsExamChoice } from '../lib/examChoice.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar({ viewUserId, isAdminPreview }) {
+function Navbar({ viewUserId, isAdminPreview, currentExam }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
+  const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
+  const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
   return (
     <nav className="nav">
-      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
+      <BrandLink to={withViewUser(withExam('/dashboard', currentExam), viewUserId, isAdminPreview)} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         {isAdmin && (
           <Link
             to="/admin"
@@ -121,10 +134,22 @@ function ScheduleTaskLink({ task, compact = false, stopParentClick = false }) {
   )
 }
 
+function examResultLabel(exam = 'sat') {
+  return exam === 'act' ? 'ACT progress' : 'SAT progress'
+}
+
+function formatExamSubscore(exam, scores, key) {
+  if (!scores) return '—'
+  if (exam === 'act' && key === 'total') return scores.composite || scores.total || '—'
+  return scores[key] ?? '—'
+}
+
 export default function Dashboard() {
   const { user, profile } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const searchParams = useMemo(() => new URLSearchParams(location.search || ''), [location.search])
+  const requestedExam = String(searchParams.get('exam') || '').toLowerCase()
   const { viewUserId, isAdminPreview } = useMemo(
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
@@ -141,18 +166,23 @@ export default function Dashboard() {
   const [confirmExtraTestId, setConfirmExtraTestId] = useState(null)
   const [reviewItems, setReviewItems] = useState({})
   const [mistakes, setMistakes] = useState([])
-  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
-  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
   const [targetProfile, setTargetProfile] = useState(null)
+  const chosenExam = chooseDashboardExam({ user, attempts, explicitExam: requestedExam })
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : chosenExam
+  const examConfig = getExamConfig(exam)
+  const examTests = getTestsForExam(exam)
+  const chaptersForExam = getChaptersForExam(exam)
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
+  const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
 
   useEffect(() => {
-    setSatDate(loadSatTestDate(viewUserId))
-    setStudyPrefs(loadStudyPrefs(viewUserId))
-  }, [viewUserId])
+    setSatDate(loadSatTestDate(viewUserId, exam))
+    setStudyPrefs(loadStudyPrefs(viewUserId, exam))
+  }, [viewUserId, exam])
 
   const displayProfile = isAdminPreview ? targetProfile : profile
   const readOnlyView = isAdminPreview
-  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!viewUserId || !attemptId) return false
@@ -170,26 +200,7 @@ export default function Dashboard() {
     try {
       const keyBySection = getAnswerKeyBySection(attempt?.test_id) || null
       if (!keyBySection) return null
-      const ans = attempt?.answers || {}
-      const scoreMod = (section, sectionAnswers) => {
-        const key = keyBySection?.[section] || {}
-        const total = Object.keys(key).length
-        let correct = 0
-        for (const [qStr, right] of Object.entries(key)) {
-          const given = sectionAnswers?.[qStr]
-          if (right == null) continue
-          const ok = answerMatches(given, right)
-          if (ok) correct++
-        }
-        return { correct, total }
-      }
-      const rwM1 = scoreMod('rw_m1', ans.rw_m1)
-      const rwM2 = scoreMod('rw_m2', ans.rw_m2)
-      const mM1 = scoreMod('math_m1', ans.math_m1)
-      const mM2 = scoreMod('math_m2', ans.math_m2)
-      const rawRW = (rwM1.correct || 0) + (rwM2.correct || 0)
-      const rawMath = (mM1.correct || 0) + (mM2.correct || 0)
-      return rawToScaled(rawRW, rawMath)
+      return scoreAttemptFromKey(attempt?.test_id, attempt?.answers || {}, keyBySection)
     } catch {
       return null
     }
@@ -254,9 +265,21 @@ export default function Dashboard() {
     }
   }, [user, viewUserId, isAdminPreview, readOnlyView])
 
-  async function startNewTest(testId = 'pre_test') {
+  useEffect(() => {
+    if (!user || loading) return
+    if (userNeedsExamChoice(user, attempts) && !requestedExam) {
+      navigate('/choose-test', { replace: true })
+      return
+    }
+    if (!requestedExam || requestedExam !== exam) {
+      saveLocalPreferredExam(user.id, exam)
+      navigate(viewHref('/dashboard'), { replace: true })
+    }
+  }, [user, loading, attempts, requestedExam, exam, navigate, viewHref])
+
+  async function startNewTest(testId = examConfig.preTestId) {
     if (readOnlyView) return
-    if (testId === 'pre_test') {
+    if (testId === examConfig.preTestId) {
       if (!confirmStart) { setConfirmStart(true); return }
       setConfirmStart(false)
     }
@@ -264,9 +287,9 @@ export default function Dashboard() {
     const payload = {
       user_id: user.id,
       test_id: testId,
-      current_section: 'rw_m1',
+      current_section: examConfig.moduleOrder[0],
       answers: {},
-      module_time_remaining: { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 }
+      module_time_remaining: getDefaultModuleTimeRemaining(testId)
     }
     const res = await supabase.from('test_attempts').insert(payload).select().single()
     if (!res.error && res.data) navigate(`/test/${res.data.id}`)
@@ -279,9 +302,11 @@ export default function Dashboard() {
   async function savePostScore(attemptId) {
     if (readOnlyView) return
     const sc = parseInt(postInput)
-    if (isNaN(sc) || sc < 400 || sc > 1600) return alert('Enter a valid score (400–1600)')
-    const rw = Math.round(sc * 0.5 / 10) * 10
-    const math = sc - rw
+    if (isNaN(sc)) return alert(exam === 'act' ? 'Enter a valid ACT composite (1–36)' : 'Enter a valid score (400–1600)')
+    if (exam === 'act' && (sc < 1 || sc > 36)) return alert('Enter a valid ACT composite (1–36)')
+    if (exam === 'sat' && (sc < 400 || sc > 1600)) return alert('Enter a valid score (400–1600)')
+    const rw = exam === 'sat' ? Math.round(sc * 0.5 / 10) * 10 : null
+    const math = exam === 'sat' ? sc - rw : null
     const payload = { user_id: user.id, attempt_id: attemptId, post_score: sc, post_rw: rw, post_math: math }
     const ins = await supabase.from('post_scores').insert(payload)
     if (ins.error) alert(ins.error.message)
@@ -290,18 +315,25 @@ export default function Dashboard() {
     setAddingPost(null); setPostInput('')
   }
 
-  const completed = attempts.filter(a => a.completed_at || a.scores?.total)
-  const inProgress = attempts.filter(a => !a.completed_at)
+  const examAttemptIds = new Set(examTests.map((test) => test.id))
+  const examAttempts = attempts.filter((attempt) => examAttemptIds.has(normalizeTestId(attempt?.test_id)))
+  const examPostScores = postScores.filter((row) => examAttempts.some((attempt) => attempt.id === row.attempt_id))
+  const studiedForExam = Object.fromEntries(Object.entries(studied || {}).filter(([chapterId]) => Boolean(chaptersForExam?.[chapterId])))
+  const studiedRowsForExam = (studiedRows || []).filter((row) => Boolean(chaptersForExam?.[row.chapter_id]))
+  const mistakesForExam = (mistakes || []).filter((row) => getExamFromTestId(row?.test_id) === exam)
+
+  const completed = examAttempts.filter(a => a.completed_at || a.scores?.total)
+  const inProgress = examAttempts.filter(a => !a.completed_at)
   const latestCompleted = completed.length ? completed[0] : null
-  const completedPre = completed.filter(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
-  const preInProgress = inProgress.find(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
+  const completedPre = completed.filter(a => normalizeTestId(a.test_id) === examConfig.preTestId)
+  const preInProgress = inProgress.find(a => normalizeTestId(a.test_id) === examConfig.preTestId)
   const preTotals = completedPre.map(a => a.scores?.total || computeScoresFromAnswers(a)?.total || 0)
   const bestScore = preTotals.length ? Math.max(...preTotals) : null
   const completedWithScores = completed
     .map((attempt) => ({ attempt, scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}) }))
     .filter((entry) => entry.scores?.total)
   const fullLengthRecords = completedWithScores.filter(({ attempt }) => {
-    const cfg = TESTS.find((t) => t.id === (attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id))
+    const cfg = examTests.find((t) => t.id === normalizeTestId(attempt.test_id))
     return cfg && cfg.kind !== 'extra'
   })
   const bestSatRecord = completedWithScores.reduce((best, entry) => {
@@ -313,21 +345,29 @@ export default function Dashboard() {
     return Number(entry.scores.total || 0) > Number(best.scores.total || 0) ? entry : best
   }, null)
   const mostRecentRecord = completedWithScores[0] || null
-  const latestPostScore = postScores[0]?.post_score
+  const latestPostScore = examPostScores[0]?.post_score
   const improvement = bestScore && latestPostScore ? latestPostScore - bestScore : null
-  const studiedCount = Object.values(studied).filter(Boolean).length
-  const studiedPct = Math.round((studiedCount / 34) * 100)
-  const hasStartedGuide = (studiedRows || []).some((r) => {
+  const studiedCount = Object.values(studiedForExam).filter(Boolean).length
+  const studiedPct = Math.round((studiedCount / Math.max(1, examConfig.guideCompletionTarget)) * 100)
+  const hasStartedGuide = (studiedRowsForExam || []).some((r) => {
     const g = r?.practice?.guide
     if (r?.practice?.meta?.guide_started_at) return true
     return g && typeof g === 'object' && Object.values(g).some(Boolean)
   })
   const hasStudyPlan = Boolean(satDate)
-  const extraTests = TESTS.filter(t => t.kind === 'extra')
+  const extraTests = examTests.filter(t => t.kind === 'extra')
   const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id))
   const hasTakenPretest = completedPre.length > 0
+  const preTestConfig = examTests.find((test) => test.id === examConfig.preTestId) || examTests[0]
+  const totalQuestions = getQuestionCountForTest(examConfig.preTestId)
+  const totalDuration = formatDurationMinutes(
+    examConfig.moduleOrder.reduce((sum, moduleId) => sum + Number(examConfig.modules?.[moduleId]?.time || 0), 0)
+  )
+  const scoreColumns = getScoreColumnsForExam(exam)
+  const bestScoreLabel = exam === 'act' ? 'Best ACT Composite' : 'Best SAT Score'
+  const improvementLabel = exam === 'act' ? 'Post-test minus best pre-test composite' : 'Post-test minus best pre-test'
   const viewedLatestResults = latestCompleted ? hasViewedResultsForAttempt(latestCompleted.id) : false
-  const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
+  const latestMistakes = latestCompleted ? mistakesForExam.filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
   const latestValidated = latestMistakes.filter((m) => {
     const k = `${m.test_id}:${m.section}:${m.q_num}`
     return reviewItems?.[k]?.last_correct === true
@@ -346,7 +386,7 @@ export default function Dashboard() {
     if (!hasTakenPretest || !latestCompleted) return null
     const schedule = buildAdaptiveSchedule({
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-      studiedMap: studied,
+      studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
       hasViewedResults: viewedLatestResults,
       hasTakenPretest: true,
@@ -363,7 +403,7 @@ export default function Dashboard() {
         }),
       })),
     }
-  }, [hasTakenPretest, latestCompleted, studied, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes, viewHref])
+  }, [hasTakenPretest, latestCompleted, studiedForExam, reviewTodoCount, viewedLatestResults, studyPrefs, satDate, mistakes, viewHref])
 
   const scheduleDayCards = useMemo(() => {
     const days = journeySchedule?.days || []
@@ -395,7 +435,7 @@ export default function Dashboard() {
       counts[ch] = (counts[ch] || 0) + 1
     }
     return Object.entries(counts)
-      .map(([ch, count]) => ({ ...(CHAPTERS?.[ch] || {}), ch, count }))
+      .map(([ch, count]) => ({ ...(chaptersForExam?.[ch] || {}), ch, count }))
       .filter((t) => t.ch && Number(t.count) > 0)
       .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
   }
@@ -452,14 +492,14 @@ export default function Dashboard() {
           <h1 style={{fontFamily:'Sora,sans-serif',fontSize:26,fontWeight:800,color:'#1a2744'}}>
             {`Hey there ${displayProfile?.full_name?.split(' ')[0] || 'there'}!`}
           </h1>
-          <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your SAT progress</p>
+          <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your {examResultLabel(exam)}</p>
         </div>
 
         {/* Score overview */}
 	        <div className="stats-grid">
             <ScoreOverviewCard
-              label="Best SAT Score"
-              value={bestSatRecord?.scores?.total || '—'}
+              label={bestScoreLabel}
+              value={bestSatRecord ? formatExamSubscore(exam, bestSatRecord.scores, 'total') : '—'}
               sub={bestSatRecord ? `${TESTS.find((t) => t.id === (bestSatRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : bestSatRecord.attempt.test_id))?.label || 'Completed test'}` : 'All-time high'}
               icon="sparkle"
               dark={Boolean(bestSatRecord?.scores?.total)}
@@ -467,14 +507,14 @@ export default function Dashboard() {
             />
             <ScoreOverviewCard
               label="Highest Test"
-              value={highestTestRecord?.scores?.total || '—'}
+              value={highestTestRecord ? formatExamSubscore(exam, highestTestRecord.scores, 'total') : '—'}
               sub={highestTestRecord ? `${TESTS.find((t) => t.id === (highestTestRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : highestTestRecord.attempt.test_id))?.label || 'Highest full-length test'}` : 'No full-length test recorded yet'}
               icon="test"
               to={highestTestRecord ? viewHref(`/results/${highestTestRecord.attempt.id}`) : ''}
             />
             <ScoreOverviewCard
               label="Most Recent Test"
-              value={mostRecentRecord?.scores?.total || '—'}
+              value={mostRecentRecord ? formatExamSubscore(exam, mostRecentRecord.scores, 'total') : '—'}
               sub={mostRecentRecord ? `${TESTS.find((t) => t.id === (mostRecentRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : mostRecentRecord.attempt.test_id))?.label || 'Latest test'} · ${new Date(mostRecentRecord.attempt.started_at).toLocaleDateString()}` : 'No completed attempt yet'}
               icon="results"
               to={mostRecentRecord ? viewHref(`/results/${mostRecentRecord.attempt.id}`) : ''}
@@ -482,23 +522,23 @@ export default function Dashboard() {
             <ScoreOverviewCard
               label="Total Improvement"
               value={improvement ? `+${improvement}` : '—'}
-              sub={improvement ? 'Post-test minus best pre-test' : `${completed.length} completed · ${inProgress.length} in progress`}
+              sub={improvement ? improvementLabel : `${completed.length} completed · ${inProgress.length} in progress`}
               icon="chart"
               dark={Boolean(improvement)}
             />
         </div>
 
 	        {/* Pre Test CTA (hidden after completion) */}
-	        {(completedPre.length === 0 || preInProgress) && (
+        {(completedPre.length === 0 || preInProgress) && (
 	          <div className="card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
 	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
 	              <div>
 	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
 	                  <Icon name="test" size={18} />
-	                  Pre Test
+	                  {preTestConfig?.label || 'Pre Test'}
 	                </div>
 	                <div style={{fontSize:13, opacity:.7}}>
-	                  4 modules · 120 questions · 2 hrs 14 min · Timed like the real SAT
+	                  {examConfig.moduleOrder.length} sections · {totalQuestions} questions · {totalDuration} · Timed like the real {examConfig.label}
 	                </div>
 	              </div>
 	              {preInProgress ? (
@@ -509,9 +549,9 @@ export default function Dashboard() {
 	                  </button>
 	                </div>
 	              ) : (
-	                <button className="btn" onClick={() => startNewTest('pre_test')} disabled={startingTest || readOnlyView}
+	                <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
 	                  style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
-	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : 'Start Pre Test'}
+	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
 	                </button>
 	              )}
 	            </div>
@@ -519,13 +559,13 @@ export default function Dashboard() {
 	              <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
 	                <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
 	                <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
-	                  This is a full timed test (about 2.5 hours with a break). Once you start, your timer runs.
+	                  This is a full timed {examConfig.label} test ({totalDuration}). Once you start, your timer runs.
 	                </div>
 	                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
 	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
 	                    Cancel
 	                  </button>
-	                  <button className="btn" onClick={() => startNewTest('pre_test')} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
+	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
 	                    {readOnlyView ? 'Preview only' : 'Start Test'}
 	                  </button>
 	                </div>
@@ -643,7 +683,7 @@ export default function Dashboard() {
             <div style={{ minWidth: 260 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
                 <span>Study Progress</span>
-                <span>{studiedCount}/34</span>
+                <span>{studiedCount}/{examConfig.guideCompletionTarget}</span>
               </div>
               <div style={{ height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
                 <div style={{ height: '100%', width: `${Math.min(100, studiedPct)}%`, background: studiedPct >= 80 ? '#10b981' : studiedPct >= 40 ? '#f59e0b' : '#ef4444', transition: 'width .6s ease' }} />
@@ -663,13 +703,13 @@ export default function Dashboard() {
                   onClick: () => {
                     if (readOnlyView) return
                     if (preInProgress?.id) navigate(`/test/${preInProgress.id}`)
-                    else startNewTest('pre_test')
+                    else startNewTest(examConfig.preTestId)
                   },
                 },
                 {
                   title: '2) Study Plan',
                   status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
-                  desc: 'Set your SAT date (or best estimate) and use the plan for guidance (updates after each test).',
+                  desc: `Set your ${examConfig.label} date (or best estimate) and use the plan for guidance (updates after each test).`,
                   onClick: () => navigate(viewHref('/calendar')),
                 },
                 {
@@ -691,7 +731,7 @@ export default function Dashboard() {
                 },
                 {
                   title: '5) Study Guide',
-                  status: studiedCount >= 34 ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
+                  status: studiedCount >= examConfig.guideCompletionTarget ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
                   desc: 'Master chapters (25/25) to mark them complete.',
                   onClick: () => navigate(viewHref('/guide')),
                 },
@@ -739,11 +779,11 @@ export default function Dashboard() {
 	              Progress Report →
 	            </button>
 	            {(() => {
-	              const unlocked = studiedCount >= 34 && hasTakenPretest
+	              const unlocked = studiedCount >= examConfig.guideCompletionTarget && hasTakenPretest
 	              return (
 	            <button
 	              className="btn"
-	              onClick={() => startNewTest('final_test')}
+	              onClick={() => startNewTest(examConfig.finalTestId)}
 	              disabled={!unlocked || readOnlyView}
 	              style={{
 	                background: unlocked ? '#10b981' : '#e2e8f0',
@@ -757,7 +797,7 @@ export default function Dashboard() {
 	              )
 	            })()}
 	          </div>
-	          {!(studiedCount >= 34 && hasTakenPretest) && (
+	          {!(studiedCount >= examConfig.guideCompletionTarget && hasTakenPretest) && (
 	            <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#64748b' }}>
 	              The <b>Final Test unlocks automatically</b> once you complete the Journey Tracker (Pre Test + review results + review missed questions + complete the Study Guide).
 	            </div>
@@ -870,8 +910,15 @@ export default function Dashboard() {
 	              <table style={{width:'100%', borderCollapse:'collapse'}}>
 	                <thead>
 	                  <tr>
-	                    {['Test', 'Date', 'R&W Score', 'Math Score', 'Total', 'Post-Test', 'Gain', ''].map(h => (
-	                      <th key={h} style={{padding:'8px 12px', textAlign:'left', fontSize:11, color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px', background:'#f8fafc', borderBottom:'1px solid #e8ecf0'}}>
+                      {[
+                        'Test',
+                        'Date',
+                        ...scoreColumns.map((column) => column.label),
+                        'Post-Test',
+                        'Gain',
+                        ''
+                      ].map(h => (
+	                        <th key={h} style={{padding:'8px 12px', textAlign:'left', fontSize:11, color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px', background:'#f8fafc', borderBottom:'1px solid #e8ecf0'}}>
 	                        {h}
 	                      </th>
 	                    ))}
@@ -887,13 +934,30 @@ export default function Dashboard() {
 		                      <tr key={a.id} style={{borderBottom:'1px solid #f1f5f9'}}>
 		                        <td style={{padding:'12px', fontWeight:800, color:'#1a2744'}}>{cfg?.label || a.test_id}</td>
 		                        <td style={{padding:'12px'}}>{new Date(a.started_at).toLocaleDateString()}</td>
-		                        <td style={{padding:'12px', fontWeight:700}}>{rowScores?.rw || '—'}</td>
-		                        <td style={{padding:'12px', fontWeight:700}}>{rowScores?.math || '—'}</td>
-	                        <td style={{padding:'12px', fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:'#1a2744'}}>{rowScores?.total || '—'}</td>
+                        {scoreColumns.map((column) => (
+                          <td
+                            key={`${a.id}-${column.key}`}
+                            style={{
+                              padding:'12px',
+                              fontWeight: column.key === 'total' ? 800 : 700,
+                              fontFamily: column.key === 'total' ? 'Sora,sans-serif' : 'inherit',
+                              fontSize: column.key === 'total' ? 16 : 14,
+                              color: column.key === 'total' ? '#1a2744' : 'inherit'
+                            }}
+                          >
+                            {formatExamSubscore(exam, rowScores, column.key)}
+                          </td>
+                        ))}
                         <td style={{padding:'12px'}}>
                           {addingPost === a.id ? (
                             <div style={{display:'flex', gap:6}}>
-                              <input type="number" min={400} max={1600} placeholder="Score" value={postInput} onChange={e => setPostInput(e.target.value)}
+                              <input
+                                type="number"
+                                min={exam === 'act' ? 1 : 400}
+                                max={exam === 'act' ? 36 : 1600}
+                                placeholder={exam === 'act' ? 'Composite' : 'Score'}
+                                value={postInput}
+                                onChange={e => setPostInput(e.target.value)}
                                 style={{width:80, padding:'5px 8px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13}} />
                               <button onClick={() => savePostScore(a.id)} style={{padding:'5px 10px', background:'#10b981', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:12}}>Save</button>
                               <button onClick={() => setAddingPost(null)} style={{padding:'5px 8px', background:'#f1f5f9', border:'none', borderRadius:7, cursor:'pointer', fontSize:12}}>Cancel</button>

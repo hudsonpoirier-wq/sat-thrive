@@ -1,10 +1,14 @@
 import { ANSWER_KEY } from './testData.js'
 import { EXTRA_ANSWER_KEYS } from './extraAnswerKeys.js'
 import { FINAL_ANSWER_KEY } from './finalAnswerKey.js'
+import { getActAnswerKey } from './actData.js'
+import { normalizeTestId } from './tests.js'
 
 export function getAnswerKeyBySection(testId) {
-  const id = String(testId || '')
-  if (id === 'pre_test' || id === 'practice_test_11' || !id) return ANSWER_KEY
+  const id = normalizeTestId(testId)
+  if (!id) return ANSWER_KEY
+  if (id.startsWith('act')) return getActAnswerKey(id)
+  if (id === 'pre_test') return ANSWER_KEY
   if (id === 'final_test') return FINAL_ANSWER_KEY
   if (EXTRA_ANSWER_KEYS?.[id]) return EXTRA_ANSWER_KEYS[id]
   // For tests like `final_test`, the key can be parsed at runtime and cached in localStorage.

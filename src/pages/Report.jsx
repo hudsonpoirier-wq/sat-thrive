@@ -9,18 +9,23 @@ import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import { getExamConfig } from '../data/examData.js'
+import { getExamFromTestId } from '../data/tests.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar({ dashboardHref, mistakesHref }) {
+function Navbar({ dashboardHref, mistakesHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
       <BrandLink to={dashboardHref} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -49,10 +54,15 @@ function useQuery() {
 export default function Report() {
   const { user, profile } = useAuth()
   const q = useQuery()
+  const requestedExam = String(q.get('exam') || '').toLowerCase()
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
+  const examConfig = getExamConfig(exam)
   const { viewUserId, isAdminPreview, isAdmin } = resolveViewContext({ userId: user?.id, profile, search: q.toString() ? `?${q.toString()}` : '' })
   const targetUser = viewUserId || user?.id
   const canView = (String(targetUser) === String(user?.id)) || isAdmin
-  const viewHref = (path) => withViewUser(path, targetUser, isAdminPreview)
+  const viewHref = (path) => withViewUser(withExam(path, exam), targetUser, isAdminPreview)
+  const satHref = withViewUser(withExam('/dashboard', 'sat'), targetUser, isAdminPreview)
+  const actHref = withViewUser(withExam('/dashboard', 'act'), targetUser, isAdminPreview)
 
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
@@ -84,15 +94,15 @@ export default function Report() {
   }, [targetUser, canView])
 
   const report = useMemo(() => {
-    const completed = (attempts || []).filter(a => a.completed_at || a.scores?.total)
-    const completedPre = completed.filter(a => a.test_id === 'pre_test' || a.test_id === 'practice_test_11')
+    const completed = (attempts || []).filter(a => (a.completed_at || a.scores?.total) && getExamFromTestId(a.test_id) === exam)
+    const completedPre = completed.filter(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
     const bestPre = completedPre
       .map(a => a.scores?.total || 0)
       .filter(Boolean)
       .reduce((m, v) => Math.max(m, v), 0) || null
     const latestPost = postScores?.[0]?.post_score || null
     const improvement = bestPre && latestPost ? (latestPost - bestPre) : null
-    const studiedCount = (studiedRows || []).filter(r => r.completed).length
+    const studiedCount = (studiedRows || []).filter(r => r.completed && examConfig.chapters?.[r.chapter_id]).length
     const dueReviews = computeDueCount(reviewItems)
 
     const activityKeys = (() => {
@@ -103,7 +113,7 @@ export default function Report() {
         if (k1) set.add(k1)
         if (k2) set.add(k2)
       })
-      ;(studiedRows || []).forEach((r) => {
+      ;(studiedRows || []).filter((r) => examConfig.chapters?.[r.chapter_id]).forEach((r) => {
         const k1 = toLocalDateKey(r.updated_at)
         const k2 = toLocalDateKey(r.completed_at)
         if (k1) set.add(k1)
@@ -117,7 +127,7 @@ export default function Report() {
     })()
 
     const streak = computeStreak(activityKeys)
-    const extraTests = TESTS.filter(t => t.kind === 'extra')
+    const extraTests = TESTS.filter(t => t.kind === 'extra' && t.exam === exam)
     const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id)).length
 
     const series = completed
@@ -143,7 +153,7 @@ export default function Report() {
         completed_extra: completedExtra,
       },
       series,
-      mistakes: (mistakes || []).slice(0, 200).map(m => ({
+      mistakes: (mistakes || []).filter((m) => getExamFromTestId(m.test_id) === exam).slice(0, 200).map(m => ({
         test: m.test_id,
         section: m.section,
         q: m.q_num,
@@ -152,7 +162,7 @@ export default function Report() {
         note: m.note || '',
       })),
     }
-  }, [attempts, postScores, studiedRows, mistakes, reviewItems, targetProfile?.full_name, targetProfile?.email])
+  }, [attempts, postScores, studiedRows, mistakes, reviewItems, targetProfile?.full_name, targetProfile?.email, exam, examConfig.preTestId])
 
   const shareUrl = useMemo(() => {
     if (!report) return null
@@ -217,7 +227,7 @@ export default function Report() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
+      <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} currentExam={exam} satHref={satHref} actHref={actHref} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>

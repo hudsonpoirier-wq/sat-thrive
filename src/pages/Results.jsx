@@ -2,25 +2,27 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { CHAPTERS, QUESTION_CHAPTER_MAP, MODULE_ORDER, MODULES, answerMatches } from '../data/testData.js'
+import { answerMatches } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-function SectionBreakdown({ answers, keyBySection }) {
-  const sections = [
-    { key: 'rw_m1', label: 'R&W Module 1', total: 33 },
-    { key: 'rw_m2', label: 'R&W Module 2', total: 33 },
-    { key: 'math_m1', label: 'Math Module 1', total: 27 },
-    { key: 'math_m2', label: 'Math Module 2', total: 27 },
-  ]
+function SectionBreakdown({ answers, keyBySection, moduleOrder, modules }) {
+  const sections = (moduleOrder || []).map((key) => ({
+    key,
+    label: `${modules?.[key]?.label || key}${modules?.[key]?.module ? ` — ${modules[key].module}` : ''}`,
+    total: Number(modules?.[key]?.questions || 0),
+  }))
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
       {sections.map(s => {
@@ -50,7 +52,7 @@ function SectionBreakdown({ answers, keyBySection }) {
   )
 }
 
-function QuestionReview({ answers, keyBySection, guideHref }) {
+function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules, questionChapterMap, chapters }) {
   const [expanded, setExpanded] = useState(null)
 
   return (
@@ -59,11 +61,11 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
         <Icon name="eye" size={17} />
         Question-by-Question Review
       </h3>
-      {MODULE_ORDER.map(mod => {
+      {(moduleOrder || []).map(mod => {
         const modAnswers = answers[mod] || {}
         const key = keyBySection?.[mod] || {}
-        const chMap = QUESTION_CHAPTER_MAP[mod]
-        const total = MODULES[mod].questions
+        const chMap = questionChapterMap?.[mod] || {}
+        const total = Number(modules?.[mod]?.questions || 0)
         const wrongs = []
         for (let q = 1; q <= total; q++) {
           const given = modAnswers[q]
@@ -75,7 +77,7 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
         if (wrongs.length === 0) return (
           <div key={mod} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2744', marginBottom: 8 }}>
-              {MODULES[mod].label} — {MODULES[mod].module} <span style={{ color: '#10b981' }}>(Perfect)</span>
+              {modules?.[mod]?.label} — {modules?.[mod]?.module} <span style={{ color: '#10b981' }}>(Perfect)</span>
             </div>
           </div>
         )
@@ -84,7 +86,7 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
             <button onClick={() => setExpanded(expanded === mod ? null : mod)}
               style={{ width: '100%', textAlign: 'left', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontFamily: 'Sora,sans-serif', fontSize: 13, fontWeight: 700 }}>
-                {MODULES[mod].label} — {MODULES[mod].module}
+                {modules?.[mod]?.label} — {modules?.[mod]?.module}
               </span>
               <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 700 }}>
                 {wrongs.length} wrong {expanded === mod ? '▲' : '▼'}
@@ -93,7 +95,7 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
             {expanded === mod && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {wrongs.map(({ q, given, right, ch }) => {
-                  const chData = CHAPTERS[ch]
+                  const chData = chapters?.[ch]
                   const hint = chData
                     ? `Hint: revisit Chapter ${ch} and solve the problem again using the core rule from ${chData.name}. Focus on the setup before checking any final answer.`
                     : 'Hint: slow down the setup, identify what the question is really asking for, and try the problem again before checking anything else.'
@@ -173,25 +175,34 @@ export default function Results() {
   const { user, profile } = useAuth()
   const location = useLocation()
   const { viewUserId, isAdminPreview } = resolveViewContext({ userId: user?.id, profile, search: location.search })
+  const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
   const navigate = useNavigate()
   const [attempt, setAttempt] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId))
-  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
-  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const exam = attempt
+    ? getExamConfigForTest(attempt.test_id).exam
+    : (requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user))
+  const examConfig = getExamConfigForTest(attempt?.test_id || (exam === 'act' ? 'act1' : 'pre_test'))
+  const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
+  const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+  const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
+  const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
   const readOnlyView = isAdminPreview
 
   useEffect(() => {
-    setPrefs(loadStudyPrefs(viewUserId))
-    setSatDate(loadSatTestDate(viewUserId))
-  }, [viewUserId])
+    setPrefs(loadStudyPrefs(viewUserId, exam))
+    setSatDate(loadSatTestDate(viewUserId, exam))
+  }, [viewUserId, exam])
 
   useEffect(() => {
     if (!supabase || !viewUserId) return
     supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', viewUserId).single()
       .then(({ data }) => {
-        if (!data) { navigate(viewHref('/dashboard')); return }
-        if (!data.completed_at) { navigate(readOnlyView ? viewHref('/dashboard') : `/test/${attemptId}`); return }
+        const resultExam = getExamConfigForTest(data?.test_id || 'pre_test').exam
+        const toDashboard = withViewUser(withExam('/dashboard', resultExam), viewUserId, isAdminPreview)
+        if (!data) { navigate(toDashboard); return }
+        if (!data.completed_at) { navigate(readOnlyView ? toDashboard : `/test/${attemptId}`); return }
         setAttempt(data)
         if (!readOnlyView) {
           try {
@@ -207,10 +218,12 @@ export default function Results() {
   }, [attemptId, viewUserId, navigate, readOnlyView])
 
   const scores = attempt?.scores || {}
+  const currentTestConfig = getTestConfig(attempt?.test_id)
   const weakTopics = normalizeWeakTopics(attempt?.weak_topics || [])
   const answers = attempt?.answers || {}
   const keyBySection = getAnswerKeyBySection(attempt?.test_id)
-  const isPreTest = attempt?.test_id === 'pre_test' || attempt?.test_id === 'practice_test_11' || !attempt?.test_id
+  const isPreTest = (attempt?.test_id === examConfig.preTestId) || (attempt?.test_id === 'practice_test_11' && exam === 'sat') || !attempt?.test_id
+  const scoreColumns = getScoreColumnsForExam(exam)
   const reviewCount = useMemo(() => {
     if (!keyBySection) return 0
     let wrong = 0
@@ -266,6 +279,7 @@ export default function Results() {
       <nav className="nav">
         <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
+          <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
           <button
             className="btn btn-outline"
             onClick={() => navigate(-1)}
@@ -294,29 +308,36 @@ export default function Results() {
         {/* Score Hero */}
         <div className="results-score-hero" style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', opacity: .6, marginBottom: 8 }}>
-            {(getTestConfig(attempt.test_id)?.label || 'Pre Test')} — Score
+            {(currentTestConfig?.label || 'Pre Test')} — Score
           </div>
-          <div className="results-total">{scores.total || '—'}</div>
-          <div className="results-label">out of 1600</div>
+          <div className="results-total">{scores.composite || scores.total || '—'}</div>
+          <div className="results-label">{exam === 'act' ? 'ACT composite' : 'out of 1600'}</div>
           <div className="section-scores">
-            <div className="section-score-item">
-              <div className="section-score-num">{scores.rw || '—'}</div>
-              <div className="section-score-lbl">Reading & Writing</div>
-            </div>
-            <div style={{ width: 1, background: 'rgba(255,255,255,.2)' }} />
-            <div className="section-score-item">
-              <div className="section-score-num">{scores.math || '—'}</div>
-              <div className="section-score-lbl">Math</div>
-            </div>
+            {scoreColumns.filter((column) => column.key !== 'total').map((column, index, arr) => (
+              <div key={column.key} style={{ display: 'contents' }}>
+                <div className="section-score-item">
+                  <div className="section-score-num">{scores[column.key] || '—'}</div>
+                  <div className="section-score-lbl">{column.label}</div>
+                </div>
+                {index < arr.length - 1 ? <div style={{ width: 1, background: 'rgba(255,255,255,.2)' }} /> : null}
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: 16, fontSize: 13, opacity: .6 }}>
             Completed {new Date(attempt.completed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
+          {currentTestConfig?.explanationUrl && (
+            <div style={{ marginTop: 14 }}>
+              <a className="btn btn-outline" href={currentTestConfig.explanationUrl} target="_blank" rel="noreferrer">
+                Open Answer Key + Explanations →
+              </a>
+            </div>
+          )}
         </div>
 
 	        {/* Section breakdown */}
 	        {keyBySection ? (
-	          <SectionBreakdown answers={answers} keyBySection={keyBySection} />
+	          <SectionBreakdown answers={answers} keyBySection={keyBySection} moduleOrder={examConfig.moduleOrder} modules={examConfig.modules} />
 	        ) : (
 	          <div className="card" style={{ marginBottom: 24, color: '#64748b', lineHeight: 1.7 }}>
 	            Detailed module-by-module review isn’t available for this test yet.
@@ -328,7 +349,7 @@ export default function Results() {
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="warning" size={17} />
-              Weak Areas — Mapped to Your Playbook
+              Weak Areas — Mapped to Your Study Guide
             </h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
               These are the chapters to focus on first. Study them in order of urgency.
@@ -344,7 +365,7 @@ export default function Results() {
                     </div>
                     <div className="ch-page" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Icon name="guide" size={13} />
-                      <span>Chapter {t.ch} · Playbook page {t.page}</span>
+                      <span>Chapter {t.ch}{t.page ? ` · Guide page ${t.page}` : ''}</span>
                     </div>
                   </div>
                 </div>
@@ -382,7 +403,7 @@ export default function Results() {
                 Smart Journey Planner
               </h3>
               <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target SAT date.
+                Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target {examConfig.label} date.
               </p>
             </div>
             <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
@@ -400,7 +421,7 @@ export default function Results() {
                   onChange={(e) => {
                     const value = e.target.value
                     setSatDate(value)
-                    saveSatTestDate(viewUserId, value)
+                    saveSatTestDate(viewUserId, value, exam)
                   }}
                   disabled={readOnlyView}
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
@@ -423,7 +444,7 @@ export default function Results() {
                       next.days = (next.days || Array(7).fill(false)).map(Boolean)
                       next.days[i] = !next.days[i]
                       setPrefs(next)
-                      try { saveStudyPrefs(viewUserId, next) } catch {}
+                      try { saveStudyPrefs(viewUserId, next, exam) } catch {}
                     }}
                     style={{
                       padding: '7px 12px',
@@ -489,7 +510,17 @@ export default function Results() {
         </div>
 
 	        {/* Q-by-Q review */}
-	        {keyBySection && <QuestionReview answers={answers} keyBySection={keyBySection} guideHref={(chapterId) => viewHref(`/guide?chapter=${encodeURIComponent(chapterId)}`)} />}
+	        {keyBySection && (
+            <QuestionReview
+              answers={answers}
+              keyBySection={keyBySection}
+              guideHref={(chapterId) => viewHref(`/guide?chapter=${encodeURIComponent(chapterId)}`)}
+              moduleOrder={examConfig.moduleOrder}
+              modules={examConfig.modules}
+              questionChapterMap={examConfig.questionChapterMap}
+              chapters={examConfig.chapters}
+            />
+          )}
 
         {/* CTA */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 40 }}>

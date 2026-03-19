@@ -134,10 +134,21 @@ export function AuthProvider({ children }) {
     return { data, error }
   }
 
+  async function setPreferredExam(exam) {
+    if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
+    const { data, error } = await supabase.auth.updateUser({
+      data: {
+        preferred_exam: exam,
+      },
+    })
+    if (!error && data?.user) setUser(data.user)
+    return { data, error }
+  }
+
   if (!supabase && !loading) return <SupabaseNotConfigured />
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, requestPasswordReset, resendConfirmation }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, requestPasswordReset, resendConfirmation, setPreferredExam }}>
       {children}
     </AuthContext.Provider>
   )

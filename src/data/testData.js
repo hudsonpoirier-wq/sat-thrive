@@ -198,7 +198,7 @@ function splitAcceptedAnswers(value) {
 
 export function isChoiceLetter(value) {
   const s = String(value ?? '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+  return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K'].includes(s)
 }
 
 export function isMultipleChoiceAnswer(correct) {

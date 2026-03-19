@@ -5,7 +5,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
 function isChoiceLetter(v) {
   const s = String(v || '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+  return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K'].includes(s)
 }
 
 function looksLikeFreeResponse(v) {
@@ -13,6 +13,56 @@ function looksLikeFreeResponse(v) {
   if (!s) return false
   // Accept values like: 29, 8.6, .5061, 30; -30, 3331, 15/2, (3)^2, pi, π
   return /[0-9π]/i.test(s) && /^[0-9.+/()^piπ\-\s;,]+$/i.test(s)
+}
+
+function normalizeActAnswerLetter(value) {
+  const s = String(value || '').trim().toUpperCase()
+  return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K'].includes(s) ? s : null
+}
+
+function parseActSectionPairs(text, maxQuestion) {
+  const out = {}
+  const regex = /(\d{1,2})\.\s*([A-Z])/g
+  let match
+  while ((match = regex.exec(String(text || ''))) !== null) {
+    const qNum = Number(match[1])
+    const answer = normalizeActAnswerLetter(match[2])
+    if (!Number.isFinite(qNum) || qNum < 1 || qNum > maxQuestion || !answer) continue
+    out[qNum] = answer
+  }
+  return out
+}
+
+export async function extractActAnswerKeyFromPdf(buf) {
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+  const pageTexts = []
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p)
+    const tc = await page.getTextContent()
+    const text = (tc.items || []).map((item) => String(item.str || '')).join(' ')
+    pageTexts.push(text)
+  }
+
+  const fullText = pageTexts.join('\n')
+  if (!/English Test/i.test(fullText) || !/Mathematics Test/i.test(fullText) || !/Reading Test/i.test(fullText)) {
+    throw new Error('Not an ACT answer key PDF.')
+  }
+
+  const englishText = fullText.match(/English Test([\s\S]*?)Mathematics Test/i)?.[1] || ''
+  const mathText = fullText.match(/Mathematics Test([\s\S]*?)Reading Test/i)?.[1] || ''
+  const readingText = fullText.match(/Reading Test([\s\S]*?)Science(?:\s+Reasoning)? Test/i)?.[1] || ''
+  const scienceText = fullText.match(/Science(?:\s+Reasoning)? Test([\s\S]*)/i)?.[1] || ''
+
+  const parsed = {
+    act_english: parseActSectionPairs(englishText, 75),
+    act_math: parseActSectionPairs(mathText, 60),
+    act_reading: parseActSectionPairs(readingText, 40),
+    act_science: parseActSectionPairs(scienceText, 40),
+  }
+
+  const total = Object.values(parsed).reduce((sum, section) => sum + Object.keys(section || {}).length, 0)
+  if (total < 200) throw new Error('Could not find enough ACT answers in this PDF.')
+  return parsed
 }
 
 export async function extractCollegeBoardAnswerKeyFromScoringGuide(buf) {
@@ -149,6 +199,9 @@ export async function extractSimpleAnswerKeyFromAnswerKeyPdf(buf) {
 }
 
 export async function extractAnswerKeyFromPdf(buf) {
+  try {
+    return await extractActAnswerKeyFromPdf(buf)
+  } catch {}
   try {
     return await extractCollegeBoardAnswerKeyFromScoringGuide(buf)
   } catch {

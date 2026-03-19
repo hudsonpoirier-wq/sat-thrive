@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getTestConfig } from '../data/tests.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import { getDefaultModuleTimeRemaining, getExamConfig } from '../data/examData.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
+import { withExam } from '../lib/viewAs.js'
 
-const FINAL_TEST_ID = 'final_test'
-
-function Navbar() {
+function Navbar({ exam }) {
   const navigate = useNavigate()
+  const satHref = withExam('/dashboard', 'sat')
+  const actHref = withExam('/dashboard', 'act')
   return (
     <nav className="nav">
-      <BrandLink />
+      <BrandLink to={withExam('/dashboard', exam)} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -24,7 +29,7 @@ function Navbar() {
           Back
         </button>
         <Link
-          to="/dashboard"
+          to={withExam('/dashboard', exam)}
           className="btn btn-outline"
           style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
         >
@@ -37,8 +42,13 @@ function Navbar() {
 
 export default function FinalTest() {
   const { user } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
-  const cfg = getTestConfig(FINAL_TEST_ID)
+  const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
+  const examConfig = getExamConfig(exam)
+  const finalTestId = examConfig.finalTestId
+  const cfg = getTestConfig(finalTestId)
 
   const [loading, setLoading] = useState(true)
   const [inProgress, setInProgress] = useState(null)
@@ -50,7 +60,7 @@ export default function FinalTest() {
     supabase.from('test_attempts')
       .select('*')
       .eq('user_id', user.id)
-      .eq('test_id', FINAL_TEST_ID)
+      .eq('test_id', finalTestId)
       .is('completed_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -60,17 +70,17 @@ export default function FinalTest() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [user?.id])
+  }, [user?.id, finalTestId])
 
   async function startFinal() {
     if (!supabase || !user?.id) return
     setStarting(true)
     const payload = {
       user_id: user.id,
-      test_id: FINAL_TEST_ID,
-      current_section: 'rw_m1',
+      test_id: finalTestId,
+      current_section: examConfig.moduleOrder[0],
       answers: {},
-      module_time_remaining: { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 }
+      module_time_remaining: getDefaultModuleTimeRemaining(finalTestId),
     }
     const res = await supabase.from('test_attempts').insert(payload).select().single()
     if (!res.error && res.data) navigate(`/test/${res.data.id}`)
@@ -82,16 +92,16 @@ export default function FinalTest() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar />
+      <Navbar exam={exam} />
       <div className="page fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
             <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
               <Icon name="final" size={20} />
-              Final Test
+              {cfg?.label || `${examConfig.label} Final Test`}
             </h1>
             <div style={{ color: '#64748b', fontSize: 13, marginTop: 4, lineHeight: 1.6 }}>
-              This uses the same timed test engine as the Pre Test and Skill Builder tests.
+              This uses the same timed test engine as the {examConfig.label} pre-test and optional practice tests.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>

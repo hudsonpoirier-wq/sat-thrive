@@ -1,23 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { MODULES, PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
-import { GUIDE_CONTENT } from '../data/guideContent.js'
+import { PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import PDFPage from '../components/PDFPage.jsx'
+import PDFSectionStack from '../components/PDFSectionStack.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import { getChoiceOptionsForQuestion, getExamConfigForTest, getGuideContentForExam, getPdfViewerModeForTest, getSectionPageRangesForTest } from '../data/examData.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 
-function Navbar({ viewUserId, isAdminPreview }) {
+const ALL_GUIDE_CONTENT = {
+  ...getGuideContentForExam('sat'),
+  ...getGuideContentForExam('act'),
+}
+
+function Navbar({ dashboardHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
+      <BrandLink to={dashboardHref} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -26,7 +35,7 @@ function Navbar({ viewUserId, isAdminPreview }) {
         >
           ← Back
         </button>
-        <Link to={withViewUser('/dashboard', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={dashboardHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
       </div>
@@ -74,7 +83,7 @@ function seededShuffle(arr, seed) {
 }
 
 function buildMistakeHints(mistake, isMC) {
-  const chapterConcepts = GUIDE_CONTENT?.[mistake?.chapter_id]?.concepts || []
+  const chapterConcepts = ALL_GUIDE_CONTENT?.[mistake?.chapter_id]?.concepts || []
   const conceptBodies = chapterConcepts.map((concept) => concept.body).filter(Boolean)
   const defaults = isMC
     ? [
@@ -102,6 +111,8 @@ function buildMistakeHints(mistake, isMC) {
 export default function Mistakes() {
   const { user, profile } = useAuth()
   const location = useLocation()
+  const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
   const { viewUserId, isAdminPreview } = useMemo(
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
@@ -119,7 +130,9 @@ export default function Mistakes() {
   const [redoSaving, setRedoSaving] = useState(false)
   const [hintStep, setHintStep] = useState(0)
 
-  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+  const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
+  const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
 
   useEffect(() => {
     if (!viewUserId) return
@@ -138,6 +151,7 @@ export default function Mistakes() {
   const filtered = useMemo(() => {
     const now = Date.now()
     const list = (items || []).slice()
+      .filter((m) => String(m?.test_id || '').startsWith('act') ? exam === 'act' : exam === 'sat')
       // Hide validated items (once correct, it comes off the list).
       .filter((m) => {
         const k = `${m.test_id}:${m.section}:${m.q_num}`
@@ -152,11 +166,16 @@ export default function Mistakes() {
   }, [items, filterDue, reviewItems])
 
   const selectedCfg = selected ? getTestConfig(selected.test_id) : null
+  const selectedExamConfig = selected ? getExamConfigForTest(selected.test_id) : null
+  const selectedModule = selectedExamConfig?.modules?.[selected?.section]
+  const selectedViewerMode = selected ? getPdfViewerModeForTest(selected.test_id) : 'single'
+  const selectedSectionRange = selected ? getSectionPageRangesForTest(selected.test_id)?.[selected.section] : null
   const selectedPdfPage = selected ? pdfPageFor(selected.test_id, selected.section, selected.q_num) : 0
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
   const selectedCorrect = selected ? selectedKeyBySection?.[selected.section]?.[selected.q_num] : null
   const selectedIsMC = selected ? isMultipleChoiceAnswer(selectedCorrect) : false
+  const selectedChoices = selected ? getChoiceOptionsForQuestion(selected.test_id, selected.section, selected.q_num) : ['A', 'B', 'C', 'D']
 
   useEffect(() => {
     setZoom(1)
@@ -184,7 +203,7 @@ export default function Mistakes() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
+      <Navbar dashboardHref={viewHref('/dashboard')} currentExam={exam} satHref={satHref} actHref={actHref} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -213,11 +232,11 @@ export default function Mistakes() {
 
         {filtered.length === 0 ? (
           <div className="card" style={{ padding: 18 }}>
-            <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No mistakes yet</div>
-            <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Take the Pre Test or an optional Skill Builder test. Any missed questions will appear here.
+              <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No mistakes yet</div>
+              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+              Take a {exam === 'act' ? 'practice ACT' : 'Pre Test or optional Skill Builder test'}. Any missed questions will appear here.
+              </div>
             </div>
-          </div>
         ) : (
           <>
             {!selected ? (
@@ -230,7 +249,7 @@ export default function Mistakes() {
                   {filtered.map((m) => {
                     const k = `${m.test_id}:${m.section}:${m.q_num}`
                     const cfg = getTestConfig(m.test_id) || { label: m.test_id, pdfUrl: '/practice-test-11.pdf' }
-                    const secLabel = MODULES?.[m.section]?.label || m.section
+                    const secLabel = getExamConfigForTest(m.test_id)?.modules?.[m.section]?.label || m.section
                     const dueAt = reviewItems?.[k]?.due_at
                     const dueSoon = dueAt && new Date(dueAt).getTime() <= Date.now()
                     return (
@@ -274,8 +293,8 @@ export default function Mistakes() {
                       Back to Dashboard
                     </Link>
                   </div>
-                  <div style={{ fontWeight: 900, color: '#1a2744', fontSize: 15 }}>
-                    <span style={{ fontWeight: 900 }}>Answering:</span> {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · <span style={{ fontWeight: 900 }}>Q{selected.q_num}</span>
+                    <div style={{ fontWeight: 900, color: '#1a2744', fontSize: 15 }}>
+                    <span style={{ fontWeight: 900 }}>Answering:</span> {selectedCfg?.label || selected.test_id} · {selectedModule?.label || selected.section} · <span style={{ fontWeight: 900 }}>Q{selected.q_num}</span>
                   </div>
                   <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
                 </div>
@@ -294,12 +313,21 @@ export default function Mistakes() {
                 </div>
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'auto', background: 'white', marginBottom: 14 }}>
-                  <PDFPage
-                    pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
-                    pageIndex={selectedPdfPage}
-                    zoom={zoom}
-                    maxScale={6}
-                  />
+                  {selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange) ? (
+                    <PDFSectionStack
+                      pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
+                      startPage={selectedSectionRange[0]}
+                      endPage={selectedSectionRange[1]}
+                      zoom={zoom}
+                    />
+                  ) : (
+                    <PDFPage
+                      pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
+                      pageIndex={selectedPdfPage}
+                      zoom={zoom}
+                      maxScale={6}
+                    />
+                  )}
                 </div>
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
@@ -317,8 +345,8 @@ export default function Mistakes() {
                     ) : (
                       <>
                         {selectedIsMC ? (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginTop: 12 }}>
-                            {['A', 'B', 'C', 'D'].map((c) => (
+                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${selectedChoices.length >= 5 ? 5 : 4}, minmax(0, 1fr))`, gap: 10, marginTop: 12 }}>
+                            {selectedChoices.map((c) => (
                               <button
                                 key={c}
                                 className="btn btn-outline"

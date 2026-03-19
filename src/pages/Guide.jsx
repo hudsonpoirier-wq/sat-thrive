@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
-import { GUIDE_CONTENT } from '../data/guideContent.js'
+import { freeResponseMatches } from '../data/testData.js'
 import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapterGuideStarted } from '../lib/studyProgress.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import { getChaptersForExam, getGuideContentForExam } from '../data/examData.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 
-function Navbar({ viewUserId, isAdminPreview }) {
+function Navbar({ homeHref, guideHref, currentExam, satHref, actHref }) {
   const navigate = useNavigate()
   return (
     <nav className="nav">
-      <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
+      <BrandLink to={homeHref} />
       <div className="nav-actions">
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}
@@ -22,10 +25,10 @@ function Navbar({ viewUserId, isAdminPreview }) {
         >
           ← Back
         </button>
-        <Link to={withViewUser('/guide', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={guideHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
           Study Guide
         </Link>
-        <Link to={withViewUser('/dashboard', viewUserId, isAdminPreview)} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
+        <Link to={homeHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
         </Link>
       </div>
@@ -33,7 +36,7 @@ function Navbar({ viewUserId, isAdminPreview }) {
   )
 }
 
-function DomainList({ domains, selectedId, onSelect, completedMap, practiceByChapter }) {
+function DomainList({ domains, selectedId, onSelect, completedMap, practiceByChapter, guideContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {Object.entries(domains).map(([domain, chs]) => (
@@ -43,7 +46,7 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 }}>
             {chs.map(ch => {
-              const hasGuide = Boolean(GUIDE_CONTENT[ch.id])
+              const hasGuide = Boolean(guideContent?.[ch.id])
               const done = Boolean(completedMap[ch.id])
               const practice = practiceByChapter?.[ch.id] || {}
               const guideMap = extractGuideMap(practice)
@@ -103,7 +106,7 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                       </span>
                     </div>
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{ch.domain} · Playbook p.{ch.page}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{ch.domain}{ch.page ? ` · Guide p.${ch.page}` : ''}</div>
                   <div style={{ marginTop: 8, fontSize: 11, color: hasGuide ? '#10b981' : '#94a3b8', fontWeight: 800 }}>
                     {hasGuide ? 'Full guide + practice' : 'Guide coming soon'}
                   </div>
@@ -439,6 +442,10 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
 export default function Guide() {
   const { user, profile } = useAuth()
   const location = useLocation()
+  const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
+  const chapters = useMemo(() => getChaptersForExam(exam), [exam])
+  const guideContent = useMemo(() => getGuideContentForExam(exam), [exam])
   const { viewUserId, isAdminPreview } = useMemo(
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
@@ -446,13 +453,15 @@ export default function Guide() {
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
   const [practiceByChapter, setPracticeByChapter] = useState({})
-  const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+  const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
+  const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
 
   useEffect(() => {
     const sp = new URLSearchParams(location.search || '')
     const id = sp.get('chapter')
-    if (id && CHAPTERS[id]) setSelectedId(id)
-  }, [location.search])
+    if (id && chapters[id]) setSelectedId(id)
+  }, [location.search, chapters])
 
   useEffect(() => {
     if (!viewUserId) return
@@ -477,16 +486,16 @@ export default function Guide() {
 
   const domains = useMemo(() => {
     const grouped = {}
-    Object.entries(CHAPTERS).forEach(([id, ch]) => {
+    Object.entries(chapters).forEach(([id, ch]) => {
       if (!grouped[ch.domain]) grouped[ch.domain] = []
       grouped[ch.domain].push({ id, ...ch })
     })
     for (const k of Object.keys(grouped)) grouped[k].sort((a, b) => String(a.id).localeCompare(String(b.id)))
     return grouped
-  }, [])
+  }, [chapters])
 
-  const ch = selectedId ? CHAPTERS[selectedId] : null
-  const content = selectedId ? GUIDE_CONTENT[selectedId] : null
+  const ch = selectedId ? chapters[selectedId] : null
+  const content = selectedId ? guideContent[selectedId] : null
   const problems = content?.problems || []
   const expandedProblems = useMemo(() => {
     if (!problems.length) return []
@@ -505,14 +514,14 @@ export default function Guide() {
   const masteryRedoCount = Math.max(0, expandedProblems.length - corePracticeCount)
 
   const completedCount = Object.values(completedMap).filter(Boolean).length
-  const totalChapters = Object.keys(CHAPTERS).length
+  const totalChapters = Object.keys(chapters).length
   const pct = Math.round((completedCount / Math.max(1, totalChapters)) * 100)
   const selectedPractice = selectedId ? (practiceByChapter[selectedId] || {}) : {}
   const selectedGuideMap = selectedId ? extractGuideMap(selectedPractice) : {}
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} />
+      <Navbar homeHref={viewHref('/dashboard')} guideHref={viewHref('/guide')} currentExam={exam} satHref={satHref} actHref={actHref} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
@@ -545,7 +554,7 @@ export default function Guide() {
         </div>
 
         {!selectedId ? (
-          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} practiceByChapter={practiceByChapter} />
+          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} practiceByChapter={practiceByChapter} guideContent={guideContent} />
         ) : (
           <div>
             <button onClick={() => setSelectedId(null)} className="btn btn-outline" style={{ marginBottom: 14 }}>
@@ -558,7 +567,7 @@ export default function Guide() {
                   <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, color: '#1a2744' }}>
                     Chapter {selectedId}: {ch?.name}
                   </div>
-                  <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain} · Playbook p.{ch?.page}</div>
+                  <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain}{ch?.page ? ` · Guide p.${ch?.page}` : ''}</div>
                 </div>
 	                {(() => {
 	                  const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(selectedGuideMap[i]))

@@ -3,51 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import PDFPage from '../components/PDFPage.jsx'
-import {
-  MODULES, MODULE_ORDER, PDF_PAGE_MAP,
-  ANSWER_KEY, QUESTION_CHAPTER_MAP, CHAPTERS, rawToScaled, answerMatches, isMultipleChoiceAnswer
-} from '../data/testData.js'
+import PDFSectionStack from '../components/PDFSectionStack.jsx'
+import { answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { saveMistakes, ensureReviewItems } from '../lib/mistakesStore.js'
-import { buildWeeklyStudyPlan, loadStudyPrefs } from '../lib/studyPlan.js'
-
-function scoreFromKey(section, sectionAnswers, sectionKey) {
-  const total = MODULES[section]?.questions || 0
-  let correct = 0
-  for (let q = 1; q <= total; q++) {
-    const right = sectionKey?.[q]
-    if (right == null) continue
-    const given = sectionAnswers?.[q]
-    const ok = answerMatches(given, right)
-    if (ok) correct++
-  }
-  return { correct, total, wrong: total - correct }
-}
-
-function calcWeakTopicsFromKey(allAnswers, keyBySection) {
-  const counts = {}
-  Object.entries(allAnswers || {}).forEach(([section, sectionAnswers]) => {
-    const key = keyBySection?.[section]
-    const chMap = QUESTION_CHAPTER_MAP?.[section]
-    if (!key || !chMap) return
-    const total = MODULES[section]?.questions || 0
-    for (let q = 1; q <= total; q++) {
-      const given = sectionAnswers?.[q]
-      const right = key?.[q]
-      if (right == null) continue
-      const ch = chMap?.[q]
-      if (!ch) continue
-      const ok = answerMatches(given, right)
-      if (!ok) counts[ch] = (counts[ch] || 0) + 1
-    }
-  })
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([ch, count]) => ({ ch, count, ...CHAPTERS[ch] }))
-}
+import {
+  calcWeakTopicsForTest,
+  getChoiceOptionsForQuestion,
+  getDefaultModuleTimeRemaining,
+  getExamConfigForTest,
+  getPdfViewerModeForTest,
+  getSectionPageRangesForTest,
+  scoreAttemptFromKey,
+} from '../data/examData.js'
 
 function Timer({ seconds, onExpire, onTick }) {
   const [timeLeft, setTimeLeft] = useState(seconds)
@@ -83,7 +54,7 @@ function Timer({ seconds, onExpire, onTick }) {
   )
 }
 
-function BreakScreen({ nextModule, onContinue }) {
+function BreakScreen({ nextModule, onContinue, modules }) {
   const [breakTime, setBreakTime] = useState(600) // 10 min break
   useEffect(() => {
     const iv = setInterval(() => setBreakTime(t => Math.max(0, t - 1)), 1000)
@@ -96,7 +67,7 @@ function BreakScreen({ nextModule, onContinue }) {
       <div style={{ fontSize: 32, fontWeight: 900, color: '#1a2744', marginBottom: 16 }}>Break</div>
       <div className="break-title">Section Break</div>
       <div className="break-sub">
-        Take a 10-minute break. Next up: {MODULES[nextModule]?.label} – {MODULES[nextModule]?.module}
+        Take a 10-minute break. Next up: {modules?.[nextModule]?.label} – {modules?.[nextModule]?.module}
       </div>
       <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
         {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
@@ -119,7 +90,7 @@ export default function TestTaking() {
   const [testConfig, setTestConfig] = useState(null)
   const [keyBySection, setKeyBySection] = useState(null)
   const [keyStatus, setKeyStatus] = useState({ loading: false, msg: '' })
-  const [currentModule, setCurrentModule] = useState('rw_m1')
+  const [currentModule, setCurrentModule] = useState(null)
   const [currentQ, setCurrentQ] = useState(1)
   const [answers, setAnswers] = useState({}) // { rw_m1: { 1: 'A', 2: 'C', ... }, ... }
   const [markedForReview, setMarkedForReview] = useState({}) // { rw_m1: [2, 5], ... }
@@ -194,6 +165,11 @@ export default function TestTaking() {
   }, [pdfOverridesByTest])
 
   const currentTestId = attempt?.test_id || testConfig?.id || 'pre_test'
+  const examConfig = getExamConfigForTest(currentTestId)
+  const moduleOrder = examConfig.moduleOrder || []
+  const modules = examConfig.modules || {}
+  const viewerMode = getPdfViewerModeForTest(currentTestId)
+  const sectionRanges = getSectionPageRangesForTest(currentTestId) || {}
   const pdfOffsets = pdfOffsetsByTest?.[currentTestId] || {}
   const pdfOverrides = pdfOverridesByTest?.[currentTestId] || {}
 
@@ -233,35 +209,38 @@ export default function TestTaking() {
           const draft = readDraft()
           if (!draft) { navigate('/dashboard'); return }
           const cfg = getTestConfig(draft.test_id) || getTestConfig('pre_test')
+          const cfgId = draft.test_id || cfg?.id || 'pre_test'
+          const defaultModule = getExamConfigForTest(cfgId).moduleOrder[0]
           setAttempt({
             id: attemptId,
             user_id: user.id,
-            test_id: draft.test_id || cfg?.id || 'pre_test',
-            current_section: draft.current_section || 'rw_m1',
+            test_id: cfgId,
+            current_section: draft.current_section || defaultModule,
             answers: draft.answers || {},
-            module_time_remaining: draft.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 },
+            module_time_remaining: draft.module_time_remaining || getDefaultModuleTimeRemaining(cfgId),
             completed_at: null,
           })
           setTestConfig(cfg)
           const last = readLastOpen()
-          const mod = last?.current_section || draft.current_section || 'rw_m1'
+          const mod = last?.current_section || draft.current_section || defaultModule
           setCurrentModule(mod)
           setCurrentQ(Number(last?.current_q) || 1)
           setAnswers(draft.answers || {})
-          setModuleTimeLeft(draft.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 })
+          setModuleTimeLeft(draft.module_time_remaining || getDefaultModuleTimeRemaining(cfgId))
           setLoading(false)
           return
         }
         if (data.completed_at) { navigate(`/results/${attemptId}`); return }
         setAttempt(data)
         const cfg = getTestConfig(data.test_id) || getTestConfig('pre_test')
+        const defaultModule = getExamConfigForTest(data.test_id || cfg?.id || 'pre_test').moduleOrder[0]
         setTestConfig(cfg)
         const last = readLastOpen()
-        const mod = last?.current_section || data.current_section || 'rw_m1'
+        const mod = last?.current_section || data.current_section || defaultModule
         setCurrentModule(mod)
         setCurrentQ(Number(last?.current_q) || 1)
         setAnswers(data.answers || {})
-        setModuleTimeLeft(data.module_time_remaining || { rw_m1: 1920, rw_m2: 1920, math_m1: 2100, math_m2: 2100 })
+        setModuleTimeLeft(data.module_time_remaining || getDefaultModuleTimeRemaining(data.test_id || cfg?.id || 'pre_test'))
         setLoading(false)
       })
   }, [attemptId, user?.id, navigate])
@@ -272,11 +251,8 @@ export default function TestTaking() {
     const builtIn = getAnswerKeyBySection(cfg?.id)
     if (builtIn) {
       // Sanity check: optional tests must have a full 120-question key.
-      if (cfg?.id && cfg.id !== 'pre_test' && builtIn?.rw_m1) {
-        const total = Object.keys(builtIn.rw_m1 || {}).length
-          + Object.keys(builtIn.rw_m2 || {}).length
-          + Object.keys(builtIn.math_m1 || {}).length
-          + Object.keys(builtIn.math_m2 || {}).length
+      if (cfg?.id && cfg.id !== 'pre_test' && builtIn) {
+        const total = Object.values(builtIn || {}).reduce((sum, sectionKey) => sum + Object.keys(sectionKey || {}).length, 0)
         if (total < 110) {
           setKeyBySection(null)
           setKeyStatus({ loading: false, msg: 'Answer key is incomplete for this test build. Please contact the admin.' })
@@ -438,26 +414,32 @@ export default function TestTaking() {
     })
   }
 
+  function shouldShowBreakBetween(fromModule, toModule) {
+    if (examConfig.exam === 'act') return fromModule === 'act_math' && toModule === 'act_reading'
+    return fromModule === 'rw_m2' && toModule === 'math_m1'
+  }
+
   async function advanceModule() {
-    const idx = MODULE_ORDER.indexOf(currentModule)
-    if (idx >= MODULE_ORDER.length - 1) {
+    const idx = moduleOrder.indexOf(currentModule)
+    if (idx >= moduleOrder.length - 1) {
       await submitTest()
     } else {
-      const nextMod = MODULE_ORDER[idx + 1]
-      // Show break between sections
-      if (currentModule === 'rw_m2' && nextMod === 'math_m1') {
+      const nextMod = moduleOrder[idx + 1]
+      if (shouldShowBreakBetween(currentModule, nextMod)) {
         setShowBreak(true)
       } else {
         setCurrentModule(nextMod)
         setCurrentQ(1)
-        await saveProgress(answers, nextMod, moduleTimeLeft)
+        const nextTimes = { ...(moduleTimeLeft || {}), [currentModule]: timerLeft ?? moduleTimeLeft?.[currentModule] }
+        setModuleTimeLeft(nextTimes)
+        await saveProgress(answers, nextMod, nextTimes)
       }
     }
   }
 
   function startNextModule() {
-    const idx = MODULE_ORDER.indexOf(currentModule)
-    const nextMod = MODULE_ORDER[idx + 1]
+    const idx = moduleOrder.indexOf(currentModule)
+    const nextMod = moduleOrder[idx + 1]
     setShowBreak(false)
     setCurrentModule(nextMod)
     setCurrentQ(1)
@@ -470,14 +452,9 @@ export default function TestTaking() {
       return
     }
     setSubmitting(true)
-    const rwM1 = scoreFromKey('rw_m1', answers.rw_m1, keyBySection?.rw_m1)
-    const rwM2 = scoreFromKey('rw_m2', answers.rw_m2, keyBySection?.rw_m2)
-    const mM1 = scoreFromKey('math_m1', answers.math_m1, keyBySection?.math_m1)
-    const mM2 = scoreFromKey('math_m2', answers.math_m2, keyBySection?.math_m2)
-    const rawRW = (rwM1.correct || 0) + (rwM2.correct || 0)
-    const rawMath = (mM1.correct || 0) + (mM2.correct || 0)
-    const scores = rawToScaled(rawRW, rawMath)
-    const weakTopics = calcWeakTopicsFromKey(answers, keyBySection || ANSWER_KEY)
+    const testId = attempt?.test_id || testConfig?.id || 'pre_test'
+    const scores = scoreAttemptFromKey(testId, answers, keyBySection || {})
+    const weakTopics = calcWeakTopicsForTest(testId, answers, keyBySection || {})
 
     const up = await supabase.from('test_attempts').update({
       completed_at: new Date().toISOString(),
@@ -492,26 +469,14 @@ export default function TestTaking() {
       return
     }
 
-    // Adaptive weekly study plan (auto-updates after each test).
-    try {
-      const prefs = loadStudyPrefs(user?.id)
-      const txt = buildWeeklyStudyPlan({ scores, weakTopics: weakTopics.slice(0, 250), prefs })
-      await supabase
-        .from('test_attempts')
-        .update({ study_plan: txt })
-        .eq('id', attemptId)
-        .eq('user_id', user.id)
-    } catch {}
-
     // Mistake notebook + spaced repetition queue (auto-save missed questions).
     try {
-      const testId = attempt?.test_id || testConfig?.id || 'pre_test'
       const mistakes = []
       let attemptedTotal = 0
       let totalQuestions = 0
-      for (const section of MODULE_ORDER) {
-        const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
-        const total = MODULES[section]?.questions || 0
+      for (const section of moduleOrder) {
+        const key = keyBySection?.[section] || {}
+        const total = modules?.[section]?.questions || 0
         totalQuestions += total
         const sectionAnswers = answers?.[section] || {}
         for (let q = 1; q <= total; q++) {
@@ -530,15 +495,15 @@ export default function TestTaking() {
             q_num: q,
             given: String(given ?? ''),
             correct: String(right ?? ''),
-            chapter_id: QUESTION_CHAPTER_MAP?.[section]?.[q] || null,
+            chapter_id: examConfig.questionChapterMap?.[section]?.[q] || null,
           })
         }
       }
       const includeUnanswered = attemptedTotal < Math.max(10, Math.round(totalQuestions * 0.25))
       if (includeUnanswered) {
-        for (const section of MODULE_ORDER) {
-          const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
-          const total = MODULES[section]?.questions || 0
+        for (const section of moduleOrder) {
+          const key = keyBySection?.[section] || {}
+          const total = modules?.[section]?.questions || 0
           const sectionAnswers = answers?.[section] || {}
           for (let q = 1; q <= total; q++) {
             const right = key?.[q]
@@ -553,7 +518,7 @@ export default function TestTaking() {
               q_num: q,
               given: '',
               correct: String(right ?? ''),
-              chapter_id: QUESTION_CHAPTER_MAP?.[section]?.[q] || null,
+              chapter_id: examConfig.questionChapterMap?.[section]?.[q] || null,
               note: 'Unanswered',
             })
           }
@@ -571,10 +536,10 @@ export default function TestTaking() {
     try {
       const nowIso = new Date().toISOString()
       const stats = {}
-      for (const section of MODULE_ORDER) {
-        const key = (keyBySection?.[section] || ANSWER_KEY?.[section] || {})
-        const chMap = QUESTION_CHAPTER_MAP[section] || {}
-        const total = MODULES[section]?.questions || 0
+      for (const section of moduleOrder) {
+        const key = keyBySection?.[section] || {}
+        const chMap = examConfig.questionChapterMap?.[section] || {}
+        const total = modules?.[section]?.questions || 0
         const sectionAnswers = answers?.[section] || {}
         for (let q = 1; q <= total; q++) {
           const ch = chMap[q]
@@ -667,16 +632,25 @@ export default function TestTaking() {
   }
 
   if (showBreak) {
-    const idx = MODULE_ORDER.indexOf(currentModule)
-    const nextMod = MODULE_ORDER[idx + 1]
-    return <BreakScreen nextModule={nextMod} onContinue={startNextModule} />
+    const idx = moduleOrder.indexOf(currentModule)
+    const nextMod = moduleOrder[idx + 1]
+    return <BreakScreen nextModule={nextMod} onContinue={startNextModule} modules={modules} />
   }
 
-  const mod = MODULES[currentModule]
+  const mod = modules[currentModule]
+  if (!mod) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Sora,sans-serif', color: '#64748b' }}>
+        Loading test section…
+      </div>
+    )
+  }
   const totalQ = mod.questions
-  const pageMap = (testConfig?.id === 'pre_test')
-    ? (PDF_PAGE_MAP[currentModule] || {})
-    : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {})
+  const pageMap = viewerMode === 'single'
+    ? ((testConfig?.id === 'pre_test')
+      ? (PDF_PAGE_MAP[currentModule] || {})
+      : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {}))
+    : {}
   const basePdfPage = (() => {
     if (Number.isFinite(Number(pageMap?.[currentQ]))) return pageMap[currentQ]
     // Fallback: use the nearest previous mapped question page.
@@ -688,6 +662,7 @@ export default function TestTaking() {
   const pdfOffset = Number(pdfOffsets?.[currentModule] || 0)
   const overridePage = pdfOverrides?.[currentModule]?.[currentQ]
   const pdfPage = Math.max(0, Number.isFinite(Number(overridePage)) ? Number(overridePage) : (basePdfPage + pdfOffset))
+  const sectionRange = Array.isArray(sectionRanges?.[currentModule]) ? sectionRanges[currentModule] : null
   const modAnswers = answers[currentModule] || {}
   const currentAnswer = modAnswers[currentQ]
   const markedList = markedForReview[currentModule] || []
@@ -695,8 +670,8 @@ export default function TestTaking() {
   const right = keyBySection?.[currentModule]?.[currentQ]
   const isFR = right != null && !isMultipleChoiceAnswer(right)
   const isLastQ = currentQ === totalQ
-  const isLastModule = MODULE_ORDER.indexOf(currentModule) === MODULE_ORDER.length - 1
-  const choices = ['A', 'B', 'C', 'D']
+  const isLastModule = moduleOrder.indexOf(currentModule) === moduleOrder.length - 1
+  const choices = getChoiceOptionsForQuestion(currentTestId, currentModule, currentQ)
 
   const moduleTotalTime = mod.time
   const currentLeft = timerLeft ?? (moduleTimeLeft[currentModule] || moduleTotalTime)
@@ -751,7 +726,7 @@ export default function TestTaking() {
           </div>
           <a
             className="btn btn-outline"
-            href="/guide"
+            href={`/guide?exam=${encodeURIComponent(examConfig.exam)}`}
             target="_blank"
             rel="noreferrer"
             style={{ padding: '6px 10px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.18)', background: 'rgba(255,255,255,.08)' }}
@@ -775,10 +750,18 @@ export default function TestTaking() {
 	          <div style={{ width: '100%', maxWidth: 760 }}>
 	            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
 	              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-	                PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
-	                <span style={{ color: '#94a3b8', fontWeight: 700 }}>
-	                  {Number.isFinite(Number(overridePage)) ? ' · (override)' : ` · offset ${pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}`}
-	                </span>
+                  {viewerMode === 'stack' && sectionRange ? (
+                    <>
+                      Section pages <span style={{ color: '#0f172a' }}>{sectionRange[0] + 1}–{sectionRange[1] + 1}</span>
+                    </>
+                  ) : (
+                    <>
+                      PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
+                      <span style={{ color: '#94a3b8', fontWeight: 700 }}>
+                        {Number.isFinite(Number(overridePage)) ? ' · (override)' : ` · offset ${pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}`}
+                      </span>
+                    </>
+                  )}
 	              </div>
 	              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <a
@@ -799,61 +782,74 @@ export default function TestTaking() {
                       target="_blank"
                       rel="noreferrer"
                       title="Admin-only: open the answer key PDF in a new tab"
-                    >
-                      Open AK →
-                    </a>
-                  )}
-	                <button
-	                  className="btn btn-outline"
-	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => {
-	                    const page = window.prompt('Set the PDF page number for this question (1-based):', String(pdfPage + 1))
-	                    const n = Number(String(page || '').trim())
-	                    if (!Number.isFinite(n) || n < 1) return
-	                    const idx = Math.max(0, Math.floor(n - 1))
-	                    setPdfOverrideFor(currentModule, currentQ, idx)
-	                  }}
-	                  title="If the mapping is glitchy, set an exact PDF page for this question"
-	                >
-	                  Set page
-	                </button>
-	                {Number.isFinite(Number(overridePage)) && (
+	                    >
+	                      Open AK →
+	                    </a>
+	                  )}
+                  {viewerMode === 'single' && (
+                    <>
 	                  <button
 	                    className="btn btn-outline"
 	                    style={{ padding: '6px 10px', fontSize: 12 }}
-	                    onClick={() => clearPdfOverrideFor(currentModule, currentQ)}
-	                    title="Remove the per-question page override"
+	                    onClick={() => {
+	                      const page = window.prompt('Set the PDF page number for this question (1-based):', String(pdfPage + 1))
+	                      const n = Number(String(page || '').trim())
+	                      if (!Number.isFinite(n) || n < 1) return
+	                      const idx = Math.max(0, Math.floor(n - 1))
+	                      setPdfOverrideFor(currentModule, currentQ, idx)
+	                    }}
+	                    title="If the mapping is glitchy, set an exact PDF page for this question"
 	                  >
-	                    Clear override
+	                    Set page
 	                  </button>
-	                )}
-	                <button
-	                  className="btn btn-outline"
-	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) - 1)}
-	                  title="If the PDF is behind, decrease the offset"
-	                >
-	                  −1 page
-	                </button>
-	                <button
-	                  className="btn btn-outline"
-	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) + 1)}
-	                  title="If the PDF is ahead, increase the offset"
-	                >
-	                  +1 page
-	                </button>
-	                <button
-	                  className="btn btn-outline"
-	                  style={{ padding: '6px 10px', fontSize: 12 }}
-	                  onClick={() => setPdfOffsetFor(currentModule, 0)}
-	                  title="Reset PDF alignment for this module"
-	                >
-	                  Reset
-	                </button>
+	                  {Number.isFinite(Number(overridePage)) && (
+	                    <button
+	                      className="btn btn-outline"
+	                      style={{ padding: '6px 10px', fontSize: 12 }}
+	                      onClick={() => clearPdfOverrideFor(currentModule, currentQ)}
+	                      title="Remove the per-question page override"
+	                    >
+	                      Clear override
+	                    </button>
+	                  )}
+	                  <button
+	                    className="btn btn-outline"
+	                    style={{ padding: '6px 10px', fontSize: 12 }}
+	                    onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) - 1)}
+	                    title="If the PDF is behind, decrease the offset"
+	                  >
+	                    −1 page
+	                  </button>
+	                  <button
+	                    className="btn btn-outline"
+	                    style={{ padding: '6px 10px', fontSize: 12 }}
+	                    onClick={() => setPdfOffsetFor(currentModule, Number(pdfOffsets?.[currentModule] || 0) + 1)}
+	                    title="If the PDF is ahead, increase the offset"
+	                  >
+	                    +1 page
+	                  </button>
+	                  <button
+	                    className="btn btn-outline"
+	                    style={{ padding: '6px 10px', fontSize: 12 }}
+	                    onClick={() => setPdfOffsetFor(currentModule, 0)}
+	                    title="Reset PDF alignment for this module"
+	                  >
+	                    Reset
+	                  </button>
+                    </>
+                  )}
 	              </div>
 	            </div>
-	            <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />
+              {viewerMode === 'stack' && sectionRange ? (
+                <PDFSectionStack
+                  key={`${currentModule}:${sectionRange[0]}-${sectionRange[1]}`}
+                  pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'}
+                  startPage={sectionRange[0]}
+                  endPage={sectionRange[1]}
+                />
+              ) : (
+	              <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />
+              )}
 	          </div>
 	        </div>
 
@@ -903,16 +899,18 @@ export default function TestTaking() {
                 </div>
               </div>
             ) : (
-              choices.map(letter => (
-                <button
-                  key={letter}
-                  className={`choice-btn${currentAnswer === letter ? ' selected' : ''}`}
-                  onClick={() => setAnswer(currentQ, letter)}
-                >
-                  <span className="choice-letter">{letter}</span>
-                  <span style={{ paddingTop: 4, fontWeight: 800 }}>Choose {letter}</span>
-                </button>
-              ))
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${choices.length >= 5 ? 5 : 2}, minmax(0, 1fr))`, gap: 10 }}>
+                {choices.map(letter => (
+                  <button
+                    key={letter}
+                    className={`choice-btn${currentAnswer === letter ? ' selected' : ''}`}
+                    onClick={() => setAnswer(currentQ, letter)}
+                  >
+                    <span className="choice-letter">{letter}</span>
+                    <span style={{ paddingTop: 4, fontWeight: 800 }}>Choose {letter}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 

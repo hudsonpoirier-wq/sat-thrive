@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, freeResponseMatches, rawToScaled } from '../../src/data/testData.js'
 import { getAnswerKeyBySection } from '../../src/data/answerKeys.js'
+import { calcWeakTopicsForTest, scoreAttemptFromKey } from '../../src/data/examData.js'
 
 const ADMIN_EMAIL = 'agora@admin.org'
 
@@ -10,59 +10,16 @@ function json(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
-function normalizeTestId(id) {
-  if (!id || id === 'practice_test_11') return 'pre_test'
-  return id
-}
-
 function getKeyForTest(testId) {
-  const normalized = normalizeTestId(testId)
-  return getAnswerKeyBySection(normalized) || (normalized === 'pre_test' ? ANSWER_KEY : null)
-}
-
-function isChoiceLetter(value) {
-  const s = String(value || '').trim().toUpperCase()
-  return s === 'A' || s === 'B' || s === 'C' || s === 'D'
+  return getAnswerKeyBySection(testId) || null
 }
 
 function computeScoresAndWeakTopics(attempt) {
   const keyBySection = getKeyForTest(attempt?.test_id)
   const answers = attempt?.answers || {}
   if (!keyBySection || !answers || typeof answers !== 'object') return null
-
-  const counts = {}
-  let rawRW = 0
-  let rawMath = 0
-
-  for (const section of Object.keys(MODULES)) {
-    const key = keyBySection?.[section] || {}
-    const sectionAnswers = answers?.[section] || {}
-    const chapterMap = QUESTION_CHAPTER_MAP?.[section] || {}
-    const totalQ = MODULES?.[section]?.questions || 0
-
-    for (let q = 1; q <= totalQ; q++) {
-      const right = key?.[q]
-      if (right == null) continue
-      const given = sectionAnswers?.[q]
-      const ok = isChoiceLetter(right)
-        ? String(given || '').toUpperCase() === String(right).toUpperCase()
-        : freeResponseMatches(given, right)
-
-      if (ok) {
-        if (section.startsWith('rw_')) rawRW += 1
-        else rawMath += 1
-      } else {
-        const chapterId = chapterMap?.[q]
-        if (chapterId) counts[chapterId] = (counts[chapterId] || 0) + 1
-      }
-    }
-  }
-
-  const scores = rawToScaled(rawRW, rawMath)
-  const weakTopics = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([ch, count]) => ({ ch, count, ...(CHAPTERS?.[ch] || {}) }))
-
+  const scores = scoreAttemptFromKey(attempt?.test_id, answers, keyBySection)
+  const weakTopics = calcWeakTopicsForTest(attempt?.test_id, answers, keyBySection)
   return { scores, weakTopics }
 }
 

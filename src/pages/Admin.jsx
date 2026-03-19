@@ -7,9 +7,10 @@ import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import { TESTS } from '../data/tests.js'
-import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, answerMatches, rawToScaled } from '../data/testData.js'
+import { TESTS, getExamFromTestId } from '../data/tests.js'
+import { ANSWER_KEY } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import { calcWeakTopicsForTest, getExamConfig, getExamConfigForTest, getScoreColumnsForExam, scoreAttemptFromKey } from '../data/examData.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -64,13 +65,31 @@ function isPreTestId(id) {
 
 function countKey(key) {
   if (!key || typeof key !== 'object') return 0
-  if (key.rw_m1) {
-    return Object.keys(key.rw_m1 || {}).length
-      + Object.keys(key.rw_m2 || {}).length
-      + Object.keys(key.math_m1 || {}).length
-      + Object.keys(key.math_m2 || {}).length
+  const values = Object.values(key)
+  if (values.some((value) => value && typeof value === 'object' && !Array.isArray(value))) {
+    return values.reduce((sum, value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return sum
+      return sum + Object.keys(value).length
+    }, 0)
   }
-  return Object.keys(key).length
+  return Object.keys(key || {}).length
+}
+
+function attemptTotalScore(attempt) {
+  const exam = getExamFromTestId(attempt?.test_id)
+  return Number(attempt?.scores?.composite || attempt?.scores?.total || 0)
+}
+
+function formatAttemptBreakdown(attempt) {
+  const exam = getExamFromTestId(attempt?.test_id)
+  const columns = getScoreColumnsForExam(exam).filter((column) => column.key !== 'total')
+  return columns
+    .map((column) => {
+      const value = attempt?.scores?.[column.key]
+      return value != null ? `${column.label} ${value}` : null
+    })
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function pairedTTest(pairs) {
@@ -115,6 +134,7 @@ export default function Admin() {
   const [resettingUserId, setResettingUserId] = useState(null)
   const [resetMsg, setResetMsg] = useState('')
   const [regrading, setRegrading] = useState(false)
+  const [analyticsExam, setAnalyticsExam] = useState('sat')
 
   useEffect(() => {
     if (!supabase) return
@@ -316,19 +336,23 @@ export default function Admin() {
     const attemptsByUser = new Map()
     const bestPreByUser = new Map()
     const bestExtraByUser = new Map()
+    const bestByUser = new Map()
     const extraIds = new Set(TESTS.filter(t => t.kind === 'extra').map(t => t.id))
     for (const a of attempts) {
       const list = attemptsByUser.get(a.user_id) || []
       list.push(a)
       attemptsByUser.set(a.user_id, list)
+      const totalAny = attemptTotalScore(a)
+      const prevBest = bestByUser.get(a.user_id) || 0
+      if (totalAny > prevBest) bestByUser.set(a.user_id, totalAny)
       const isPre = a.test_id === 'pre_test' || a.test_id === 'practice_test_11' || !a.test_id
       if (isPre) {
-        const total = a.scores?.total || 0
+        const total = attemptTotalScore(a)
         const prev = bestPreByUser.get(a.user_id) || 0
         if (total > prev) bestPreByUser.set(a.user_id, total)
       }
       if (extraIds.has(a.test_id) && (a.completed_at || a.scores?.total)) {
-        const total = a.scores?.total || 0
+        const total = attemptTotalScore(a)
         const prev = bestExtraByUser.get(a.user_id) || 0
         if (total > prev) bestExtraByUser.set(a.user_id, total)
       }
@@ -360,7 +384,7 @@ export default function Admin() {
         name: student?.full_name || 'Unknown',
       })
     }
-    return { studentById, attemptsByUser, bestPreByUser, bestExtraByUser, postByAttemptId, pairsPost, pairsOptional }
+    return { studentById, attemptsByUser, bestByUser, bestPreByUser, bestExtraByUser, postByAttemptId, pairsPost, pairsOptional }
   }, [students, attempts, postScores])
 
   const pairs = computed.pairsPost
@@ -416,20 +440,26 @@ export default function Admin() {
   ]
 
   const analytics = useMemo(() => {
+    const examMode = analyticsExam === 'act' ? 'act' : 'sat'
+    const analyticsExamConfig = getExamConfig(examMode)
+    const analyticsScoreColumns = getScoreColumnsForExam(examMode)
     const now = Date.now()
     const daysAgo = (n) => now - n * 24 * 60 * 60 * 1000
     const recent7 = daysAgo(7)
     const recent30 = daysAgo(30)
 
-    const allAttempts = (attempts || []).slice()
+    const allAttempts = (attempts || []).filter((attempt) => getExamFromTestId(attempt?.test_id) === examMode)
     const totals = []
     const totalsPre = []
     const totalsExtra = []
     const totalsFinal = []
-    const sectionRW = []
-    const sectionMath = []
+    const sectionBuckets = Object.fromEntries(
+      analyticsScoreColumns
+        .filter((column) => column.key !== 'total')
+        .map((column) => [column.key, []])
+    )
 
-    const byTest = new Map() // testId -> {count, totals[], rw[], math[]}
+    const byTest = new Map()
     const attemptsByDay = new Map() // day -> count
     const completesByDay = new Map()
 
@@ -444,28 +474,7 @@ export default function Admin() {
         const tid = normalizeTestId(attempt?.test_id)
         const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
         if (!keyBySection) return []
-        const answers = attempt?.answers || {}
-        const counts = new Map()
-
-        for (const section of Object.keys(MODULES)) {
-          const key = keyBySection?.[section] || {}
-          const sectionAnswers = answers?.[section] || {}
-          const chapterMap = QUESTION_CHAPTER_MAP?.[section] || {}
-
-          for (const [qStr, right] of Object.entries(key)) {
-            const chapterId = chapterMap?.[qStr]
-            if (!chapterId || right == null) continue
-            const given = sectionAnswers?.[qStr]
-            const ok = answerMatches(given, right)
-            if (!ok) counts.set(chapterId, (counts.get(chapterId) || 0) + 1)
-          }
-        }
-
-        return Array.from(counts.entries()).map(([chapterId, count]) => ({
-          ch: chapterId,
-          count,
-          domain: CHAPTERS?.[chapterId]?.domain || 'Other',
-        }))
+        return calcWeakTopicsForTest(tid, attempt?.answers || {}, keyBySection)
       } catch {
         return []
       }
@@ -476,24 +485,7 @@ export default function Admin() {
         const tid = normalizeTestId(attempt?.test_id)
         const keyBySection = getAnswerKeyBySection(tid) || (isPreTestId(tid) ? ANSWER_KEY : null)
         if (!keyBySection) return null
-        const answers = attempt?.answers || {}
-        const scoreSection = (section) => {
-          const key = keyBySection?.[section] || {}
-          const sectionAnswers = answers?.[section] || {}
-          const totalQ = MODULES?.[section]?.questions || 0
-          let correct = 0
-          for (let q = 1; q <= totalQ; q++) {
-            const right = key?.[q]
-            if (right == null) continue
-            const given = sectionAnswers?.[q]
-            const ok = answerMatches(given, right)
-            if (ok) correct++
-          }
-          return correct
-        }
-        const rawRW = scoreSection('rw_m1') + scoreSection('rw_m2')
-        const rawMath = scoreSection('math_m1') + scoreSection('math_m2')
-        const scaled = rawToScaled(rawRW, rawMath)
+        const scaled = scoreAttemptFromKey(tid, attempt?.answers || {}, keyBySection)
         return scaled?.total ? scaled : null
       } catch {
         return null
@@ -502,19 +494,26 @@ export default function Admin() {
 
     for (const a of allAttempts) {
       const tid = normalizeTestId(a.test_id)
+      if (getExamFromTestId(tid) !== examMode) continue
       const sc = a.scores || {}
-      let total = Number(sc.total || 0)
-      let rw = Number(sc.rw || 0)
-      let math = Number(sc.math || 0)
+      let total = Number(sc.composite || sc.total || 0)
+      const sectionValues = Object.fromEntries(
+        analyticsScoreColumns
+          .filter((column) => column.key !== 'total')
+          .map((column) => [column.key, Number(sc[column.key] || sc.sections?.[column.key] || 0)])
+      )
       const started = new Date(a.started_at || a.completed_at || 0).getTime()
 
       // Some older rows only stored `total` (or lost section splits). Recompute from answers when possible.
-      if (total && (!rw || !math) && a.answers && Object.keys(a.answers || {}).length) {
+      if (a.answers && Object.keys(a.answers || {}).length && (!total || Object.values(sectionValues).some((value) => !value))) {
         const computed = computeScaledFromAnswers(a)
         if (computed) {
-          if (!rw) rw = Number(computed.rw || 0)
-          if (!math) math = Number(computed.math || 0)
-          if (!total) total = Number(computed.total || 0)
+          if (!total) total = Number(computed.composite || computed.total || 0)
+          for (const column of analyticsScoreColumns.filter((entry) => entry.key !== 'total')) {
+            if (!sectionValues[column.key]) {
+              sectionValues[column.key] = Number(computed[column.key] || computed.sections?.[column.key] || 0)
+            }
+          }
         }
       }
 
@@ -523,17 +522,19 @@ export default function Admin() {
 
       if (total) {
         totals.push(total)
-        if (rw) sectionRW.push(rw)
-        if (math) sectionMath.push(math)
+        for (const [key, value] of Object.entries(sectionValues)) {
+          if (value) sectionBuckets[key].push(value)
+        }
         if (isPreTestId(tid)) totalsPre.push(total)
-        else if (tid === FINAL_TEST_ID) totalsFinal.push(total)
+        else if (tid === analyticsExamConfig.finalTestId || (examMode === 'sat' && tid === FINAL_TEST_ID)) totalsFinal.push(total)
         else totalsExtra.push(total)
 
-        const row = byTest.get(tid) || { count: 0, totals: [], rw: [], math: [] }
+        const row = byTest.get(tid) || { count: 0, totals: [], sections: Object.fromEntries(Object.keys(sectionBuckets).map((key) => [key, []])) }
         row.count += 1
         row.totals.push(total)
-        if (rw) row.rw.push(rw)
-        if (math) row.math.push(math)
+        for (const [key, value] of Object.entries(sectionValues)) {
+          if (value) row.sections[key].push(value)
+        }
         byTest.set(tid, row)
       }
 
@@ -560,11 +561,11 @@ export default function Admin() {
     const avg = (arr) => arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length) : null
 
     const summary = {
+      exam: examMode,
       active7: activeUsers7.size,
       active30: activeUsers30.size,
       avgTotal: avg(totals),
-      avgRW: avg(sectionRW),
-      avgMath: avg(sectionMath),
+      avgSections: Object.fromEntries(Object.entries(sectionBuckets).map(([key, values]) => [key, avg(values)])),
       median: quantile(totalsSorted, 0.5),
       p25: quantile(totalsSorted, 0.25),
       p75: quantile(totalsSorted, 0.75),
@@ -580,8 +581,7 @@ export default function Admin() {
         label: testLabel(id),
         count: row.count,
         avgTotal: avg(row.totals),
-        avgRW: avg(row.rw),
-        avgMath: avg(row.math),
+        avgSections: Object.fromEntries(Object.entries(row.sections || {}).map(([key, values]) => [key, avg(values)])),
         median: quantile(totalsS, 0.5),
       }
     }).sort((a, b) => (b.count - a.count) || String(a.label).localeCompare(String(b.label)))
@@ -620,19 +620,21 @@ export default function Admin() {
     }
 
     const histogram = (() => {
-      const bins = []
-      for (let x = 400; x <= 1600; x += 100) bins.push(x)
-      const counts = new Array(bins.length).fill(0)
+      const starts = examMode === 'act' ? [1, 6, 11, 16, 21, 26, 31] : [400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600]
+      const counts = new Array(starts.length).fill(0)
       for (const t of totals) {
-        const cl = clamp(t, 400, 1600)
-        const idx = Math.min(bins.length - 1, Math.floor((cl - 400) / 100))
-        counts[idx] += 1
+        if (examMode === 'act') {
+          const cl = clamp(t, 1, 36)
+          const idx = Math.min(starts.length - 1, Math.floor((cl - 1) / 5))
+          counts[idx] += 1
+        } else {
+          const cl = clamp(t, 400, 1600)
+          const idx = Math.min(starts.length - 1, Math.floor((cl - 400) / 100))
+          counts[idx] += 1
+        }
       }
       return {
-        labels: bins.map((b, i) => {
-          const hi = Math.min(1600, b + 99)
-          return `${b}-${hi}`
-        }),
+        labels: starts.map((start) => examMode === 'act' ? `${start}-${Math.min(36, start + 4)}` : `${start}-${Math.min(1600, start + 99)}`),
         datasets: [{
           label: 'Students',
           data: counts,
@@ -647,26 +649,21 @@ export default function Admin() {
       labels: testRows.map(r => r.label),
       datasets: [
         {
-          label: 'Avg Total',
+          label: examMode === 'act' ? 'Avg Composite' : 'Avg Total',
           data: testRows.map(r => (Number.isFinite(Number(r.avgTotal)) ? Math.round(r.avgTotal) : null)),
           backgroundColor: '#1a2744',
           borderRadius: 6,
           borderSkipped: false,
         },
-        {
-          label: 'Avg R&W',
-          data: testRows.map(r => (Number.isFinite(Number(r.avgRW)) ? Math.round(r.avgRW) : null)),
-          backgroundColor: '#0ea5e9',
-          borderRadius: 6,
-          borderSkipped: false,
-        },
-        {
-          label: 'Avg Math',
-          data: testRows.map(r => (Number.isFinite(Number(r.avgMath)) ? Math.round(r.avgMath) : null)),
-          backgroundColor: '#f59e0b',
-          borderRadius: 6,
-          borderSkipped: false,
-        },
+        ...analyticsScoreColumns
+          .filter((column) => column.key !== 'total')
+          .map((column, index) => ({
+            label: `Avg ${column.label}`,
+            data: testRows.map((row) => (Number.isFinite(Number(row.avgSections?.[column.key])) ? Math.round(row.avgSections[column.key]) : null)),
+            backgroundColor: ['#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981'][index % 4],
+            borderRadius: 6,
+            borderSkipped: false,
+          })),
       ],
     }
 
@@ -692,8 +689,8 @@ export default function Admin() {
       }]
     }
 
-    return { summary, testRows, histogram, byTestChart, domainsChart, chaptersChart, activitySeries, topChapters, topDomains }
-  }, [attempts])
+    return { summary, testRows, histogram, byTestChart, domainsChart, chaptersChart, activitySeries, topChapters, topDomains, scoreColumns: analyticsScoreColumns }
+  }, [attempts, analyticsExam])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Loading…</div>
@@ -795,7 +792,7 @@ export default function Admin() {
               <tbody>
                 {students.map(s => {
                   const userAttempts = computed.attemptsByUser.get(s.id) || []
-                  const best = computed.bestPreByUser.get(s.id) || null
+                  const best = computed.bestByUser.get(s.id) || null
                   const isSelf = s.id === profile?.id
                   return (
                     <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -858,7 +855,7 @@ export default function Admin() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Student', 'Date', 'R&W', 'Math', 'Total', 'Post-Test', 'Gain', 'Top Weakness', ''].map(h => (
+                  {['Student', 'Exam', 'Test', 'Date', 'Breakdown', 'Total', 'Post-Test', 'Gain', 'Top Weakness', ''].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
                   ))}
                 </tr>
@@ -867,7 +864,9 @@ export default function Admin() {
                 {attempts.map(a => {
                   const student = computed.studentById.get(a.user_id)
                   const post = computed.postByAttemptId.get(a.id)
-                  const gain = post ? post.post_score - (a.scores?.total || 0) : null
+                  const exam = getExamFromTestId(a.test_id)
+                  const total = attemptTotalScore(a)
+                  const gain = post ? post.post_score - total : null
                   const topWeak = a.weak_topics?.[0]
                   return (
                     <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -876,10 +875,15 @@ export default function Admin() {
                           {student?.full_name || 'Unknown'}
                         </Link>
                       </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: exam === 'act' ? 'rgba(59,130,246,.10)' : 'rgba(245,158,11,.12)', color: exam === 'act' ? '#2563eb' : '#b45309' }}>
+                          {exam.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 800, color: '#1a2744' }}>{testLabel(a.test_id)}</td>
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(a.started_at).toLocaleDateString()}</td>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>{a.scores?.rw || '—'}</td>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>{a.scores?.math || '—'}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#1a2744' }}>{a.scores?.total || '—'}</td>
+                      <td style={{ padding: '12px', fontSize: 12, color: '#475569' }}>{formatAttemptBreakdown(a) || '—'}</td>
+                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#1a2744' }}>{total || '—'}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#10b981' }}>{post?.post_score || '—'}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: gain > 0 ? '#10b981' : gain < 0 ? '#ef4444' : '#64748b' }}>
                         {gain !== null ? `${gain > 0 ? '+' : ''}${gain}` : '—'}
@@ -907,7 +911,24 @@ export default function Admin() {
                 Program Analytics
               </h3>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                These metrics summarize all completed attempts loaded into the admin dashboard (latest 2,000).
+                Review completed {analyticsExam.toUpperCase()} attempts with separate analytics for SAT and ACT.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+                {['sat', 'act'].map((mode) => (
+                  <button
+                    key={mode}
+                    className="btn btn-outline"
+                    onClick={() => setAnalyticsExam(mode)}
+                    style={{
+                      padding: '7px 12px',
+                      background: analyticsExam === mode ? 'rgba(14,165,233,.10)' : 'white',
+                      borderColor: analyticsExam === mode ? 'rgba(14,165,233,.35)' : '#e2e8f0',
+                      color: analyticsExam === mode ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    {mode.toUpperCase()}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -916,9 +937,16 @@ export default function Admin() {
               {[
                 { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: 'activity' },
                 { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: 'calendar' },
-                { label: 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: 'chart' },
-                { label: 'Avg R&W', val: analytics.summary.avgRW ? Math.round(analytics.summary.avgRW) : '—', sub: 'Section average', icon: 'guide' },
-                { label: 'Avg Math', val: analytics.summary.avgMath ? Math.round(analytics.summary.avgMath) : '—', sub: 'Section average', icon: 'math' },
+                { label: analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: 'chart' },
+                ...analytics.scoreColumns
+                  .filter((column) => column.key !== 'total')
+                  .slice(0, 3)
+                  .map((column, index) => ({
+                    label: `Avg ${column.label}`,
+                    val: analytics.summary.avgSections?.[column.key] ? Math.round(analytics.summary.avgSections[column.key]) : '—',
+                    sub: 'Section average',
+                    icon: index === 0 ? 'guide' : index === 1 ? 'math' : 'results',
+                  })),
                 { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '—', sub: 'Total score', icon: 'target' },
               ].map(s => (
                 <div key={s.label} className="stat-box" style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
@@ -993,7 +1021,7 @@ export default function Admin() {
                     plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
                     scales: {
                       x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                      y: { min: 200, max: 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } } }
+                      y: { min: analyticsExam === 'act' ? 1 : 200, max: analyticsExam === 'act' ? 36 : 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } } }
                     }
                   }} />
                 </div>
@@ -1046,7 +1074,7 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Test', 'Attempts', 'Avg Total', 'Median', 'Avg R&W', 'Avg Math'].map(h => (
+                    {['Test', 'Attempts', analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', 'Median', ...analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => `Avg ${column.label}`)].map(h => (
                       <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
                     ))}
                   </tr>
@@ -1058,8 +1086,11 @@ export default function Admin() {
                       <td style={{ padding: '12px' }}>{r.count}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 900 }}>{r.avgTotal ? Math.round(r.avgTotal) : '—'}</td>
                       <td style={{ padding: '12px' }}>{r.median ? Math.round(r.median) : '—'}</td>
-                      <td style={{ padding: '12px' }}>{r.avgRW ? Math.round(r.avgRW) : '—'}</td>
-                      <td style={{ padding: '12px' }}>{r.avgMath ? Math.round(r.avgMath) : '—'}</td>
+                      {analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => (
+                        <td key={`${r.id}-${column.key}`} style={{ padding: '12px' }}>
+                          {r.avgSections?.[column.key] ? Math.round(r.avgSections[column.key]) : '—'}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -1253,7 +1284,12 @@ export default function Admin() {
 		                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
 		                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
 		                      <div>
-		                        <div style={{ fontWeight: 900, color: '#1a2744' }}>{t.label}</div>
+		                        <div style={{ fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span>{t.label}</span>
+                              <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: t.exam === 'act' ? 'rgba(59,130,246,.10)' : 'rgba(245,158,11,.12)', color: t.exam === 'act' ? '#2563eb' : '#b45309' }}>
+                                {(t.exam || 'sat').toUpperCase()}
+                              </span>
+                            </div>
 		                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
 		                          Answer key: {builtIn
 		                            ? `Built-in (${builtInCount} answers)`
@@ -1267,8 +1303,8 @@ export default function Admin() {
 		                      </div>
 		                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
 		                        {t.akUrl && (
-		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key">
-		                            Open AK →
+		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key and explanations">
+		                            {t.explanationUrl ? 'Open AK + Explanations →' : 'Open AK →'}
 		                          </a>
 		                        )}
 		                        {builtIn && storedCount > 0 && storedCount !== builtInCount && (
@@ -1336,9 +1372,7 @@ export default function Admin() {
 		                              try {
 		                                const buf = new Uint8Array(await file.arrayBuffer())
 		                                const parsed = await extractAnswerKeyFromPdf(buf)
-		                                const parsedCount = parsed?.rw_m1
-		                                  ? (Object.keys(parsed.rw_m1 || {}).length + Object.keys(parsed.rw_m2 || {}).length + Object.keys(parsed.math_m1 || {}).length + Object.keys(parsed.math_m2 || {}).length)
-		                                  : Object.keys(parsed || {}).length
+		                                const parsedCount = countKey(parsed)
 		                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
 		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
 		                                if (up.error) throw up.error

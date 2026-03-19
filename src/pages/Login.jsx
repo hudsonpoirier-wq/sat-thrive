@@ -24,12 +24,12 @@ export default function Login() {
       else {
         // If "Confirm email" is OFF in Supabase, signUp returns a session immediately.
         if (data?.session) {
-          setSuccess('Account created! Signing you in…')
+          setSuccess('Account created! Let’s choose your first test…')
           setLoading(false)
-          navigate('/dashboard', { replace: true })
+          navigate('/choose-test', { replace: true })
           return
         }
-        setSuccess('Account created! You can sign in now.')
+        setSuccess('Account created! Sign in, then choose whether you want to start with SAT or ACT.')
         // Most users expect to sign in next; keep their email filled.
         setMode('signin')
         setPassword('')
@@ -69,9 +69,9 @@ export default function Login() {
           </div>
 
           <div className="login-points">
-            {[
-              { k: 'Timed Tests', v: 'Realistic modules with pace tracking and clean review.' },
-              { k: 'Study Guide', v: 'Chapter practice that locks in mastery (25/25 to complete).' },
+              {[
+              { k: 'Timed Tests', v: 'Realistic SAT and ACT sections with pacing, review, and admin support.' },
+              { k: 'Study Guide', v: 'Separate SAT and ACT study guides that lock in mastery chapter by chapter.' },
               { k: 'Progress', v: 'Charts + optional skill builders that show improvement over time.' },
             ].map(({ k, v }) => (
               <div key={k} className="login-point">
@@ -85,7 +85,7 @@ export default function Login() {
           </div>
 
           <div className="login-footnote">
-            Based on official SAT structure and scoring conventions.
+            Built around official SAT and ACT structures with separate dashboards for each track.
           </div>
         </div>
 

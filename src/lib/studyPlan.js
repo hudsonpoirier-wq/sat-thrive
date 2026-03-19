@@ -1,4 +1,5 @@
 import { CHAPTERS } from '../data/testData.js'
+import { ACT_CHAPTERS } from '../data/actData.js'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const READING_DOMAINS = new Set([
@@ -8,38 +9,50 @@ const READING_DOMAINS = new Set([
   'Expression of Ideas',
 ])
 
-function lsKeyTestDate(userId) {
-  return `agora_sat_test_date_v1:${userId || 'anon'}`
+const ALL_CHAPTERS = { ...CHAPTERS, ...ACT_CHAPTERS }
+
+function lsKeyTestDate(userId, exam = 'sat') {
+  return `agora_${exam}_test_date_v2:${userId || 'anon'}`
 }
 
-export function defaultStudyPrefs() {
+export function defaultStudyPrefs(_exam = 'sat') {
   return {
     days: [true, true, true, true, true, false, false], // Mon–Fri
   }
 }
 
-export function loadStudyPrefs(userId) {
+export function loadStudyPrefs(userId, exam = 'sat') {
   try {
-    const key = `agora_study_prefs_v1:${userId || 'anon'}`
+    const key = `agora_study_prefs_v2:${exam}:${userId || 'anon'}`
     const raw = localStorage.getItem(key)
-    if (!raw) return defaultStudyPrefs()
+    if (!raw && exam === 'sat') {
+      const legacy = localStorage.getItem(`agora_study_prefs_v1:${userId || 'anon'}`)
+      if (legacy) {
+        const p = JSON.parse(legacy)
+        const base = defaultStudyPrefs(exam)
+        const days = Array.isArray(p?.days) && p.days.length === 7 ? p.days.map(Boolean) : base.days
+        return { days }
+      }
+    }
+    if (!raw) return defaultStudyPrefs(exam)
     const p = JSON.parse(raw)
-    const base = defaultStudyPrefs()
+    const base = defaultStudyPrefs(exam)
     const days = Array.isArray(p?.days) && p.days.length === 7 ? p.days.map(Boolean) : base.days
     return { days }
   } catch {
-    return defaultStudyPrefs()
+    return defaultStudyPrefs(exam)
   }
 }
 
-export function saveStudyPrefs(userId, prefs) {
-  const key = `agora_study_prefs_v1:${userId || 'anon'}`
+export function saveStudyPrefs(userId, prefs, exam = 'sat') {
+  const key = `agora_study_prefs_v2:${exam}:${userId || 'anon'}`
   localStorage.setItem(key, JSON.stringify(prefs))
 }
 
-export function loadSatTestDate(userId) {
+export function loadSatTestDate(userId, exam = 'sat') {
   try {
-    const raw = localStorage.getItem(lsKeyTestDate(userId))
+    let raw = localStorage.getItem(lsKeyTestDate(userId, exam))
+    if (!raw && exam === 'sat') raw = localStorage.getItem(`agora_sat_test_date_v1:${userId || 'anon'}`)
     if (!raw) return ''
     const s = String(raw || '').trim()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return ''
@@ -49,14 +62,14 @@ export function loadSatTestDate(userId) {
   }
 }
 
-export function saveSatTestDate(userId, yyyyMmDd) {
+export function saveSatTestDate(userId, yyyyMmDd, exam = 'sat') {
   try {
     const s = String(yyyyMmDd || '').trim()
     if (!s) {
-      localStorage.removeItem(lsKeyTestDate(userId))
+      localStorage.removeItem(lsKeyTestDate(userId, exam))
       return
     }
-    localStorage.setItem(lsKeyTestDate(userId), s)
+    localStorage.setItem(lsKeyTestDate(userId, exam), s)
   } catch {}
 }
 
@@ -71,7 +84,7 @@ export function normalizeWeakTopics(input) {
           const countRaw = t?.count ?? t?.missed ?? t?.wrong ?? t?.n
           const count = Number.isFinite(Number(countRaw)) ? Number(countRaw) : 0
           if (!ch || count <= 0) return null
-          const meta = CHAPTERS?.[ch] || {}
+          const meta = ALL_CHAPTERS?.[ch] || {}
           return { ...(meta || {}), ...(t || {}), ch, count }
         })
         .filter(Boolean)
@@ -87,7 +100,7 @@ export function normalizeWeakTopics(input) {
       .map(([ch, c]) => {
         const count = Number.isFinite(Number(c)) ? Number(c) : 0
         if (!ch || count <= 0) return null
-        const meta = CHAPTERS?.[String(ch)] || {}
+        const meta = ALL_CHAPTERS?.[String(ch)] || {}
         return { ...(meta || {}), ch: String(ch), count }
       })
       .filter(Boolean)
@@ -147,7 +160,10 @@ function daysBetween(a, b) {
 
 export function chapterSubject(input) {
   const chapterId = typeof input === 'string' ? input : input?.ch
-  const domain = CHAPTERS?.[chapterId]?.domain || input?.domain || ''
+  const known = ALL_CHAPTERS?.[chapterId] || {}
+  if (known?.subject) return known.subject
+  if (input?.subject) return input.subject
+  const domain = known?.domain || input?.domain || ''
   return READING_DOMAINS.has(domain) ? 'Reading' : 'Math'
 }
 
@@ -159,8 +175,7 @@ function chapterTaskUnits(count) {
 }
 
 function buildChapterQueues(weakTopics, studiedMap) {
-  const reading = []
-  const math = []
+  const buckets = {}
   for (const topic of normalizeWeakTopics(weakTopics)) {
     if (!topic?.ch || studiedMap?.[String(topic.ch)]) continue
     const units = chapterTaskUnits(topic.count)
@@ -178,14 +193,14 @@ function buildChapterQueues(weakTopics, studiedMap) {
       const task = units > 1
         ? { ...base, id: `${base.chapterId}-${i + 1}`, subtitle: `${base.subtitle} · Session ${i + 1}/${units}` }
         : { ...base, id: base.chapterId }
-      if (task.subject === 'Reading') reading.push(task)
-      else math.push(task)
+      const subject = task.subject || 'Mixed'
+      if (!buckets[subject]) buckets[subject] = []
+      buckets[subject].push(task)
     }
   }
   const byWeight = (a, b) => (b.weight - a.weight) || String(a.chapterId).localeCompare(String(b.chapterId))
-  reading.sort(byWeight)
-  math.sort(byWeight)
-  return { reading, math }
+  Object.values(buckets).forEach((bucket) => bucket.sort(byWeight))
+  return buckets
 }
 
 function takeNextTask(queue, blockedChapterIds = new Set()) {
@@ -230,7 +245,7 @@ export function buildAdaptiveSchedule({
 
   const activeDays = days.filter((d) => d.isActive)
   const usableDays = activeDays.length ? activeDays : days
-  const { reading, math } = buildChapterQueues(weakTopics, studiedMap || {})
+  const subjectQueues = buildChapterQueues(weakTopics, studiedMap || {})
   const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
   let reviewBlocks = Math.ceil(pendingReviewCount / 5)
   let reviewLeft = pendingReviewCount
@@ -238,14 +253,18 @@ export function buildAdaptiveSchedule({
     const amount = Math.min(5, Math.max(1, pendingReviewCount - index * 5 || 5))
     return Math.max(12, amount * 3)
   }).reduce((sum, value) => sum + value, 0)
-  const totalUnits = reading.length + math.length + reviewBlocks
-  const totalMinutes = [...reading, ...math].reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
+  const allTasks = Object.values(subjectQueues).flat()
+  const totalUnits = allTasks.length + reviewBlocks
+  const totalMinutes = allTasks.reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
   const requiredMinutesPerDay = Math.max(20, Math.ceil((totalMinutes / Math.max(1, usableDays.length)) / 5) * 5)
   const effectiveMinutesPerDay = requiredMinutesPerDay
   const avgTasksNeeded = Math.ceil(totalUnits / Math.max(1, usableDays.length))
   const capacityByTime = Math.max(1, Math.floor(effectiveMinutesPerDay / 15))
   const tasksPerDay = Math.max(1, Math.min(Math.max(8, avgTasksNeeded), Math.max(avgTasksNeeded, capacityByTime)))
-  let nextSubject = reading.length >= math.length ? 'Reading' : 'Math'
+  const subjectOrder = Object.entries(subjectQueues)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([subject]) => subject)
+  let subjectCursor = 0
 
   for (const day of usableDays) {
     const tasks = []
@@ -271,29 +290,34 @@ export function buildAdaptiveSchedule({
       reviewBlocks -= 1
     }
 
-    while (tasks.length < tasksPerDay && (reading.length || math.length)) {
-      const preferredQueue = nextSubject === 'Reading' ? reading : math
-      const fallbackQueue = nextSubject === 'Reading' ? math : reading
-      let task = takeNextTask(preferredQueue, chapterIdsUsedToday)
-      if (!task) task = takeNextTask(fallbackQueue, chapterIdsUsedToday)
+    while (tasks.length < tasksPerDay && Object.values(subjectQueues).some((queue) => queue.length)) {
+      const orderedSubjects = subjectOrder.length
+        ? [...subjectOrder.slice(subjectCursor), ...subjectOrder.slice(0, subjectCursor)]
+        : ['Mixed']
+      let task = null
+      for (const subject of orderedSubjects) {
+        task = takeNextTask(subjectQueues[subject], chapterIdsUsedToday)
+        if (task) {
+          subjectCursor = (subjectOrder.indexOf(subject) + 1 + subjectOrder.length) % Math.max(1, subjectOrder.length)
+          break
+        }
+      }
       if (!task) break
       const estimatedMinutes = Number(task.estimatedMinutes || 20)
       if (tasks.length > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
-        if (task.subject === 'Reading') reading.unshift(task)
-        else math.unshift(task)
+        const subject = task.subject || 'Mixed'
+        if (!subjectQueues[subject]) subjectQueues[subject] = []
+        subjectQueues[subject].unshift(task)
         break
       }
       tasks.push(task)
       if (task.chapterId) chapterIdsUsedToday.add(String(task.chapterId))
       usedMinutes += estimatedMinutes
-      if (reading.length && math.length) {
-        nextSubject = task.subject === 'Reading' ? 'Math' : 'Reading'
-      }
     }
 
     day.tasks = tasks
-    const subjects = new Set(tasks.map((task) => task.subject).filter((subject) => subject === 'Reading' || subject === 'Math'))
-    day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((task) => task.subject === 'Reading' || task.subject === 'Math')?.subject || (tasks.length ? 'Mixed' : 'Rest')
+    const subjects = new Set(tasks.map((task) => task.subject).filter(Boolean))
+    day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((task) => task.subject)?.subject || (tasks.length ? 'Mixed' : 'Rest')
     day.estimatedMinutes = usedMinutes
   }
 
@@ -312,7 +336,7 @@ export function buildAdaptiveSchedule({
     reviewLeft = Math.max(0, reviewLeft - amount)
     reviewBlocks -= 1
   }
-  overflowTasks.push(...reading, ...math)
+  overflowTasks.push(...Object.values(subjectQueues).flat())
 
   if (overflowTasks.length && usableDays.length) {
     let dayIndex = 0
@@ -320,10 +344,10 @@ export function buildAdaptiveSchedule({
       const targetDay = usableDays[dayIndex % usableDays.length]
       targetDay.tasks.push(task)
       targetDay.estimatedMinutes = Number(targetDay.estimatedMinutes || 0) + Number(task.estimatedMinutes || 0)
-      const subjects = new Set(targetDay.tasks.map((item) => item.subject).filter((subject) => subject === 'Reading' || subject === 'Math'))
+      const subjects = new Set(targetDay.tasks.map((item) => item.subject).filter(Boolean))
       targetDay.focus = subjects.size > 1
         ? 'Mixed'
-        : targetDay.tasks.find((item) => item.subject === 'Reading' || item.subject === 'Math')?.subject || (targetDay.tasks.length ? 'Mixed' : 'Rest')
+        : targetDay.tasks.find((item) => item.subject)?.subject || (targetDay.tasks.length ? 'Mixed' : 'Rest')
       dayIndex += 1
     }
   }
