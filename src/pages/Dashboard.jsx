@@ -201,57 +201,53 @@ export default function Dashboard() {
 
     async function loadDashboardData() {
       setLoading(true)
-      const [data, previewProfile] = await Promise.all([
-        loadDashboardViewData(viewUserId),
-        isAdminPreview ? loadProfileSafe(viewUserId) : Promise.resolve(null),
-      ])
-      const rows = data?.attempts || []
-      const posts = data?.postScores || []
-
-      if (cancelled) return
-
-      setAttempts(rows)
-      setPostScores(posts)
-      setTargetProfile(previewProfile || null)
-
       try {
-        const firstCompleted = (rows || []).find(r => r.completed_at || r.scores?.total) || null
-        setPlanText(firstCompleted?.study_plan || '')
+        const [dataRes, previewRes] = await Promise.allSettled([
+          loadDashboardViewData(viewUserId),
+          isAdminPreview ? loadProfileSafe(viewUserId) : Promise.resolve(null),
+        ])
+
+        const data = dataRes.status === 'fulfilled' ? dataRes.value : null
+        const previewProfile = previewRes.status === 'fulfilled' ? previewRes.value : null
+        const rows = data?.attempts || []
+        const posts = data?.postScores || []
+
+        if (cancelled) return
+
+        setAttempts(rows)
+        setPostScores(posts)
+        setTargetProfile(previewProfile || null)
+        setStudied(data?.studiedMap || {})
+        setStudiedRows(data?.studiedRows || [])
+        setReviewItems(data?.reviewItems || {})
+        setMistakes(data?.mistakes || [])
+
+        if (readOnlyView) return
+        const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
+        needsPatch.slice(0, 3).forEach(async (r) => {
+          const computed = computeScoresFromAnswers(r)
+          if (!computed?.total) return
+          try {
+            await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
+            if (cancelled) return
+            setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
+          } catch {}
+        })
       } catch {
-        setPlanText('')
+        if (cancelled) return
+        setAttempts([])
+        setPostScores([])
+        setStudied({})
+        setStudiedRows([])
+        setReviewItems({})
+        setMistakes([])
+        setTargetProfile(null)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-
-      setStudied(data?.studiedMap || {})
-      setStudiedRows(data?.studiedRows || [])
-      setReviewItems(data?.reviewItems || {})
-      setMistakes(data?.mistakes || [])
-
-      if (!cancelled) setLoading(false)
-
-      if (readOnlyView) return
-      const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
-      needsPatch.slice(0, 3).forEach(async (r) => {
-        const computed = computeScoresFromAnswers(r)
-        if (!computed?.total) return
-        try {
-          await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
-          if (cancelled) return
-          setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
-        } catch {}
-      })
     }
 
-    loadDashboardData().catch(() => {
-      if (cancelled) return
-      setAttempts([])
-      setPostScores([])
-      setStudied({})
-      setStudiedRows([])
-      setReviewItems({})
-      setMistakes([])
-      setPlanText('')
-      setLoading(false)
-    })
+    loadDashboardData()
 
     return () => {
       cancelled = true
