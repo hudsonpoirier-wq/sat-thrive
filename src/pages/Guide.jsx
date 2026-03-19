@@ -5,6 +5,7 @@ import { CHAPTERS, freeResponseMatches } from '../data/testData.js'
 import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { getStudiedTopics, setStudiedTopic, setChapterGuidePractice, markChapterGuideStarted } from '../lib/studyProgress.js'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 
 function Navbar({ viewUserId, isAdminPreview }) {
@@ -86,9 +87,20 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                           {status}
                         </span>
                       )}
-                      <div style={{ fontSize: 12, lineHeight: 1 }}>
-                        {done ? '✅' : inProgress ? '🟡' : hasGuide ? '🔴' : '⏳'}
-                      </div>
+                      <span
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 999,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: done ? 'rgba(16,185,129,.12)' : inProgress ? 'rgba(245,158,11,.14)' : hasGuide ? 'rgba(239,68,68,.12)' : 'rgba(148,163,184,.12)',
+                          color: done ? '#10b981' : inProgress ? '#f59e0b' : hasGuide ? '#ef4444' : '#94a3b8',
+                        }}
+                      >
+                        <Icon name={done ? 'check' : inProgress ? 'clock' : hasGuide ? 'warning' : 'task'} size={14} />
+                      </span>
                     </div>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{ch.domain} · Playbook p.{ch.page}</div>
@@ -375,7 +387,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts }) {
         )}
         {show && (
           <div style={{ fontSize: 12, fontWeight: 800, color: isCorrect ? '#10b981' : '#ef4444' }}>
-            {isCorrect ? '✅ Correct' : `❌ Not quite`}
+            {isCorrect ? 'Correct' : 'Not quite'}
           </div>
         )}
       </div>
@@ -505,7 +517,10 @@ export default function Guide() {
         )}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
 	          <div>
-	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📖 Study Guide</h1>
+	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name="guide" size={20} />
+                Study Guide
+              </h1>
 	            <div style={{ color: '#64748b', marginTop: 4, fontSize: 13 }}>
 	              Work through chapters, complete practice, and mark each chapter done. To mark a chapter complete, you must get all 25 practice questions correct.
 	            </div>
@@ -560,7 +575,7 @@ export default function Guide() {
                     await setStudiedTopic(viewUserId, selectedId, next)
                   }}
                 >
-                  {isAdminPreview ? 'Preview only' : completedMap[selectedId] ? '✅ Marked Complete' : 'Mark Chapter Complete'}
+                  {isAdminPreview ? 'Preview only' : completedMap[selectedId] ? 'Marked Complete' : 'Mark Chapter Complete'}
                 </button>
                   )
                 })()}
@@ -590,8 +605,11 @@ export default function Guide() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-	                  <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, color: '#1a2744' }}>🎯 Practice Problems</div>
+	                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+	                  <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon name="target" size={18} />
+                      Practice Problems
+                    </div>
 	                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
 	                    {Object.values(selectedGuideMap || {}).filter(Boolean).length}/{expandedProblems.length} correct
 	                  </div>

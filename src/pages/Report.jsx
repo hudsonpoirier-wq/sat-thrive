@@ -8,6 +8,7 @@ import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesS
 import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
@@ -26,7 +27,8 @@ function Navbar({ dashboardHref, mistakesHref }) {
           style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
           title="Go back"
         >
-          ← Back
+          <Icon name="back" size={15} />
+          Back
         </button>
         <Link to={dashboardHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
@@ -227,7 +229,10 @@ export default function Report() {
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>📣 Progress Report</h1>
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="report" size={20} />
+              Progress Report
+            </h1>
             <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
               Generated {new Date(report.generated_at).toLocaleString()}
             </div>

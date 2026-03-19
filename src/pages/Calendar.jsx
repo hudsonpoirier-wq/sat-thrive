@@ -57,10 +57,12 @@ function dateKey(d) {
 export default function CalendarPage() {
   const { user, profile } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const { viewUserId, isAdminPreview } = useMemo(
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
   )
+  const requestedDayKey = useMemo(() => new URLSearchParams(location.search || '').get('day') || '', [location.search])
 
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
@@ -161,8 +163,13 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (!schedule?.days?.length) return
+    const requestedDay = schedule.days.find((day) => day.key === requestedDayKey)
+    if (requestedDay) {
+      setSelectedDayKey(requestedDay.key)
+      return
+    }
     setSelectedDayKey((prev) => prev || schedule.days[0].key)
-  }, [schedule])
+  }, [schedule, requestedDayKey])
 
   const selectedDay = useMemo(() => {
     if (!schedule?.days?.length) return null
@@ -206,6 +213,14 @@ export default function CalendarPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn btn-outline" onClick={() => navigate(-1)}>
+              <Icon name="back" size={16} />
+              Back
+            </button>
+            <Link className="btn btn-outline" to={homeHref}>
+              <Icon name="home" size={16} />
+              Dashboard
+            </Link>
             <Link className="btn btn-outline" to={guideHref}>Open Study Guide →</Link>
             <Link className="btn btn-outline" to={resultsHref}>Latest Results →</Link>
           </div>
@@ -302,6 +317,16 @@ export default function CalendarPage() {
                         No required tasks on this day. Use it for catch-up, a light review set, or a confidence reset.
                       </div>
                     )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+                    <Link className="btn btn-outline" to={homeHref}>
+                      <Icon name="home" size={16} />
+                      Back to Dashboard
+                    </Link>
+                    <button className="btn btn-outline" onClick={() => navigate(-1)}>
+                      <Icon name="back" size={16} />
+                      Previous page
+                    </button>
                   </div>
                 </>
               ) : (

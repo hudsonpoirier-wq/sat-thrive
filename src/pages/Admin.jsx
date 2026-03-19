@@ -6,6 +6,7 @@ import { clearAdminTestingData } from '../lib/studyProgress.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { TESTS } from '../data/tests.js'
 import { ANSWER_KEY, CHAPTERS, MODULES, QUESTION_CHAPTER_MAP, freeResponseMatches, rawToScaled } from '../data/testData.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -407,11 +408,11 @@ export default function Admin() {
   } : null
 
   const tabs = [
-    { id: 'students', label: '👥 Students' },
-    { id: 'results', label: '📋 Test Results' },
-    { id: 'analytics', label: '📈 Analytics' },
-    { id: 'impact', label: '📊 Proof of Impact' },
-    { id: 'tests', label: '🧩 Tests' },
+    { id: 'students', label: 'Students', icon: 'students' },
+    { id: 'results', label: 'Test Results', icon: 'results' },
+    { id: 'analytics', label: 'Analytics', icon: 'chart' },
+    { id: 'impact', label: 'Proof of Impact', icon: 'report' },
+    { id: 'tests', label: 'Tests', icon: 'test' },
   ]
 
   const analytics = useMemo(() => {
@@ -745,7 +746,8 @@ export default function Admin() {
       <div style={{ background: 'white', borderBottom: '1px solid #e8ecf0', display: 'flex', padding: '0 32px' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: '14px 20px', border: 'none', background: 'none', fontFamily: 'Sora,sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: tab === t.id ? '#1a2744' : '#64748b', borderBottom: `3px solid ${tab === t.id ? '#f59e0b' : 'transparent'}`, transition: 'all .2s', whiteSpace: 'nowrap' }}>
+            style={{ padding: '14px 20px', border: 'none', background: 'none', fontFamily: 'Sora,sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: tab === t.id ? '#1a2744' : '#64748b', borderBottom: `3px solid ${tab === t.id ? '#f59e0b' : 'transparent'}`, transition: 'all .2s', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <Icon name={t.icon} size={16} />
             {t.label}
           </button>
         ))}
@@ -755,13 +757,24 @@ export default function Admin() {
         {/* Summary stats */}
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           {[
-            { label: 'Total Students', val: students.length, icon: '👥', dark: false },
-            { label: 'Completed Tests', val: attempts.length, icon: '✅', dark: false },
-            { label: 'Paired Records', val: pairs.length, icon: '📊', dark: false },
-            { label: 'Avg Improvement', val: avgImprovement !== null ? `+${avgImprovement} pts` : '—', icon: '📈', dark: !!avgImprovement },
+            { label: 'Total Students', val: students.length, icon: 'students', dark: false },
+            { label: 'Completed Tests', val: attempts.length, icon: 'check', dark: false },
+            { label: 'Paired Records', val: pairs.length, icon: 'chart', dark: false },
+            { label: 'Avg Improvement', val: avgImprovement !== null ? `+${avgImprovement} pts` : '—', icon: 'trend', dark: !!avgImprovement },
           ].map(s => (
             <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-              <div style={{ fontSize: 24 }}>{s.icon}</div>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: s.dark ? 'rgba(255,255,255,.12)' : 'rgba(14,165,233,.10)',
+                color: s.dark ? 'white' : '#0f172a',
+              }}>
+                <Icon name={s.icon} size={20} />
+              </div>
               <div>
                 <div className="stat-label">{s.label}</div>
                 <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
@@ -897,7 +910,10 @@ export default function Admin() {
         {tab === 'analytics' && (
           <div style={{ display: 'grid', gap: 18 }}>
             <div className="card">
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, marginBottom: 6 }}>📈 Program Analytics</h3>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="chart" size={17} />
+                Program Analytics
+              </h3>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
                 These metrics summarize all completed attempts loaded into the admin dashboard (latest 2,000).
               </div>
@@ -906,15 +922,26 @@ export default function Admin() {
             {/* KPI grid */}
             <div className="stats-grid" style={{ marginBottom: 0 }}>
               {[
-                { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: '🔥' },
-                { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: '🗓' },
-                { label: 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: '📊' },
-                { label: 'Avg R&W', val: analytics.summary.avgRW ? Math.round(analytics.summary.avgRW) : '—', sub: 'Section average', icon: '📚' },
-                { label: 'Avg Math', val: analytics.summary.avgMath ? Math.round(analytics.summary.avgMath) : '—', sub: 'Section average', icon: '🧮' },
-                { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '—', sub: 'Total score', icon: '⚖️' },
+                { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: 'activity' },
+                { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: 'calendar' },
+                { label: 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: 'chart' },
+                { label: 'Avg R&W', val: analytics.summary.avgRW ? Math.round(analytics.summary.avgRW) : '—', sub: 'Section average', icon: 'guide' },
+                { label: 'Avg Math', val: analytics.summary.avgMath ? Math.round(analytics.summary.avgMath) : '—', sub: 'Section average', icon: 'math' },
+                { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '—', sub: 'Total score', icon: 'target' },
               ].map(s => (
                 <div key={s.label} className="stat-box" style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-                  <div style={{ fontSize: 24 }}>{s.icon}</div>
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(14,165,233,.10)',
+                    color: '#0f172a',
+                  }}>
+                    <Icon name={s.icon} size={20} />
+                  </div>
                   <div>
                     <div className="stat-label">{s.label}</div>
                     <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
@@ -926,7 +953,10 @@ export default function Admin() {
 
             {/* Activity over time */}
             <div className="card">
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📅 Activity Over Time</h3>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="calendar" size={17} />
+                Activity Over Time
+              </h3>
               <div style={{ height: 220 }}>
                 <Line data={analytics.activitySeries} options={{
                   responsive: true,
@@ -943,7 +973,10 @@ export default function Admin() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
               {/* Score distribution */}
               <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📊 Score Distribution</h3>
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="chart" size={17} />
+                  Score Distribution
+                </h3>
                 <div style={{ height: 220 }}>
                   <Bar data={analytics.histogram} options={{
                     responsive: true, maintainAspectRatio: false,
@@ -958,7 +991,10 @@ export default function Admin() {
 
               {/* Averages by test */}
               <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>🏁 Averages by Test</h3>
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="final" size={17} />
+                  Averages by Test
+                </h3>
                 <div style={{ height: 220 }}>
                   <Bar data={analytics.byTestChart} options={{
                     responsive: true, maintainAspectRatio: false,
@@ -975,7 +1011,10 @@ export default function Admin() {
             {/* Weakness analytics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
               <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>🚩 Most Missed Domains</h3>
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="warning" size={17} />
+                  Most Missed Domains
+                </h3>
                 <div style={{ height: 240 }}>
                   <Bar data={analytics.domainsChart} options={{
                     responsive: true, maintainAspectRatio: false,
@@ -989,7 +1028,10 @@ export default function Admin() {
               </div>
 
               <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📕 Most Missed Chapters</h3>
+                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="guide" size={17} />
+                  Most Missed Chapters
+                </h3>
                 <div style={{ height: 240 }}>
                   <Bar data={analytics.chaptersChart} options={{
                     responsive: true, maintainAspectRatio: false,
@@ -1005,7 +1047,10 @@ export default function Admin() {
 
             {/* Test summary table */}
             <div className="card" style={{ overflowX: 'auto' }}>
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>📋 Test Summary</h3>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="results" size={17} />
+                Test Summary
+              </h3>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -1036,7 +1081,9 @@ export default function Admin() {
           <div>
             {pairs.length < 2 ? (
               <div className="card" style={{ textAlign: 'center', padding: '60px 24px', color: '#94a3b8' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>⏳</div>
+                <div style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'rgba(148,163,184,.12)', color: '#64748b' }}>
+                  <Icon name="clock" size={28} />
+                </div>
                 <h3 style={{ color: '#475569', marginBottom: 4 }}>Need at least 2 paired records</h3>
                 <p>Currently {pairs.length} student(s) with both pre and post scores. Add post-test scores in the database to generate the impact report.</p>
               </div>
@@ -1073,7 +1120,10 @@ export default function Admin() {
 
                 {/* T-test stats */}
                 <div className="card" style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 14 }}>📐 Paired T-Test Statistics</h3>
+                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Icon name="math" size={17} />
+                    Paired T-Test Statistics
+                  </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                     {stats && [
                       { l: 'Sample (n)', v: stats.n },
@@ -1103,7 +1153,7 @@ export default function Admin() {
                   <div className="proof-box">
                     {stats.sig ? (
                       <>
-                        <div className="proof-verified">✅ Proof of Impact — Statistically Verified</div>
+                        <div className="proof-verified">Proof of Impact — Statistically Verified</div>
                         <div className="proof-statement">
                           "Our students improved by an average of {Math.round(stats.mean)} points."
                         </div>
@@ -1135,7 +1185,9 @@ export default function Admin() {
             <div style={{ marginTop: 20 }}>
               {pairsOpt.length < 2 ? (
                 <div className="card" style={{ textAlign: 'center', padding: '44px 24px', color: '#94a3b8' }}>
-                  <div style={{ fontSize: 40, marginBottom: 10 }}>🧠</div>
+                  <div style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 14, background: 'rgba(14,165,233,.10)', color: '#0ea5e9' }}>
+                    <Icon name="refresh" size={24} />
+                  </div>
                   <h3 style={{ color: '#475569', marginBottom: 4 }}>Optional practice proof needs more data</h3>
                   <p>Currently {pairsOpt.length} student(s) have both a pre-test score and at least one optional test score.</p>
                 </div>
@@ -1170,7 +1222,10 @@ export default function Admin() {
                   </div>
 
                   <div className="card">
-                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>📐 Paired T-Test (Optional)</h3>
+                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon name="math" size={17} />
+                      Paired T-Test (Optional)
+                    </h3>
                     {statsOpt && (
                       <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>
                         n={statsOpt.n} · mean gain {statsOpt.mean.toFixed(1)} · {statsOpt.pLabel} · Cohen’s d {statsOpt.d.toFixed(2)} · avg gain {avgImprovementOpt} points
@@ -1186,7 +1241,10 @@ export default function Admin() {
 	        {/* Tests tab */}
 	        {tab === 'tests' && (
 	          <div className="card">
-	            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 12 }}>🧩 Test Setup</h3>
+	            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="test" size={17} />
+                Test Setup
+              </h3>
 	            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 14 }}>
 	              Manage your test PDFs and answer keys. Skill Builder keys can be imported directly from the scoring guide PDFs.
 	            </div>

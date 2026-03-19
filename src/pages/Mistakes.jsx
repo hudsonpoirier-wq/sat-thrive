@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { MODULES, PDF_PAGE_MAP, freeResponseMatches } from '../data/testData.js'
+import { GUIDE_CONTENT } from '../data/guideContent.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import PDFPage from '../components/PDFPage.jsx'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { loadMistakes, loadReviewItems, computeDueCount, updateMistakeNote, applyReviewResult, saveReviewItem } from '../lib/mistakesStore.js'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 
@@ -50,6 +52,53 @@ function pdfPageFor(testId, section, qNum) {
   return 0
 }
 
+function hashString(s) {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+function seededShuffle(arr, seed) {
+  const out = arr.slice()
+  let x = seed || 1
+  for (let i = out.length - 1; i > 0; i--) {
+    x ^= x << 13
+    x ^= x >>> 17
+    x ^= x << 5
+    const j = Math.abs(x) % (i + 1)
+    const tmp = out[i]
+    out[i] = out[j]
+    out[j] = tmp
+  }
+  return out
+}
+
+function buildMistakeHints(mistake, isMC) {
+  const chapterConcepts = GUIDE_CONTENT?.[mistake?.chapter_id]?.concepts || []
+  const conceptBodies = chapterConcepts.map((concept) => concept.body).filter(Boolean)
+  const defaults = isMC
+    ? [
+        'Pause before choosing. Predict what the correct choice should do, then compare the choices to that prediction.',
+        'Eliminate at least two choices with a reason. Focus on the wording, logic, or evidence that makes them wrong.',
+        'After narrowing it down, plug the final choice back into the sentence or passage and read it all the way through.',
+      ]
+    : [
+        'Write what the question is asking for in one short phrase, then solve only for that final value.',
+        'Check your setup before your arithmetic. Most misses come from setting up the equation or expression incorrectly.',
+        'Make sure your final answer is in a valid SAT format such as a simplified fraction, decimal, or expression.',
+      ]
+
+  if (!conceptBodies.length) return defaults
+
+  const seed = hashString(`${mistake?.test_id || ''}:${mistake?.section || ''}:${mistake?.q_num || ''}`)
+  const shuffled = seededShuffle(conceptBodies, seed)
+  return [
+    shuffled[0] || defaults[0],
+    shuffled[1] || defaults[1],
+    defaults[2],
+  ]
+}
+
 export default function Mistakes() {
   const { user, profile } = useAuth()
   const location = useLocation()
@@ -68,6 +117,7 @@ export default function Mistakes() {
   const [redoText, setRedoText] = useState('')
   const [redoFeedback, setRedoFeedback] = useState(null)
   const [redoSaving, setRedoSaving] = useState(false)
+  const [hintStep, setHintStep] = useState(0)
 
   const viewHref = (path) => withViewUser(path, viewUserId, isAdminPreview)
 
@@ -114,6 +164,7 @@ export default function Mistakes() {
     setRedoText('')
     setRedoFeedback(null)
     setRedoSaving(false)
+    setHintStep(0)
   }, [selectedItemKey])
 
   if (loading) {
@@ -145,7 +196,10 @@ export default function Mistakes() {
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>🧾 Mistake Notebook</h1>
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="mistakes" size={20} />
+              Mistake Notebook
+            </h1>
             <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
               Your missed questions auto-save here. Adding an explanation is <b>optional</b>, but it helps you avoid repeating the same mistake.
             </div>
@@ -170,7 +224,7 @@ export default function Mistakes() {
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: 14, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 900, color: '#1a2744' }}>Mistakes ({filtered.length})</div>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>Click one to practice</div>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>Click one to open its full question page</div>
                 </div>
                 <div style={{ maxHeight: 720, overflow: 'auto' }}>
                   {filtered.map((m) => {
@@ -210,7 +264,16 @@ export default function Mistakes() {
             ) : (
               <div className="card" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-                  <button className="btn btn-outline" onClick={() => setSelected(null)}>← Back to list</button>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button className="btn btn-outline" onClick={() => setSelected(null)}>
+                      <Icon name="back" size={16} />
+                      Back to list
+                    </button>
+                    <Link className="btn btn-outline" to={viewHref('/dashboard')}>
+                      <Icon name="home" size={16} />
+                      Back to Dashboard
+                    </Link>
+                  </div>
                   <div style={{ fontWeight: 900, color: '#1a2744', fontSize: 15 }}>
                     <span style={{ fontWeight: 900 }}>Answering:</span> {selectedCfg?.label || selected.test_id} · {MODULES?.[selected.section]?.label || selected.section} · <span style={{ fontWeight: 900 }}>Q{selected.q_num}</span>
                   </div>
@@ -304,7 +367,8 @@ export default function Mistakes() {
                                 ? (String(redoChoice || '').toUpperCase() === right.toUpperCase())
                                 : freeResponseMatches(redoText, right)
 
-                              setRedoFeedback(ok ? { ok: true, msg: '✅ Correct — nice work!' } : { ok: false, msg: '❌ Not quite — try again.' })
+                              setRedoFeedback(ok ? { ok: true, msg: 'Correct — nice work.' } : { ok: false, msg: 'Not quite — try the hints and check again.' })
+                              if (!ok) setHintStep((step) => Math.max(step, 1))
                               if (!ok) return
 
                               setRedoSaving(true)
@@ -329,9 +393,39 @@ export default function Mistakes() {
                           )}
                         </div>
 
+                        <div style={{ marginTop: 14, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ fontWeight: 900, color: '#9a3412' }}>Hints (optional)</div>
+                            <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 700 }}>
+                              Use these before checking again.
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                            {[1, 2, 3].map((n) => (
+                              <button
+                                key={n}
+                                className="btn btn-outline"
+                                style={{ padding: '7px 12px', fontSize: 12, background: 'white' }}
+                                onClick={() => setHintStep((step) => Math.max(step, n))}
+                              >
+                                Hint {n}
+                              </button>
+                            ))}
+                          </div>
+                          <ul style={{ marginTop: 10, marginLeft: 18, color: '#7c2d12', fontSize: 13, lineHeight: 1.65 }}>
+                            {buildMistakeHints(selected, selectedIsMC).slice(0, hintStep).map((hint, index) => (
+                              <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 6 }}>{hint}</li>
+                            ))}
+                            {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
+                          </ul>
+                        </div>
+
                         {redoFeedback?.ok && (
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-                            <button className="btn btn-outline" onClick={() => setSelected(null)}>Back to list</button>
+                            <button className="btn btn-outline" onClick={() => setSelected(null)}>
+                              <Icon name="back" size={16} />
+                              Back to list
+                            </button>
                             <button
                               className="btn btn-primary"
                               disabled={!nextMistake || nextMistake?.id === selected.id}

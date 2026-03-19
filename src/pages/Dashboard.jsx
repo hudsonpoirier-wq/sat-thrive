@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { rawToScaled, freeResponseMatches } from '../data/testData.js'
-import { buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
+import { buildStudyPlanToTestDate, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule, dayLabels } from '../lib/studyPlan.js'
 import { CHAPTERS } from '../data/testData.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
@@ -25,19 +25,6 @@ function Navbar({ viewUserId, isAdminPreview }) {
     <nav className="nav">
       <BrandLink to={withViewUser('/dashboard', viewUserId, isAdminPreview)} />
       <div className="nav-actions">
-        <Link
-          to={withViewUser('/guide', viewUserId, isAdminPreview)}
-          className="btn btn-outline"
-          style={{
-            padding: '6px 14px',
-            fontSize: 12,
-            color: 'rgba(255,255,255,.9)',
-            borderColor: 'rgba(255,255,255,.3)',
-            background: 'rgba(255,255,255,.08)'
-          }}
-        >
-          Study Guide
-        </Link>
         {isAdmin && (
           <Link
             to="/admin"
@@ -87,12 +74,13 @@ function ScoreOverviewCard({ label, value, sub, icon, dark = false }) {
   )
 }
 
-function ScheduleTaskLink({ task, compact = false }) {
+function ScheduleTaskLink({ task, compact = false, stopParentClick = false }) {
   const accent = task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9'
   const icon = task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results'
   return (
     <Link
       to={task.href}
+      onClick={stopParentClick ? (event) => event.stopPropagation() : undefined}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -151,6 +139,7 @@ export default function Dashboard() {
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId))
   const [targetProfile, setTargetProfile] = useState(null)
+  const availabilityLabels = dayLabels()
 
   useEffect(() => {
     setSatDate(loadSatTestDate(viewUserId))
@@ -380,6 +369,27 @@ export default function Dashboard() {
     setConfirmExtraTestId(null)
   }, [hasTakenPretest])
 
+  function rebuildStoredPlan(nextPrefs = studyPrefs, nextDate = satDate) {
+    if (!latestCompleted) return
+    try {
+      const txt = buildStudyPlanToTestDate({
+        scores: latestCompleted?.scores || {},
+        weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+        prefs: nextPrefs,
+        testDate: nextDate,
+      })
+      setPlanText(txt)
+      if (!readOnlyView) {
+        supabase
+          .from('test_attempts')
+          .update({ study_plan: txt })
+          .eq('id', latestCompleted.id)
+          .eq('user_id', user.id)
+          .catch(() => {})
+      }
+    } catch {}
+  }
+
   // If the latest attempt doesn't have a stored plan, generate one locally from mistakes/weak-topics.
   useEffect(() => {
     if (!hasTakenPretest) return
@@ -564,6 +574,16 @@ export default function Dashboard() {
                   <Icon name="calendar" size={16} />
                   {journeySchedule.hasTestDate ? 'Calendar runs through 3 days before your test.' : 'Set a test date to expand the full calendar.'}
                 </div>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const el = document.getElementById('study-plan-card')
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                  style={{ padding: '8px 12px', fontSize: 12 }}
+                >
+                  Edit Test Date &amp; Availability
+                </button>
                 <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ padding: '8px 12px', fontSize: 12 }}>
                   View Calendar →
                 </Link>
@@ -572,7 +592,25 @@ export default function Dashboard() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
               {scheduleDayCards.map((day, idx) => (
-                <div key={day.key} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: idx === 0 ? 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.10))' : '#f8fafc' }}>
+                <div
+                  key={day.key}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(viewHref(`/calendar?day=${encodeURIComponent(day.key)}`))}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      navigate(viewHref(`/calendar?day=${encodeURIComponent(day.key)}`))
+                    }
+                  }}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 14,
+                    padding: 14,
+                    background: idx === 0 ? 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.10))' : '#f8fafc',
+                    cursor: 'pointer',
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                     <div>
                       <div style={{ fontWeight: 900, color: '#1a2744' }}>
@@ -591,9 +629,12 @@ export default function Dashboard() {
                       {day.focus}
                     </div>
                   </div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
+                    Click this card to open the full day plan.
+                  </div>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {day.tasks.length ? day.tasks.map((task) => (
-                      <ScheduleTaskLink key={task.id} task={task} compact />
+                      <ScheduleTaskLink key={task.id} task={task} compact stopParentClick />
                     )) : (
                       <div style={{ padding: '12px', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
                         No assigned tasks for this day. Use it as a catch-up or light review day.
@@ -767,28 +808,10 @@ export default function Dashboard() {
                       value={satDate || ''}
                       onChange={(e) => {
                         const v = e.target.value
-	                        setSatDate(v)
-	                        saveSatTestDate(viewUserId, v)
-                        if (!latestCompleted) return
-                        try {
-                          const prefs = studyPrefs
-	                  const txt = buildStudyPlanToTestDate({
-	                    scores: latestCompleted?.scores || {},
-	                    weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-	                    prefs,
-	                    testDate: v,
-	                  })
-	                  setPlanText(txt)
-	                  if (!readOnlyView) {
-	                    supabase
-	                      .from('test_attempts')
-	                      .update({ study_plan: txt })
-	                      .eq('id', latestCompleted.id)
-	                      .eq('user_id', user.id)
-	                      .catch(() => {})
-	                  }
-	                } catch {}
-	              }}
+                        setSatDate(v)
+                        saveSatTestDate(viewUserId, v)
+                        rebuildStoredPlan(studyPrefs, v)
+                      }}
 	                      disabled={readOnlyView}
 	                      style={{
 	                        padding: '7px 10px',
@@ -814,24 +837,7 @@ export default function Dashboard() {
                         const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), minutesPerDay }
                         setStudyPrefs(next)
                         try { saveStudyPrefs(viewUserId, next) } catch {}
-                        if (!latestCompleted) return
-                        try {
-                          const txt = buildStudyPlanToTestDate({
-	                          scores: latestCompleted?.scores || {},
-	                          weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-	                          prefs: next,
-	                          testDate: satDate,
-	                        })
-	                        setPlanText(txt)
-	                        if (!readOnlyView) {
-	                          supabase
-	                            .from('test_attempts')
-	                            .update({ study_plan: txt })
-	                            .eq('id', latestCompleted.id)
-	                            .eq('user_id', user.id)
-	                            .catch(() => {})
-	                        }
-	                      } catch {}
+                        rebuildStoredPlan(next, satDate)
 	                    }}
 	                      disabled={readOnlyView}
 	                      style={{
@@ -857,37 +863,51 @@ export default function Dashboard() {
                   >
                     Copy
                   </button>
-	                  <button
-	                    className="btn btn-primary"
-	                    disabled={rebalancing || !latestCompleted || readOnlyView}
-	                    onClick={async () => {
-	                      if (!latestCompleted) return
+                  <button
+                    className="btn btn-primary"
+                    disabled={rebalancing || !latestCompleted || readOnlyView}
+                    onClick={async () => {
+                      if (!latestCompleted) return
                       setRebalancing(true)
-                      try {
-                        const prefs = studyPrefs
-                        const txt = buildStudyPlanToTestDate({
-                          scores: latestCompleted?.scores || {},
-                          weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
-                          prefs,
-                          testDate: satDate,
-                        })
-                        setPlanText(txt)
-                        if (!readOnlyView) {
-                          await supabase
-                            .from('test_attempts')
-                            .update({ study_plan: txt })
-                            .eq('id', latestCompleted.id)
-                            .eq('user_id', user.id)
-                        }
-                      } catch {
-                        // no-op
-                      }
+                      rebuildStoredPlan(studyPrefs, satDate)
                       setRebalancing(false)
                     }}
                   >
                     {rebalancing ? 'Rebalancing…' : 'Rebalance now'}
                   </button>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, marginBottom: 2, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Availability:</div>
+                {availabilityLabels.map((label, index) => {
+                  const enabled = Boolean(studyPrefs?.days?.[index])
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={readOnlyView}
+                      onClick={() => {
+                        const days = Array.isArray(studyPrefs?.days) ? [...studyPrefs.days] : [...loadStudyPrefs(viewUserId).days]
+                        days[index] = !days[index]
+                        const next = { ...(studyPrefs || loadStudyPrefs(viewUserId)), days }
+                        setStudyPrefs(next)
+                        try { saveStudyPrefs(viewUserId, next) } catch {}
+                        rebuildStoredPlan(next, satDate)
+                      }}
+                      style={{
+                        padding: '7px 12px',
+                        fontSize: 12,
+                        background: enabled ? 'rgba(14,165,233,.10)' : 'white',
+                        borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
+                        color: enabled ? '#0f172a' : '#64748b',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
 
               <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc', padding: 14, flex: 1 }}>

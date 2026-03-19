@@ -775,7 +775,7 @@ export default function TestTaking() {
           {isLastModule && (
             <button className="btn" onClick={submitTest} disabled={submitting}
               style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 700, padding: '7px 16px', fontSize: 13 }}>
-              {submitting ? 'Submitting…' : '📊 Submit Test'}
+              {submitting ? 'Submitting…' : 'Submit Test'}
             </button>
           )}
         </div>

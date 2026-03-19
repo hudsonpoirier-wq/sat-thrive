@@ -316,7 +316,7 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
   }
 
   const lines = []
-  lines.push('📅 WEEKLY STUDY PLAN (AUTO)')
+  lines.push('WEEKLY STUDY PLAN (AUTO)')
   lines.push(`Target: ${p.minutesPerDay} min/day · ${sessions} sessions this week`)
   if (scores?.total) lines.push(`Last score: ${scores.total} (R&W ${scores.rw || '—'} / Math ${scores.math || '—'})`)
   lines.push('')
@@ -326,19 +326,19 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
     return lines.join('\n')
   }
 
-  lines.push("🔴 THIS WEEK'S PRIORITIES")
+  lines.push("THIS WEEK'S PRIORITIES")
   top.slice(0, 3).forEach((t, i) => {
     lines.push(`${i + 1}) Chapter ${t.ch} — ${t.name || 'Topic'} (${t.count || 0} missed)`)
   })
   lines.push('')
 
-  lines.push('✅ HOW TO DO EACH SESSION')
+  lines.push('HOW TO DO EACH SESSION')
   lines.push('1) 8 min: Review missed questions (Mistake Notebook)')
   lines.push('2) 22 min: Study the focus chapter (read + examples)')
   lines.push('3) 15 min: Practice (aim for 25/25 mastery in Study Guide)')
   lines.push('')
 
-  lines.push('🗓 SCHEDULE (NEXT 7 DAYS)')
+  lines.push('SCHEDULE (NEXT 7 DAYS)')
   let dayCursor = 0
   for (let i = 0; i < sessions; i++) {
     const d = activeDays[dayCursor] || days[dayCursor] || new Date()
@@ -349,7 +349,7 @@ export function buildWeeklyStudyPlan({ scores, weakTopics, prefs }) {
   }
   lines.push('')
 
-  lines.push('🔁 RE-BALANCE RULE')
+  lines.push('RE-BALANCE RULE')
   lines.push('After your next timed test, this plan auto-updates based on the newest missed-topic counts.')
   return lines.join('\n')
 }
@@ -395,7 +395,7 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   }
 
   const lines = []
-  lines.push('🗓 STUDY PLAN (TO TEST DATE)')
+  lines.push('STUDY PLAN (TO TEST DATE)')
   lines.push(`SAT test date: ${fmtDate(target)} · Plan runs until: ${fmtDate(end)} (3-day taper)`)
   lines.push(`Target: ${p.minutesPerDay} min/day · ${sessions} sessions planned`)
   if (scores?.total) lines.push(`Last score: ${scores.total} (R&W ${scores.rw || '—'} / Math ${scores.math || '—'})`)
@@ -406,19 +406,19 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
     return lines.join('\n')
   }
 
-  lines.push('🔴 TOP PRIORITIES (FROM MISSED TOPICS)')
+  lines.push('TOP PRIORITIES (FROM MISSED TOPICS)')
   top.slice(0, 5).forEach((t, i) => {
     lines.push(`${i + 1}) Chapter ${t.ch} — ${t.name || 'Topic'} (${t.count || 0} missed)`)
   })
   lines.push('')
 
-  lines.push('✅ SESSION TEMPLATE')
+  lines.push('SESSION TEMPLATE')
   lines.push('1) 10 min: Mistake Notebook (redo + optional explanation)')
   lines.push('2) 20 min: Study the focus chapter (guide + examples)')
   lines.push('3) 15 min: Practice (aim 25/25 mastery in Study Guide)')
   lines.push('')
 
-  lines.push('🗓 SCHEDULE (UNTIL 3 DAYS BEFORE TEST)')
+  lines.push('SCHEDULE (UNTIL 3 DAYS BEFORE TEST)')
   for (let i = 0; i < sessions; i++) {
     const d = sessionDates[i]
     const t = focus[i]
@@ -427,7 +427,7 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   }
   lines.push('')
 
-  lines.push('🧊 FINAL 3-DAY TAPER')
+  lines.push('FINAL 3-DAY TAPER')
   lines.push('- 3 days out: Light review only (notes + 1 short set).')
   lines.push('- 2 days out: Only the hardest 10 mistakes + formulas.')
   lines.push('- 1 day out: Rest + confidence review.')

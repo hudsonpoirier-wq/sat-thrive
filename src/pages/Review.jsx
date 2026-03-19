@@ -7,6 +7,7 @@ import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import {
   loadMistakes,
   loadReviewItems,
@@ -29,7 +30,8 @@ function Navbar() {
           style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
           title="Go back"
         >
-          ← Back
+          <Icon name="back" size={15} />
+          Back
         </button>
         <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
           Dashboard
@@ -180,7 +182,7 @@ export default function Review() {
         <Navbar />
         <div className="page fade-up">
           <div className="card" style={{ padding: 18 }}>
-            <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>✅ No reviews due</div>
+            <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No reviews due</div>
             <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
               Your spaced-repetition queue is clear. Keep taking timed sets and your missed questions will appear here.
             </div>
@@ -209,7 +211,10 @@ export default function Review() {
       <div className="page fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744' }}>🧠 Spaced Review</h1>
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="refresh" size={20} />
+              Spaced Review
+            </h1>
             <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
               Due now: <b>{dueCount}</b> · Reviewing: <b>{current.cfg?.label || current.test_id}</b> · {mod?.label || current.section} · Q{current.q_num}
               {current.mistake?.chapter_id ? <> · Study Guide: <b>Ch {current.mistake.chapter_id}</b></> : null}

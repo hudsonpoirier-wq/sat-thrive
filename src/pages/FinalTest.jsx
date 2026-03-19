@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { getTestConfig } from '../data/tests.js'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 
 const FINAL_TEST_ID = 'final_test'
 
@@ -19,7 +20,8 @@ function Navbar() {
           style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
           title="Go back"
         >
-          ← Back
+          <Icon name="back" size={15} />
+          Back
         </button>
         <Link
           to="/dashboard"
@@ -84,7 +86,10 @@ export default function FinalTest() {
       <div className="page fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#1a2744' }}>🏁 Final Test</h1>
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="final" size={20} />
+              Final Test
+            </h1>
             <div style={{ color: '#64748b', fontSize: 13, marginTop: 4, lineHeight: 1.6 }}>
               This uses the same timed test engine as the Pre Test and Skill Builder tests.
             </div>

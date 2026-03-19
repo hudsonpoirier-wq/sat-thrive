@@ -7,6 +7,7 @@ import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildPlanFromAttempt, loadStudyPrefs, saveStudyPrefs, dayLabels } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
 import { resolveViewContext, withViewUser } from '../lib/viewAs.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
@@ -55,7 +56,10 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
 
   return (
     <div className="card" style={{ marginBottom: 24 }}>
-      <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🔍 Question-by-Question Review</h3>
+      <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="eye" size={17} />
+        Question-by-Question Review
+      </h3>
       {MODULE_ORDER.map(mod => {
         const modAnswers = answers[mod] || {}
         const key = keyBySection?.[mod] || {}
@@ -108,8 +112,10 @@ function QuestionReview({ answers, keyBySection, guideHref }) {
                           <strong style={{ color: '#1a2744' }}>Hint:</strong> {hint}
                         </div>
                         {chData && (
-                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                            📖 Study Guide: <Link to={guideHref(ch)} style={{ color: '#1a2744', fontWeight: 800 }}>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Icon name="guide" size={13} />
+                            <span>Study Guide:</span>
+                            <Link to={guideHref(ch)} style={{ color: '#1a2744', fontWeight: 800 }}>
                               Chapter {ch} — {chData.name}
                             </Link>
                           </div>
@@ -221,8 +227,18 @@ export default function Results() {
       <nav className="nav">
         <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
+          <button
+            className="btn btn-outline"
+            onClick={() => navigate(-1)}
+            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
+            title="Go back"
+          >
+            <Icon name="back" size={15} />
+            Back
+          </button>
           <Link to={viewHref('/dashboard')} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-            ← Dashboard
+            <Icon name="home" size={15} />
+            Dashboard
           </Link>
         </div>
       </nav>
@@ -270,9 +286,10 @@ export default function Results() {
 
 	        {/* Weak topics */}
 	        {isPreTest && weakTopics.length > 0 && (
-	          <div className="card" style={{ marginBottom: 24 }}>
-            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
-              🚩 Weak Areas — Mapped to Your Playbook
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="warning" size={17} />
+              Weak Areas — Mapped to Your Playbook
             </h3>
             <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
               These are the chapters to focus on first. Study them in order of urgency.
@@ -286,7 +303,10 @@ export default function Results() {
                       <span style={{ color: '#94a3b8', fontSize: 11, marginRight: 6 }}>#{i + 1}</span>
                       {t.name}
                     </div>
-                    <div className="ch-page">📖 Chapter {t.ch} · Playbook page {t.page}</div>
+                    <div className="ch-page" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="guide" size={13} />
+                      <span>Chapter {t.ch} · Playbook page {t.page}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -296,9 +316,10 @@ export default function Results() {
 
 	        {/* Domain chart */}
 	        {isPreTest && Object.keys(domainCounts).length > 0 && (
-	          <div className="card" style={{ marginBottom: 24 }}>
-            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>
-              📊 Missed Questions by Domain
+          <div className="card" style={{ marginBottom: 24 }}>
+            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="chart" size={17} />
+              Missed Questions by Domain
             </h3>
             <div style={{ height: 220 }}>
               <Bar data={chartData} options={{
@@ -317,11 +338,14 @@ export default function Results() {
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16 }}>
             <div>
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>🧭 Weekly Study Plan</h3>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="calendar" size={17} />
+                Weekly Study Plan
+              </h3>
               <p style={{ fontSize: 13, color: '#64748b' }}>Auto-built from your missed topics and your available days.</p>
             </div>
             <button className="btn btn-primary" onClick={generatePlan} disabled={generatingPlan || readOnlyView} style={{ flexShrink: 0 }}>
-              {generatingPlan ? <><span className="spinner" /> Updating…</> : plan ? '🔄 Rebalance' : '🤖 Build Plan'}
+              {generatingPlan ? <><span className="spinner" /> Updating…</> : plan ? 'Rebalance' : 'Build Plan'}
             </button>
           </div>
 
@@ -378,7 +402,9 @@ export default function Results() {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '32px 24px', color: '#94a3b8' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📖</div>
+              <div style={{ marginBottom: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 14, background: 'rgba(14,165,233,.10)', color: '#0ea5e9' }}>
+                <Icon name="guide" size={22} />
+              </div>
               <div>Tap “Build Plan” to create your weekly schedule.</div>
             </div>
           )}
@@ -389,7 +415,10 @@ export default function Results() {
 
         {/* CTA */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 40 }}>
-          <Link to={viewHref('/dashboard')} className="btn btn-primary">← Back to Dashboard</Link>
+          <Link to={viewHref('/dashboard')} className="btn btn-primary">
+            <Icon name="back" size={16} />
+            Back to Dashboard
+          </Link>
         </div>
       </div>
     </div>
