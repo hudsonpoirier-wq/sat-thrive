@@ -345,7 +345,17 @@ export default function Mistakes() {
                     ) : (
                       <>
                         {selectedIsMC ? (
-                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${selectedChoices.length >= 5 ? 5 : 4}, minmax(0, 1fr))`, gap: 10, marginTop: 12 }}>
+                          <div
+                            className={`mistake-choice-grid${exam === 'act' ? ' act' : ''}`}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: exam === 'act'
+                                ? 'repeat(auto-fit, minmax(72px, 1fr))'
+                                : `repeat(${selectedChoices.length >= 5 ? 5 : 4}, minmax(0, 1fr))`,
+                              gap: 10,
+                              marginTop: 12,
+                            }}
+                          >
                             {selectedChoices.map((c) => (
                               <button
                                 key={c}
