@@ -378,7 +378,7 @@ export default function Mistakes() {
   })()
 
   const answerPanel = selected ? (
-    <div className={`mistake-answer-box${exam === 'act' ? ' act-floating' : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
+    <div className={`mistake-answer-box${exam === 'act' ? ' act-floating' : ''} ${redoFeedback ? (redoFeedback.ok ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
         <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
