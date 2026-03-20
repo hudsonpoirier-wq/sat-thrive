@@ -1028,14 +1028,17 @@ button,
   height: 150px;
   flex-shrink: 0;
 }
+.login-intro-brand.intro-center {
+  overflow: hidden;
+}
 .login-intro-brand::after {
   content: '';
   position: absolute;
-  inset: -20px;
-  background: linear-gradient(110deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 70%);
+  inset: 0;
+  background: linear-gradient(110deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 70%);
   transform: translateX(-150%);
   pointer-events: none;
-  mix-blend-mode: screen;
+  mix-blend-mode: overlay;
   opacity: 0;
 }
 .login-intro-brand.intro-center::after {
