@@ -35,8 +35,8 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    const settleTimer = window.setTimeout(() => setIntroPhase('settle'), 1500)
-    const doneTimer = window.setTimeout(() => setIntroPhase('done'), 2300)
+    const settleTimer = window.setTimeout(() => setIntroPhase('settle'), 1750)
+    const doneTimer = window.setTimeout(() => setIntroPhase('done'), 3150)
     return () => {
       window.clearTimeout(settleTimer)
       window.clearTimeout(doneTimer)
