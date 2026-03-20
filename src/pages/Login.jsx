@@ -127,10 +127,7 @@ export default function Login() {
       <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
-          <div ref={finalBrandRef} className="login-brand-anchor" aria-hidden="true" />
-
-          {/* Static brand for mobile (floating brand is hidden on phones) */}
-          <div className="login-brand-static">
+          <div ref={finalBrandRef} className="login-brand-static">
             <img src="/logo.png" alt="" className="login-logo" />
             <div className="login-brand-text">
               <div className="login-title">The Agora Project</div>

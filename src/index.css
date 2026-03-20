@@ -1013,23 +1013,16 @@ button,
   z-index: 2;
 }
 
-.login-brand-anchor {
-  height: 168px;
-  margin-bottom: 18px;
-}
 .login-brand-static {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 18px;
   margin-bottom: 18px;
+  visibility: hidden;
 }
 
 .login-shell.intro-done .login-brand-static {
-  display: flex;
-}
-
-.login-shell.intro-done .login-brand-anchor {
-  display: none;
+  visibility: visible;
 }
 
 .login-shell.intro-done .login-intro-stage {
@@ -1523,11 +1516,6 @@ button,
   }
 
   /* Keep intro animation — size brand for phone */
-  .login-brand-anchor {
-    height: 90px;
-    margin-bottom: 10px;
-  }
-
   .login-intro-inner {
     gap: 10px;
   }
@@ -1590,10 +1578,7 @@ button,
     padding: 14px 14px 8px;
   }
 
-  .login-brand-anchor {
-    height: 60px;
-    margin-bottom: 6px;
-  }
+
 
   .login-intro-inner .login-logo {
     width: 50px;
