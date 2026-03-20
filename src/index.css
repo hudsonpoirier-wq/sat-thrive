@@ -980,11 +980,11 @@ button,
   transform-origin: center center;
 }
 .login-brand-row.intro-phase-center {
-  animation: loginBrandCenter 1.85s cubic-bezier(.22,1,.36,1) forwards;
+  animation: loginBrandCenter 2.35s cubic-bezier(.22,1,.36,1) forwards;
 }
 .login-brand-row.intro-phase-move {
   transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
-  animation: loginBrandDock 1.2s cubic-bezier(.22,1,.36,1) forwards;
+  animation: loginBrandDock 1.45s cubic-bezier(.22,1,.36,1) forwards;
 }
 .login-brand-row.intro-phase-reveal {
   transform: translate(0, 0);
