@@ -924,7 +924,7 @@ button,
   width: 100%;
   max-width: 1440px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 18px;
   border-radius: 28px;
   padding: 22px;
@@ -996,7 +996,8 @@ button,
 }
 
 .login-brand {
-  flex: 1 1 520px;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 26px 26px 22px;
   color: white;
   display: flex;
@@ -1026,7 +1027,7 @@ button,
 .login-title { font-family: 'Sora', sans-serif; font-size: 44px; font-weight: 900; line-height: 1.05; }
 .login-subtitle { font-size: 16px; font-weight: 650; color: rgba(255,255,255,.72); margin-top: 8px; }
 
-.login-points { display: grid; gap: 10px; margin-top: 10px; max-width: 520px; }
+.login-points { display: grid; gap: 10px; margin-top: 10px; }
 .login-point { display: flex; gap: 12px; align-items: flex-start; }
 .login-point { animation: fadeUpSoft .45s ease both; }
 .login-point:nth-child(1) { animation-delay: .08s; }
@@ -1072,7 +1073,8 @@ button,
 }
 
 .login-auth-col {
-  flex: 0 1 620px;
+  flex: 0 1 520px;
+  min-width: 320px;
   padding: 16px;
   display: flex;
   align-items: center;
@@ -1412,22 +1414,7 @@ button,
     .break-ring { width: 180px; height: 180px; }
     .break-timer { font-size: 48px; }
 
-    /* Login: prevent giant/cropped hero, stack cleanly */
-    .login-shell {
-      min-height: 100dvh;
-      min-height: 100svh;
-      padding: 14px 10px;
-      align-items: flex-start;
-    }
-    .login-wrap { padding: 12px; border-radius: 22px; gap: 12px; }
-    .login-brand { padding: 16px 14px 6px; }
-    .login-brand-row { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-    .login-logo { width: 120px; height: 120px; }
-    .login-title { font-size: 34px; }
-    .login-subtitle { font-size: 14px; }
-    .login-points { margin-top: 8px; }
-    .login-auth-col { padding: 6px 0 10px; }
-    .login-card { padding: 26px 18px; border-radius: 20px; max-width: 520px; }
+    /* Login mobile overrides moved to standalone media query below */
   }
 }
 
@@ -1439,5 +1426,160 @@ button,
 
   .exam-switcher-sub {
     display: none;
+  }
+}
+
+/* ── Login: Phone (<768px) ── */
+@media (max-width: 767px) {
+  .login-shell {
+    min-height: 100dvh;
+    padding: 12px 10px;
+    align-items: flex-start;
+  }
+
+  .login-wrap {
+    flex-direction: column;
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 14px;
+    border-radius: 22px;
+  }
+
+  .login-brand {
+    padding: 18px 16px 8px;
+  }
+
+  .login-brand-anchor {
+    height: 130px;
+    margin-bottom: 12px;
+  }
+
+  .login-intro-inner {
+    gap: 14px;
+  }
+
+  .login-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .login-title {
+    font-size: 28px;
+  }
+
+  .login-subtitle {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .login-points {
+    margin-top: 8px;
+    gap: 8px;
+  }
+
+  .login-point-title {
+    font-size: 13px;
+  }
+
+  .login-point-sub {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .login-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+  }
+
+  .login-footnote {
+    margin-top: 10px;
+    font-size: 11px;
+  }
+
+  .login-auth-col {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 0 8px;
+  }
+
+  .login-card {
+    padding: 28px 20px;
+    border-radius: 18px;
+  }
+
+  .login-card-title {
+    font-size: 22px;
+  }
+
+  .login-card-subtitle {
+    font-size: 12px;
+    margin-bottom: 20px;
+  }
+
+  /* Hide intro animation on phones — go straight to login */
+  .login-intro-stage {
+    display: none;
+  }
+}
+
+/* ── Login: Landscape phones ── */
+@media (max-width: 767px) and (orientation: landscape) {
+  .login-shell {
+    align-items: center;
+  }
+
+  .login-wrap {
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .login-brand {
+    flex: 1 1 0;
+    padding: 14px 14px 8px;
+  }
+
+  .login-brand-anchor {
+    height: 90px;
+    margin-bottom: 8px;
+  }
+
+  .login-logo {
+    width: 70px;
+    height: 70px;
+  }
+
+  .login-title {
+    font-size: 22px;
+  }
+
+  .login-subtitle {
+    font-size: 11px;
+  }
+
+  .login-points {
+    display: none;
+  }
+
+  .login-footnote {
+    display: none;
+  }
+
+  .login-auth-col {
+    flex: 0 1 380px;
+    min-width: 280px;
+  }
+
+  .login-card {
+    padding: 20px 18px;
+  }
+
+  .login-card-title {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .login-card-subtitle {
+    margin-bottom: 14px;
   }
 }
