@@ -13,7 +13,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
-  const [introPhase, setIntroPhase] = useState('enter')
+  const [introPhase, setIntroPhase] = useState('center')
   const [introOffset, setIntroOffset] = useState({ x: 0, y: 0 })
   const { signIn, signUp } = useAuth()
 
@@ -35,13 +35,15 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    const settleTimer = window.setTimeout(() => setIntroPhase('settle'), 1750)
-    const doneTimer = window.setTimeout(() => setIntroPhase('done'), 3150)
+    const moveTimer = window.setTimeout(() => setIntroPhase('move'), 1550)
+    const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 2800)
     return () => {
-      window.clearTimeout(settleTimer)
-      window.clearTimeout(doneTimer)
+      window.clearTimeout(moveTimer)
+      window.clearTimeout(revealTimer)
     }
   }, [])
+
+  const showLoginContent = introPhase === 'reveal'
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -77,39 +79,37 @@ export default function Login() {
   }
 
   return (
-    <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
-      {introPhase !== 'done' && (
-        <div
-          className={`login-intro-overlay ${introPhase}`}
-          style={{
-            '--intro-offset-x': `${introOffset.x}px`,
-            '--intro-offset-y': `${introOffset.y}px`,
-          }}
-          aria-hidden="true"
-        >
-          <div className="login-intro-brand">
-            <img
-              src="/logo.png"
-              alt=""
-              className="login-logo"
-            />
-            <div className="login-brand-text">
-              <div className="login-title">
-                The Agora Project
-              </div>
-              <div className="login-subtitle">
-                Built for speed, focus, and results.
-              </div>
+    <div className={`login-shell ${introPhase !== 'reveal' ? 'intro-active' : ''} intro-${introPhase}`}>
+      <div
+        className={`login-intro-overlay ${introPhase}`}
+        style={{
+          '--intro-offset-x': `${introOffset.x}px`,
+          '--intro-offset-y': `${introOffset.y}px`,
+        }}
+        aria-hidden="true"
+      >
+        <div className="login-intro-brand">
+          <img
+            src="/logo.png"
+            alt=""
+            className="login-logo"
+          />
+          <div className="login-brand-text">
+            <div className="login-title">
+              The Agora Project
+            </div>
+            <div className="login-subtitle">
+              Built for speed, focus, and results.
             </div>
           </div>
         </div>
-      )}
+      </div>
       <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
           <div
             ref={brandRowRef}
-            className={`login-brand-row ${introPhase !== 'done' ? 'intro-hidden' : ''}`}
+            className={`login-brand-row ${!showLoginContent ? 'intro-hidden' : ''}`}
           >
             <img
               src="/logo.png"
@@ -126,7 +126,7 @@ export default function Login() {
             </div>
           </div>
 
-          <div className={`login-points ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
+          <div className={`login-points ${!showLoginContent ? 'intro-content-hidden' : ''}`}>
               {[
               { k: 'Timed Tests', v: 'Realistic SAT and ACT sections with pacing, review, and admin support.' },
               { k: 'Study Guide', v: 'Separate SAT and ACT study guides that lock in mastery chapter by chapter.' },
@@ -142,60 +142,64 @@ export default function Login() {
             ))}
           </div>
 
-          <div className={`login-footnote ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
+          <div className={`login-footnote ${!showLoginContent ? 'intro-content-hidden' : ''}`}>
             Built around official SAT and ACT structures with separate dashboards for each track.
           </div>
         </div>
 
         {/* Auth card */}
-        <div className={`login-auth-col ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
-          <div className="login-card">
-          <div className="login-card-title">
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
-          </div>
-          <div className="login-card-subtitle">
-            {mode === 'signin' ? 'Sign in to continue' : 'Create an account to begin'}
-          </div>
+        <div className={`login-auth-col ${!showLoginContent ? 'intro-content-hidden' : ''}`}>
+          {showLoginContent ? (
+            <div className="login-card">
+            <div className="login-card-title">
+              {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+            </div>
+            <div className="login-card-subtitle">
+              {mode === 'signin' ? 'Sign in to continue' : 'Create an account to begin'}
+            </div>
 
-          <form onSubmit={handleSubmit}>
-            {mode === 'signup' && (
+            <form onSubmit={handleSubmit}>
+              {mode === 'signup' && (
+                <div className="input-wrap">
+                  <label className="input-label">Full Name</label>
+                  <input className="input-field" type="text" placeholder="Jane Smith" value={fullName} onChange={e => setFullName(e.target.value)} required />
+                </div>
+              )}
               <div className="input-wrap">
-                <label className="input-label">Full Name</label>
-                <input className="input-field" type="text" placeholder="Jane Smith" value={fullName} onChange={e => setFullName(e.target.value)} required />
+                <label className="input-label">Email</label>
+                <input className="input-field" type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
-            )}
-            <div className="input-wrap">
-              <label className="input-label">Email</label>
-              <input className="input-field" type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+              <div className="input-wrap">
+                <label className="input-label">Password</label>
+                <PasswordInput
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
+                  minLength={8}
+                  required
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                />
+              </div>
+
+              {error && <div className="error-msg" style={{marginBottom:14}}>Error: {error}</div>}
+              {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>Success: {success}</div>}
+
+              <button type="submit" className="btn btn-primary" style={{width:'100%', padding:'13px', marginTop:4}} disabled={loading}>
+                {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : 'Create Account →'}
+              </button>
+            </form>
+
+            <div className="login-switch">
+              {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+              <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
+                className="login-switch-btn">
+                {mode === 'signin' ? 'Create one' : 'Sign in'}
+              </button>
             </div>
-            <div className="input-wrap">
-              <label className="input-label">Password</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
-                minLength={8}
-                required
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-              />
-            </div>
-
-            {error && <div className="error-msg" style={{marginBottom:14}}>Error: {error}</div>}
-            {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>Success: {success}</div>}
-
-            <button type="submit" className="btn btn-primary" style={{width:'100%', padding:'13px', marginTop:4}} disabled={loading}>
-              {loading ? <span className="spinner" /> : mode === 'signin' ? 'Sign In →' : 'Create Account →'}
-            </button>
-          </form>
-
-          <div className="login-switch">
-            {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-            <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
-              className="login-switch-btn">
-              {mode === 'signin' ? 'Create one' : 'Sign in'}
-            </button>
           </div>
-        </div>
+          ) : (
+            <div className="login-card login-card-placeholder" aria-hidden="true" />
+          )}
         </div>
       </div>
     </div>

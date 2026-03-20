@@ -933,25 +933,25 @@ button,
   box-shadow: 0 30px 90px rgba(0,0,0,.45);
   animation: fadeUpSoft .55s ease both;
   transition:
-    transform 1.15s cubic-bezier(.22,1,.36,1),
-    opacity 1.15s cubic-bezier(.22,1,.36,1),
-    box-shadow 1.15s cubic-bezier(.22,1,.36,1);
+    transform 1.05s cubic-bezier(.22,1,.36,1),
+    opacity 1.05s cubic-bezier(.22,1,.36,1),
+    box-shadow 1.05s cubic-bezier(.22,1,.36,1);
   transform-origin: center center;
 }
 
-.login-wrap.intro-phase-enter {
+.login-wrap.intro-phase-center {
   opacity: 0;
-  transform: translateY(120px) scale(.975);
+  transform: translateY(72px) scale(.985);
   box-shadow: 0 12px 36px rgba(0,0,0,.14);
 }
 
-.login-wrap.intro-phase-settle {
-  opacity: .96;
+.login-wrap.intro-phase-move {
+  opacity: 1;
   transform: translateY(0) scale(1);
-  box-shadow: 0 24px 70px rgba(0,0,0,.32);
+  box-shadow: 0 24px 70px rgba(0,0,0,.3);
 }
 
-.login-wrap.intro-phase-done {
+.login-wrap.intro-phase-reveal {
   opacity: 1;
   transform: translateY(0) scale(1);
   box-shadow: 0 30px 90px rgba(0,0,0,.45);
@@ -976,22 +976,22 @@ button,
   will-change: transform, opacity;
 }
 
-.login-intro-overlay.enter .login-intro-brand {
-  animation: loginBrandRise 1.75s cubic-bezier(.22,1,.36,1) forwards;
+.login-intro-overlay.center .login-intro-brand {
+  animation: loginBrandRise 1.55s cubic-bezier(.22,1,.36,1) forwards;
 }
 
-.login-intro-overlay.settle .login-intro-brand {
+.login-intro-overlay.move .login-intro-brand {
   transform: translate(-50%, -50%) translate(var(--intro-offset-x), var(--intro-offset-y)) scale(.985);
   transition:
-    transform 1.05s cubic-bezier(.22,1,.36,1),
-    opacity .45s ease,
+    transform 1.1s cubic-bezier(.22,1,.36,1),
+    opacity .55s ease,
     filter 1.05s cubic-bezier(.22,1,.36,1);
   filter: drop-shadow(0 16px 30px rgba(0,0,0,.28));
 }
 
-.login-intro-overlay.done {
+.login-intro-overlay.reveal {
   opacity: 0;
-  transition: opacity .55s ease;
+  transition: opacity .65s ease;
 }
 
 .login-brand {
@@ -1003,7 +1003,7 @@ button,
   justify-content: center;
 }
 
-.login-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; animation: fadeUpSoft .55s ease both; transition: opacity .45s ease, transform .65s cubic-bezier(.22,1,.36,1); }
+.login-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; animation: fadeUpSoft .55s ease both; transition: opacity .65s ease, transform .85s cubic-bezier(.22,1,.36,1); }
 .login-brand-row.intro-hidden { opacity: 0; transform: translateY(10px); pointer-events: none; }
 .login-logo {
   width: 150px;
@@ -1029,28 +1029,28 @@ button,
   opacity: 0;
   transform: translateY(18px);
   pointer-events: none;
-  transition: opacity .7s ease, transform .95s cubic-bezier(.22,1,.36,1);
+  transition: opacity .7s ease, transform .9s cubic-bezier(.22,1,.36,1);
 }
 
-.login-shell.intro-done .intro-content-hidden,
-.login-shell.intro-done .login-auth-col,
-.login-shell.intro-done .login-points,
-.login-shell.intro-done .login-footnote,
-.login-shell.intro-done .login-brand-row {
+.login-shell.intro-reveal .intro-content-hidden,
+.login-shell.intro-reveal .login-auth-col,
+.login-shell.intro-reveal .login-points,
+.login-shell.intro-reveal .login-footnote,
+.login-shell.intro-reveal .login-brand-row {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
 }
 
-.login-shell.intro-done .login-auth-col {
+.login-shell.intro-reveal .login-auth-col {
   transition-delay: .06s;
 }
 
-.login-shell.intro-done .login-points {
+.login-shell.intro-reveal .login-points {
   transition-delay: .12s;
 }
 
-.login-shell.intro-done .login-footnote {
+.login-shell.intro-reveal .login-footnote {
   transition-delay: .18s;
 }
 
@@ -1072,6 +1072,16 @@ button,
   border: 1px solid rgba(15,23,42,.08);
   box-shadow: 0 18px 55px rgba(0,0,0,.22);
   animation: popIn .5s ease .08s both;
+}
+
+.login-card-placeholder {
+  opacity: 0;
+  pointer-events: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  min-height: 426px;
+  animation: none;
 }
 
 .login-card-title { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 900; color: #1a2744; margin-bottom: 6px; }
