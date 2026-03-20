@@ -113,11 +113,13 @@ export default function Login() {
     <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
       <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
         <div className={`login-intro-brand intro-${introPhase}`}>
-          <img
-            src="/logo.png"
-            alt=""
-            className="login-logo"
-          />
+          <div className="login-logo-wrap">
+            <img
+              src="/logo.png"
+              alt=""
+              className="login-logo"
+            />
+          </div>
           <div className="login-brand-text">
             <div className="login-title">
               The Agora Project
