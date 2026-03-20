@@ -111,46 +111,27 @@ export default function Login() {
 
   return (
     <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
-      {introPhase !== 'done' && (
-        <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
-          <div className={`login-intro-brand intro-${introPhase}`}>
-            <img
-              src="/logo.png"
-              alt=""
-              className="login-logo"
-            />
-            <div className="login-brand-text">
-              <div className="login-title">
-                The Agora Project
-              </div>
-              <div className="login-subtitle">
-                Built for speed, focus, and results.
-              </div>
+      <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
+        <div className={`login-intro-brand intro-${introPhase}`}>
+          <img
+            src="/logo.png"
+            alt=""
+            className="login-logo"
+          />
+          <div className="login-brand-text">
+            <div className="login-title">
+              The Agora Project
+            </div>
+            <div className="login-subtitle">
+              Built for speed, focus, and results.
             </div>
           </div>
         </div>
-      )}
+      </div>
       <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
-          <div
-            ref={finalBrandRef}
-            className={`login-brand-row ${!showLoginContent ? 'intro-hidden' : ''}`}
-          >
-            <img
-              src="/logo.png"
-              alt="The Agora Project"
-              className="login-logo"
-            />
-            <div className="login-brand-text">
-              <div className="login-title">
-                The Agora Project
-              </div>
-              <div className="login-subtitle">
-                Built for speed, focus, and results.
-              </div>
-            </div>
-          </div>
+          <div ref={finalBrandRef} className="login-brand-anchor" aria-hidden="true" />
 
           <div className={`login-points ${!showLoginContent ? 'intro-content-hidden' : ''}`}>
               {[

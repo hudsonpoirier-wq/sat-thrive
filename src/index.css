@@ -990,8 +990,12 @@ button,
 }
 
 .login-intro-stage.intro-reveal {
-  opacity: 0;
-  transition: opacity .22s ease;
+  opacity: 1;
+}
+
+.login-intro-brand.intro-reveal,
+.login-intro-brand.intro-done {
+  transform: translate(0, 0) scale(1);
 }
 
 .login-brand {
@@ -1010,6 +1014,11 @@ button,
   margin-bottom: 18px;
   position: relative;
   z-index: 2;
+}
+
+.login-brand-anchor {
+  height: 168px;
+  margin-bottom: 18px;
 }
 .login-logo {
   width: 150px;
