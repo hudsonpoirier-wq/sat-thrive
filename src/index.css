@@ -970,12 +970,14 @@ button,
   left: var(--intro-final-left);
   top: var(--intro-final-top);
   width: var(--intro-final-width);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
   color: #fff;
   transform-origin: center center;
+}
+
+.login-intro-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
 .login-intro-brand.intro-center {
@@ -994,10 +996,6 @@ button,
 .login-intro-brand.intro-reveal,
 .login-intro-brand.intro-done {
   transform: translate(0, 0) scale(1);
-}
-
-.login-intro-brand.intro-done {
-  justify-content: flex-start;
 }
 
 .login-brand {

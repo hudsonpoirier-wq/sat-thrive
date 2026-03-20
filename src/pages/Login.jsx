@@ -6,6 +6,7 @@ import PasswordInput from '../components/PasswordInput.jsx'
 export default function Login() {
   const navigate = useNavigate()
   const finalBrandRef = useRef(null)
+  const brandInnerRef = useRef(null)
   const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,7 +29,9 @@ export default function Login() {
     function updateIntroMetrics() {
       if (!finalBrandRef.current) return
       const rect = finalBrandRef.current.getBoundingClientRect()
-      const dx = Math.round((window.innerWidth / 2) - (rect.left + (rect.width / 2)))
+      const innerRect = brandInnerRef.current ? brandInnerRef.current.getBoundingClientRect() : null
+      const contentWidth = innerRect ? innerRect.width : rect.width
+      const dx = Math.round((window.innerWidth / 2) - (rect.left + contentWidth / 2))
       const dy = Math.round((window.innerHeight / 2) - (rect.top + (rect.height / 2)))
       const maxScaleByWidth = rect.width ? (window.innerWidth - 120) / rect.width : 1.7
       const scale = Math.max(1.45, Math.min(1.85, maxScaleByWidth))
@@ -113,17 +116,19 @@ export default function Login() {
     <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
       <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
         <div className={`login-intro-brand intro-${introPhase}`}>
-          <img
-            src="/logo.png"
-            alt=""
-            className="login-logo"
-          />
-          <div className="login-brand-text">
-            <div className="login-title">
-              The Agora Project
-            </div>
-            <div className="login-subtitle">
-              Built for speed, focus, and results.
+          <div ref={brandInnerRef} className="login-intro-inner">
+            <img
+              src="/logo.png"
+              alt=""
+              className="login-logo"
+            />
+            <div className="login-brand-text">
+              <div className="login-title">
+                The Agora Project
+              </div>
+              <div className="login-subtitle">
+                Built for speed, focus, and results.
+              </div>
             </div>
           </div>
         </div>
