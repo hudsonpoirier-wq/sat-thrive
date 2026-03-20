@@ -28,8 +28,9 @@ export default function Login() {
       const rect = finalBrandRef.current.getBoundingClientRect()
       const innerRect = brandInnerRef.current ? brandInnerRef.current.getBoundingClientRect() : null
       const contentWidth = innerRect ? innerRect.width : rect.width
-      const maxScaleByWidth = contentWidth ? (window.innerWidth - 120) / contentWidth : 1.7
-      const scale = Math.max(1.45, Math.min(1.85, maxScaleByWidth))
+      const padding = window.innerWidth < 768 ? 40 : 120
+      const maxScaleByWidth = contentWidth ? (window.innerWidth - padding) / contentWidth : 1.7
+      const scale = Math.max(1, Math.min(1.85, maxScaleByWidth))
       setIntroMetrics({
         left: Math.round(rect.left),
         top: Math.round(rect.top),
