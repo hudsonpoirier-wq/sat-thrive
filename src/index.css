@@ -932,6 +932,29 @@ button,
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
   box-shadow: 0 30px 90px rgba(0,0,0,.45);
   animation: fadeUpSoft .55s ease both;
+  transition:
+    transform 1.05s cubic-bezier(.22,1,.36,1),
+    opacity 1.05s cubic-bezier(.22,1,.36,1),
+    filter 1.05s cubic-bezier(.22,1,.36,1);
+  transform-origin: center center;
+}
+
+.login-wrap.intro-phase-enter {
+  opacity: .18;
+  transform: translateY(140px) scale(.965);
+  filter: blur(10px);
+}
+
+.login-wrap.intro-phase-settle {
+  opacity: .72;
+  transform: translateY(48px) scale(.985);
+  filter: blur(2px);
+}
+
+.login-wrap.intro-phase-done {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
 }
 
 .login-intro-overlay {
@@ -958,13 +981,17 @@ button,
 }
 
 .login-intro-overlay.settle .login-intro-brand {
-  transform: translate(-50%, -50%) translate(var(--intro-offset-x), var(--intro-offset-y)) scale(.98);
-  transition: transform .68s cubic-bezier(.22,1,.36,1), opacity .28s ease;
+  transform: translate(-50%, -50%) translate(var(--intro-offset-x), var(--intro-offset-y)) scale(.985);
+  transition:
+    transform .9s cubic-bezier(.22,1,.36,1),
+    opacity .35s ease,
+    filter .9s cubic-bezier(.22,1,.36,1);
+  filter: drop-shadow(0 16px 30px rgba(0,0,0,.28));
 }
 
 .login-intro-overlay.done {
   opacity: 0;
-  transition: opacity .24s ease;
+  transition: opacity .42s ease;
 }
 
 .login-brand {
@@ -976,8 +1003,8 @@ button,
   justify-content: center;
 }
 
-.login-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; animation: fadeUpSoft .55s ease both; }
-.login-brand-row.intro-hidden { visibility: hidden; }
+.login-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; animation: fadeUpSoft .55s ease both; transition: opacity .45s ease, transform .65s cubic-bezier(.22,1,.36,1); }
+.login-brand-row.intro-hidden { opacity: 0; transform: translateY(10px); pointer-events: none; }
 .login-logo {
   width: 150px;
   height: 150px;
@@ -1000,8 +1027,19 @@ button,
 .login-footnote { margin-top: 18px; font-size: 12px; color: rgba(255,255,255,.40); }
 .intro-content-hidden {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(22px);
   pointer-events: none;
+  transition: opacity .45s ease, transform .75s cubic-bezier(.22,1,.36,1);
+}
+
+.login-shell.intro-done .intro-content-hidden,
+.login-shell.intro-done .login-auth-col,
+.login-shell.intro-done .login-points,
+.login-shell.intro-done .login-footnote,
+.login-shell.intro-done .login-brand-row {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .login-auth-col {
@@ -1010,6 +1048,7 @@ button,
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity .45s ease, transform .75s cubic-bezier(.22,1,.36,1);
 }
 
 .login-card {

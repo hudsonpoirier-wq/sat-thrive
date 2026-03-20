@@ -77,7 +77,7 @@ export default function Login() {
   }
 
   return (
-    <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''}`}>
+    <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
       {introPhase !== 'done' && (
         <div
           className={`login-intro-overlay ${introPhase}`}
@@ -104,7 +104,7 @@ export default function Login() {
           </div>
         </div>
       )}
-      <div className="login-wrap">
+      <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
           <div
