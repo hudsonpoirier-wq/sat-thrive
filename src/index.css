@@ -967,9 +967,12 @@ button,
 
 .login-intro-brand {
   position: fixed;
+  left: 50%;
+  top: 50%;
   width: max-content;
   color: #fff;
   transform-origin: center center;
+  will-change: transform;
 }
 
 .login-intro-inner {
@@ -979,8 +982,6 @@ button,
 }
 
 .login-intro-brand.intro-center {
-  left: 50%;
-  top: 50%;
   animation: loginIntroRise 2.4s cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 
@@ -990,9 +991,7 @@ button,
 
 .login-intro-brand.intro-reveal,
 .login-intro-brand.intro-done {
-  left: var(--intro-final-left);
-  top: var(--intro-final-top);
-  transform: translate(0, 0) scale(1);
+  transform: translate(calc(var(--intro-final-left) - 50vw), calc(var(--intro-final-top) - 50vh)) scale(1);
 }
 
 .login-brand {
@@ -1127,14 +1126,10 @@ button,
 
 @keyframes loginIntroDock {
   0% {
-    left: 50%;
-    top: 50%;
     transform: translate(-50%, -50%) scale(var(--intro-scale));
   }
   100% {
-    left: var(--intro-final-left);
-    top: var(--intro-final-top);
-    transform: translate(0, 0) scale(1);
+    transform: translate(calc(var(--intro-final-left) - 50vw), calc(var(--intro-final-top) - 50vh)) scale(1);
   }
 }
 
@@ -1452,15 +1447,6 @@ button,
     padding: 18px 16px 8px;
   }
 
-  .login-brand-anchor {
-    height: 130px;
-    margin-bottom: 12px;
-  }
-
-  .login-intro-inner {
-    gap: 14px;
-  }
-
   .login-logo {
     width: 100px;
     height: 100px;
@@ -1528,6 +1514,12 @@ button,
 
   .login-intro-inner {
     gap: 10px;
+  }
+
+  .login-intro-brand {
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .login-intro-inner .login-logo {
