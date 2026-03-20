@@ -979,6 +979,7 @@ button,
   gap: 18px;
   color: #fff;
   transform-origin: center center;
+  isolation: isolate;
 }
 
 .login-intro-brand.intro-center {
@@ -1027,20 +1028,20 @@ button,
   width: 150px;
   height: 150px;
   flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 18px;
 }
-.login-logo-wrap::after {
+.login-intro-brand.intro-center {
+  overflow: hidden;
+}
+.login-intro-brand::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
+  inset: -20px;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%);
   transform: translateX(-100%);
-  border-radius: 18px;
   pointer-events: none;
 }
-.intro-center .login-logo-wrap::after {
-  animation: logoGlimmer 0.65s cubic-bezier(.4,0,.2,1) 1.6s forwards;
+.login-intro-brand.intro-center::after {
+  animation: logoGlimmer 0.75s cubic-bezier(.4,0,.2,1) 1.6s forwards;
 }
 @keyframes logoGlimmer {
   0%   { transform: translateX(-100%); }
