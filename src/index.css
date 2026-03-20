@@ -916,6 +916,8 @@ button,
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .login-wrap {
@@ -932,6 +934,39 @@ button,
   animation: fadeUpSoft .55s ease both;
 }
 
+.login-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.login-intro-brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  color: #fff;
+  transform: translate(-50%, 110vh);
+  will-change: transform, opacity;
+}
+
+.login-intro-overlay.enter .login-intro-brand {
+  animation: loginBrandRise 1.5s cubic-bezier(.22,1,.36,1) forwards;
+}
+
+.login-intro-overlay.settle .login-intro-brand {
+  transform: translate(-50%, -50%) translate(var(--intro-offset-x), var(--intro-offset-y)) scale(.98);
+  transition: transform .68s cubic-bezier(.22,1,.36,1), opacity .28s ease;
+}
+
+.login-intro-overlay.done {
+  opacity: 0;
+  transition: opacity .24s ease;
+}
+
 .login-brand {
   flex: 1 1 520px;
   padding: 26px 26px 22px;
@@ -942,6 +977,7 @@ button,
 }
 
 .login-brand-row { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; animation: fadeUpSoft .55s ease both; }
+.login-brand-row.intro-hidden { visibility: hidden; }
 .login-logo {
   width: 150px;
   height: 150px;
@@ -962,6 +998,11 @@ button,
 .login-point-title { font-weight: 850; letter-spacing: .2px; }
 .login-point-sub { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.70); }
 .login-footnote { margin-top: 18px; font-size: 12px; color: rgba(255,255,255,.40); }
+.intro-content-hidden {
+  opacity: 0;
+  transform: translateY(18px);
+  pointer-events: none;
+}
 
 .login-auth-col {
   flex: 0 1 620px;
@@ -986,6 +1027,28 @@ button,
 .login-card-subtitle { font-size: 13px; color: #64748b; margin-bottom: 28px; }
 .login-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
 .login-switch-btn { background: none; border: none; color: #1a2744; font-weight: 700; cursor: pointer; font-size: 13px; }
+
+@keyframes loginBrandRise {
+  0% {
+    transform: translate(-50%, 110vh) scale(.94);
+    opacity: 0;
+  }
+  28% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  82% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
 
 .exam-choice-page {
   background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.96));

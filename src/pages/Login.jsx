@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
+  const brandRowRef = useRef(null)
   const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,7 +13,35 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
+  const [introPhase, setIntroPhase] = useState('enter')
+  const [introOffset, setIntroOffset] = useState({ x: 0, y: 0 })
   const { signIn, signUp } = useAuth()
+
+  useLayoutEffect(() => {
+    function updateIntroOffset() {
+      if (!brandRowRef.current) return
+      const rect = brandRowRef.current.getBoundingClientRect()
+      const targetCenterX = rect.left + (rect.width / 2)
+      const targetCenterY = rect.top + (rect.height / 2)
+      setIntroOffset({
+        x: Math.round(targetCenterX - (window.innerWidth / 2)),
+        y: Math.round(targetCenterY - (window.innerHeight / 2)),
+      })
+    }
+
+    updateIntroOffset()
+    window.addEventListener('resize', updateIntroOffset)
+    return () => window.removeEventListener('resize', updateIntroOffset)
+  }, [])
+
+  useEffect(() => {
+    const settleTimer = window.setTimeout(() => setIntroPhase('settle'), 1500)
+    const doneTimer = window.setTimeout(() => setIntroPhase('done'), 2300)
+    return () => {
+      window.clearTimeout(settleTimer)
+      window.clearTimeout(doneTimer)
+    }
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -48,11 +77,40 @@ export default function Login() {
   }
 
   return (
-    <div className="login-shell">
+    <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''}`}>
+      {introPhase !== 'done' && (
+        <div
+          className={`login-intro-overlay ${introPhase}`}
+          style={{
+            '--intro-offset-x': `${introOffset.x}px`,
+            '--intro-offset-y': `${introOffset.y}px`,
+          }}
+          aria-hidden="true"
+        >
+          <div className="login-intro-brand">
+            <img
+              src="/logo.png"
+              alt=""
+              className="login-logo"
+            />
+            <div className="login-brand-text">
+              <div className="login-title">
+                The Agora Project
+              </div>
+              <div className="login-subtitle">
+                Built for speed, focus, and results.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="login-wrap">
         {/* Branding */}
         <div className="login-brand">
-          <div className="login-brand-row">
+          <div
+            ref={brandRowRef}
+            className={`login-brand-row ${introPhase !== 'done' ? 'intro-hidden' : ''}`}
+          >
             <img
               src="/logo.png"
               alt="The Agora Project"
@@ -68,7 +126,7 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="login-points">
+          <div className={`login-points ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
               {[
               { k: 'Timed Tests', v: 'Realistic SAT and ACT sections with pacing, review, and admin support.' },
               { k: 'Study Guide', v: 'Separate SAT and ACT study guides that lock in mastery chapter by chapter.' },
@@ -84,13 +142,13 @@ export default function Login() {
             ))}
           </div>
 
-          <div className="login-footnote">
+          <div className={`login-footnote ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
             Built around official SAT and ACT structures with separate dashboards for each track.
           </div>
         </div>
 
         {/* Auth card */}
-        <div className="login-auth-col">
+        <div className={`login-auth-col ${introPhase !== 'done' ? 'intro-content-hidden' : ''}`}>
           <div className="login-card">
           <div className="login-card-title">
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}
