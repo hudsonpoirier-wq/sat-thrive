@@ -983,12 +983,12 @@ button,
 
 .login-intro-brand.intro-center {
   justify-content: center;
-  animation: loginIntroRise 2.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: loginIntroRise 2.4s cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 
 .login-intro-brand.intro-move {
   transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
-  animation: loginIntroDock 1.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: loginIntroDock 1.8s cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 
 .login-intro-stage.intro-reveal {
@@ -1113,14 +1113,10 @@ button,
 
 @keyframes loginIntroRise {
   0% {
-    transform: translate(var(--intro-dx), calc(var(--intro-dy) + 118vh)) scale(var(--intro-scale));
+    transform: translate(var(--intro-dx), calc(var(--intro-dy) + 100vh)) scale(var(--intro-scale));
     opacity: 0;
   }
-  14% {
-    opacity: 1;
-  }
-  68% {
-    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
+  18% {
     opacity: 1;
   }
   100% {
