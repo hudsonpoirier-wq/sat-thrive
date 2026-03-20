@@ -1019,6 +1019,22 @@ button,
 }
 .login-brand-static {
   display: none;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.login-shell.intro-done .login-brand-static {
+  display: flex;
+}
+
+.login-shell.intro-done .login-brand-anchor {
+  display: none;
+}
+
+.login-shell.intro-done .login-intro-stage {
+  opacity: 0;
+  pointer-events: none;
 }
 .login-logo {
   width: 150px;
@@ -1536,6 +1552,26 @@ button,
     font-size: 11px;
     white-space: nowrap;
   }
+
+  .login-brand-static {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .login-brand-static .login-logo {
+    width: 72px;
+    height: 72px;
+  }
+
+  .login-brand-static .login-title {
+    font-size: 22px;
+    white-space: nowrap;
+  }
+
+  .login-brand-static .login-subtitle {
+    font-size: 11px;
+    white-space: nowrap;
+  }
 }
 
 /* ── Login: Landscape phones ── */
@@ -1570,6 +1606,24 @@ button,
 
   .login-intro-inner .login-subtitle {
     font-size: 10px;
+  }
+
+  .login-brand-static .login-logo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .login-brand-static .login-title {
+    font-size: 18px;
+  }
+
+  .login-brand-static .login-subtitle {
+    font-size: 10px;
+  }
+
+  .login-brand-static {
+    gap: 8px;
+    margin-bottom: 6px;
   }
 
   .login-points {
