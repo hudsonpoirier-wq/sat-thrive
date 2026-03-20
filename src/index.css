@@ -996,6 +996,10 @@ button,
   transform: translate(0, 0) scale(1);
 }
 
+.login-intro-brand.intro-done {
+  justify-content: flex-start;
+}
+
 .login-brand {
   flex: 1 1 520px;
   padding: 26px 26px 22px;
