@@ -975,13 +975,14 @@ button,
   width: var(--intro-final-width);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 18px;
   color: #fff;
   transform-origin: center center;
 }
 
 .login-intro-brand.intro-center {
+  justify-content: center;
   animation: loginIntroRise 2.2s cubic-bezier(.22,1,.36,1) forwards;
 }
 
