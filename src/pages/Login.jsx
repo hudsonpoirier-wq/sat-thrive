@@ -52,8 +52,8 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    const moveTimer = window.setTimeout(() => setIntroPhase('move'), 2400)
-    const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 4300)
+    const moveTimer = window.setTimeout(() => setIntroPhase('move'), 3200)
+    const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 4550)
     return () => {
       window.clearTimeout(moveTimer)
       window.clearTimeout(revealTimer)
