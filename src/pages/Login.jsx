@@ -128,6 +128,15 @@ export default function Login() {
         <div className="login-brand">
           <div ref={finalBrandRef} className="login-brand-anchor" aria-hidden="true" />
 
+          {/* Static brand for mobile (floating brand is hidden on phones) */}
+          <div className="login-brand-static">
+            <img src="/logo.png" alt="" className="login-logo" />
+            <div className="login-brand-text">
+              <div className="login-title">The Agora Project</div>
+              <div className="login-subtitle">Built for speed, focus, and results.</div>
+            </div>
+          </div>
+
           <div className={`login-points ${!showLoginContent ? 'intro-content-hidden' : ''}`}>
               {[
               { k: 'Timed Tests', v: 'Realistic SAT and ACT sections with pacing, review, and admin support.' },

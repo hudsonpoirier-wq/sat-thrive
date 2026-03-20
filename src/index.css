@@ -1018,6 +1018,9 @@ button,
   height: 168px;
   margin-bottom: 18px;
 }
+.login-brand-static {
+  display: none;
+}
 .login-logo {
   width: 150px;
   height: 150px;
@@ -1517,9 +1520,20 @@ button,
     margin-bottom: 20px;
   }
 
-  /* Hide intro animation on phones — go straight to login */
+  /* Hide intro animation on phones — show static brand instead */
   .login-intro-stage {
     display: none;
+  }
+
+  .login-brand-anchor {
+    display: none;
+  }
+
+  .login-brand-static {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
   }
 }
 
@@ -1540,20 +1554,24 @@ button,
   }
 
   .login-brand-anchor {
-    height: 90px;
+    display: none;
+  }
+
+  .login-brand-static {
+    gap: 10px;
     margin-bottom: 8px;
   }
 
-  .login-logo {
+  .login-brand-static .login-logo {
     width: 70px;
     height: 70px;
   }
 
-  .login-title {
+  .login-brand-static .login-title {
     font-size: 22px;
   }
 
-  .login-subtitle {
+  .login-brand-static .login-subtitle {
     font-size: 11px;
   }
 
