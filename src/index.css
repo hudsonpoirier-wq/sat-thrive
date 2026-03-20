@@ -967,8 +967,6 @@ button,
 
 .login-intro-brand {
   position: fixed;
-  left: var(--intro-final-left);
-  top: var(--intro-final-top);
   width: max-content;
   color: #fff;
   transform-origin: center center;
@@ -981,20 +979,19 @@ button,
 }
 
 .login-intro-brand.intro-center {
+  left: 50%;
+  top: 50%;
   animation: loginIntroRise 2.4s cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 
 .login-intro-brand.intro-move {
-  transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
   animation: loginIntroDock 1.8s cubic-bezier(0.5, 0, 0.5, 1) forwards;
-}
-
-.login-intro-stage.intro-reveal {
-  opacity: 1;
 }
 
 .login-intro-brand.intro-reveal,
 .login-intro-brand.intro-done {
+  left: var(--intro-final-left);
+  top: var(--intro-final-top);
   transform: translate(0, 0) scale(1);
 }
 
@@ -1111,23 +1108,27 @@ button,
 
 @keyframes loginIntroRise {
   0% {
-    transform: translate(var(--intro-dx), calc(var(--intro-dy) + 100vh)) scale(var(--intro-scale));
+    transform: translate(-50%, calc(-50% + 100vh)) scale(var(--intro-scale));
     opacity: 0;
   }
   18% {
     opacity: 1;
   }
   100% {
-    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
+    transform: translate(-50%, -50%) scale(var(--intro-scale));
     opacity: 1;
   }
 }
 
 @keyframes loginIntroDock {
   0% {
-    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(var(--intro-scale));
   }
   100% {
+    left: var(--intro-final-left);
+    top: var(--intro-final-top);
     transform: translate(0, 0) scale(1);
   }
 }

@@ -16,11 +16,8 @@ export default function Login() {
   const [success, setSuccess] = useState('')
   const [introPhase, setIntroPhase] = useState('center')
   const [introMetrics, setIntroMetrics] = useState({
-    dx: 0,
-    dy: 0,
     left: 0,
     top: 0,
-    width: 0,
     scale: 1.7,
   })
   const { signIn, signUp } = useAuth()
@@ -31,17 +28,11 @@ export default function Login() {
       const rect = finalBrandRef.current.getBoundingClientRect()
       const innerRect = brandInnerRef.current ? brandInnerRef.current.getBoundingClientRect() : null
       const contentWidth = innerRect ? innerRect.width : rect.width
-      const contentHeight = innerRect ? innerRect.height : rect.height
-      const dx = Math.round((window.innerWidth / 2) - (rect.left + contentWidth / 2))
-      const dy = Math.round((window.innerHeight / 2) - (rect.top + contentHeight / 2))
-      const maxScaleByWidth = rect.width ? (window.innerWidth - 120) / rect.width : 1.7
+      const maxScaleByWidth = contentWidth ? (window.innerWidth - 120) / contentWidth : 1.7
       const scale = Math.max(1.45, Math.min(1.85, maxScaleByWidth))
       setIntroMetrics({
-        dx,
-        dy,
         left: Math.round(rect.left),
         top: Math.round(rect.top),
-        width: Math.round(rect.width),
         scale: Number(scale.toFixed(2)),
       })
     }
@@ -73,12 +64,9 @@ export default function Login() {
 
   const showLoginContent = introPhase === 'reveal' || introPhase === 'done'
   const introOverlayStyle = {
-    '--intro-dx': `${introMetrics.dx}px`,
-    '--intro-dy': `${introMetrics.dy}px`,
     '--intro-scale': introMetrics.scale,
     '--intro-final-left': `${introMetrics.left}px`,
     '--intro-final-top': `${introMetrics.top}px`,
-    '--intro-final-width': `${introMetrics.width}px`,
   }
 
   async function handleSubmit(e) {
