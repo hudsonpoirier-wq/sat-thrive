@@ -980,11 +980,11 @@ button,
   transform-origin: center center;
 }
 .login-brand-row.intro-phase-center {
-  animation: loginBrandCenter 1.55s cubic-bezier(.22,1,.36,1) forwards;
+  animation: loginBrandCenter 1.85s cubic-bezier(.22,1,.36,1) forwards;
 }
 .login-brand-row.intro-phase-move {
-  transform: translate(var(--intro-start-x), var(--intro-start-y));
-  animation: loginBrandDock 1.1s cubic-bezier(.22,1,.36,1) forwards;
+  transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
+  animation: loginBrandDock 1.2s cubic-bezier(.22,1,.36,1) forwards;
 }
 .login-brand-row.intro-phase-reveal {
   transform: translate(0, 0);
@@ -1071,49 +1071,27 @@ button,
 .login-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
 .login-switch-btn { background: none; border: none; color: #1a2744; font-weight: 700; cursor: pointer; font-size: 13px; }
 
-@keyframes loginBrandRise {
-  0% {
-    transform: translate(-50%, 120vh) scale(.94);
-    opacity: 0;
-  }
-  18% {
-    opacity: 1;
-  }
-  54% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  84% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-}
-
 @keyframes loginBrandCenter {
   0% {
-    transform: translate(var(--intro-start-x), calc(var(--intro-start-y) + 110vh)) scale(.94);
+    transform: translate(var(--intro-start-x), calc(var(--intro-start-y) + 118vh)) scale(1.34);
     opacity: 0;
   }
-  18% {
+  16% {
     opacity: 1;
   }
-  56% {
-    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1);
+  62% {
+    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
     opacity: 1;
   }
   100% {
-    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1);
+    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
     opacity: 1;
   }
 }
 
 @keyframes loginBrandDock {
   0% {
-    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1);
+    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
   }
   100% {
     transform: translate(0, 0) scale(1);
