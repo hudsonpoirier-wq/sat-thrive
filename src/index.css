@@ -981,8 +981,12 @@ button,
   transform-origin: center center;
 }
 
-.login-intro-brand.intro-center {
+.login-intro-brand.intro-center,
+.login-intro-brand.intro-move {
   justify-content: center;
+}
+
+.login-intro-brand.intro-center {
   animation: loginIntroRise 2.4s cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 
