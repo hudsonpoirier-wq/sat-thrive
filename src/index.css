@@ -969,7 +969,7 @@ button,
   position: fixed;
   left: var(--intro-final-left);
   top: var(--intro-final-top);
-  width: var(--intro-final-width);
+  width: max-content;
   color: #fff;
   transform-origin: center center;
 }
@@ -978,7 +978,6 @@ button,
   display: flex;
   align-items: center;
   gap: 18px;
-  width: max-content;
 }
 
 .login-intro-brand.intro-center {

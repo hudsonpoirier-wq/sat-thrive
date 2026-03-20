@@ -31,8 +31,9 @@ export default function Login() {
       const rect = finalBrandRef.current.getBoundingClientRect()
       const innerRect = brandInnerRef.current ? brandInnerRef.current.getBoundingClientRect() : null
       const contentWidth = innerRect ? innerRect.width : rect.width
+      const contentHeight = innerRect ? innerRect.height : rect.height
       const dx = Math.round((window.innerWidth / 2) - (rect.left + contentWidth / 2))
-      const dy = Math.round((window.innerHeight / 2) - (rect.top + (rect.height / 2)))
+      const dy = Math.round((window.innerHeight / 2) - (rect.top + contentHeight / 2))
       const maxScaleByWidth = rect.width ? (window.innerWidth - 120) / rect.width : 1.7
       const scale = Math.max(1.45, Math.min(1.85, maxScaleByWidth))
       setIntroMetrics({
