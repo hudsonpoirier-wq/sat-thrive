@@ -961,6 +961,34 @@ button,
   box-shadow: 0 30px 90px rgba(0,0,0,.45);
 }
 
+.login-intro-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.login-intro-brand {
+  position: fixed;
+  left: var(--intro-final-left);
+  top: var(--intro-final-top);
+  width: var(--intro-final-width);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #fff;
+  transform-origin: center center;
+}
+
+.login-intro-brand.intro-center {
+  animation: loginIntroRise 2.2s cubic-bezier(.22,1,.36,1) forwards;
+}
+
+.login-intro-brand.intro-move {
+  transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
+  animation: loginIntroDock 1.15s cubic-bezier(.22,1,.36,1) forwards;
+}
+
 .login-brand {
   flex: 1 1 520px;
   padding: 26px 26px 22px;
@@ -977,29 +1005,6 @@ button,
   margin-bottom: 18px;
   position: relative;
   z-index: 2;
-  transform-origin: center center;
-}
-.login-brand-row.intro-phase-center {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  width: min(var(--intro-final-width), calc(100vw - 64px));
-  margin-bottom: 0;
-  z-index: 40;
-  animation: loginBrandCenter 2.2s cubic-bezier(.22,1,.36,1) forwards;
-}
-.login-brand-row.intro-phase-move {
-  position: fixed;
-  left: var(--intro-final-left);
-  top: var(--intro-final-top);
-  width: var(--intro-final-width);
-  margin-bottom: 0;
-  z-index: 40;
-  transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
-  animation: loginBrandDock 1.15s cubic-bezier(.22,1,.36,1) forwards;
-}
-.login-brand-row.intro-phase-reveal {
-  transform: translate(0, 0);
 }
 .login-logo {
   width: 150px;
@@ -1083,27 +1088,27 @@ button,
 .login-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
 .login-switch-btn { background: none; border: none; color: #1a2744; font-weight: 700; cursor: pointer; font-size: 13px; }
 
-@keyframes loginBrandCenter {
+@keyframes loginIntroRise {
   0% {
-    transform: translate(-50%, calc(-50% + 120vh)) scale(1.38);
+    transform: translate(var(--intro-dx), calc(var(--intro-dy) + 118vh)) scale(var(--intro-scale));
     opacity: 0;
   }
   14% {
     opacity: 1;
   }
   68% {
-    transform: translate(-50%, -50%) scale(1.14);
+    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
     opacity: 1;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1.14);
+    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
     opacity: 1;
   }
 }
 
-@keyframes loginBrandDock {
+@keyframes loginIntroDock {
   0% {
-    transform: translate(var(--intro-start-x), var(--intro-start-y)) scale(1.14);
+    transform: translate(var(--intro-dx), var(--intro-dy)) scale(var(--intro-scale));
   }
   100% {
     transform: translate(0, 0) scale(1);

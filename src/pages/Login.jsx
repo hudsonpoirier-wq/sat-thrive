@@ -5,7 +5,7 @@ import PasswordInput from '../components/PasswordInput.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
-  const brandRowRef = useRef(null)
+  const finalBrandRef = useRef(null)
   const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,45 +15,49 @@ export default function Login() {
   const [success, setSuccess] = useState('')
   const [introPhase, setIntroPhase] = useState('center')
   const [introMetrics, setIntroMetrics] = useState({
-    x: 0,
-    y: 0,
+    dx: 0,
+    dy: 0,
     left: 0,
     top: 0,
     width: 0,
+    scale: 1.7,
   })
   const { signIn, signUp } = useAuth()
 
   useLayoutEffect(() => {
-    function updateIntroOffset() {
-      if (!brandRowRef.current) return
-      const rect = brandRowRef.current.getBoundingClientRect()
-      const targetCenterX = rect.left + (rect.width / 2)
-      const targetCenterY = rect.top + (rect.height / 2)
+    function updateIntroMetrics() {
+      if (!finalBrandRef.current) return
+      const rect = finalBrandRef.current.getBoundingClientRect()
+      const dx = Math.round((window.innerWidth / 2) - (rect.left + (rect.width / 2)))
+      const dy = Math.round((window.innerHeight / 2) - (rect.top + (rect.height / 2)))
+      const maxScaleByWidth = rect.width ? (window.innerWidth - 120) / rect.width : 1.7
+      const scale = Math.max(1.45, Math.min(1.85, maxScaleByWidth))
       setIntroMetrics({
-        x: Math.round(targetCenterX - (window.innerWidth / 2)),
-        y: Math.round(targetCenterY - (window.innerHeight / 2)),
+        dx,
+        dy,
         left: Math.round(rect.left),
         top: Math.round(rect.top),
         width: Math.round(rect.width),
+        scale: Number(scale.toFixed(2)),
       })
     }
 
-    updateIntroOffset()
-    const resizeObserver = brandRowRef.current ? new ResizeObserver(updateIntroOffset) : null
-    if (brandRowRef.current && resizeObserver) resizeObserver.observe(brandRowRef.current)
+    updateIntroMetrics()
+    const resizeObserver = finalBrandRef.current ? new ResizeObserver(updateIntroMetrics) : null
+    if (finalBrandRef.current && resizeObserver) resizeObserver.observe(finalBrandRef.current)
     if (document.fonts?.ready) {
-      document.fonts.ready.then(updateIntroOffset).catch(() => {})
+      document.fonts.ready.then(updateIntroMetrics).catch(() => {})
     }
-    window.addEventListener('resize', updateIntroOffset)
+    window.addEventListener('resize', updateIntroMetrics)
     return () => {
-      window.removeEventListener('resize', updateIntroOffset)
+      window.removeEventListener('resize', updateIntroMetrics)
       resizeObserver?.disconnect()
     }
   }, [])
 
   useEffect(() => {
-    const moveTimer = window.setTimeout(() => setIntroPhase('move'), 3200)
-    const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 4550)
+    const moveTimer = window.setTimeout(() => setIntroPhase('move'), 2300)
+    const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 3750)
     return () => {
       window.clearTimeout(moveTimer)
       window.clearTimeout(revealTimer)
@@ -61,9 +65,10 @@ export default function Login() {
   }, [])
 
   const showLoginContent = introPhase === 'reveal'
-  const introStyle = {
-    '--intro-start-x': `${-introMetrics.x}px`,
-    '--intro-start-y': `${-introMetrics.y}px`,
+  const introOverlayStyle = {
+    '--intro-dx': `${introMetrics.dx}px`,
+    '--intro-dy': `${introMetrics.dy}px`,
+    '--intro-scale': introMetrics.scale,
     '--intro-final-left': `${introMetrics.left}px`,
     '--intro-final-top': `${introMetrics.top}px`,
     '--intro-final-width': `${introMetrics.width}px`,
@@ -104,13 +109,31 @@ export default function Login() {
 
   return (
     <div className={`login-shell ${introPhase !== 'reveal' ? 'intro-active' : ''} intro-${introPhase}`}>
+      {introPhase !== 'reveal' && (
+        <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
+          <div className={`login-intro-brand intro-${introPhase}`}>
+            <img
+              src="/logo.png"
+              alt=""
+              className="login-logo"
+            />
+            <div className="login-brand-text">
+              <div className="login-title">
+                The Agora Project
+              </div>
+              <div className="login-subtitle">
+                Built for speed, focus, and results.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
           <div
-            ref={brandRowRef}
-            className={`login-brand-row intro-phase-${introPhase}`}
-            style={introStyle}
+            ref={finalBrandRef}
+            className={`login-brand-row ${!showLoginContent ? 'intro-hidden' : ''}`}
           >
             <img
               src="/logo.png"
