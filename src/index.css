@@ -978,6 +978,7 @@ button,
   display: flex;
   align-items: center;
   gap: 18px;
+  width: max-content;
 }
 
 .login-intro-brand.intro-center {

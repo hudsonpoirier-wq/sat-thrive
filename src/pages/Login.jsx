@@ -48,6 +48,7 @@ export default function Login() {
     updateIntroMetrics()
     const resizeObserver = finalBrandRef.current ? new ResizeObserver(updateIntroMetrics) : null
     if (finalBrandRef.current && resizeObserver) resizeObserver.observe(finalBrandRef.current)
+    if (brandInnerRef.current && resizeObserver) resizeObserver.observe(brandInnerRef.current)
     if (document.fonts?.ready) {
       document.fonts.ready.then(updateIntroMetrics).catch(() => {})
     }
