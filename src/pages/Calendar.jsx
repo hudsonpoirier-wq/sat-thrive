@@ -359,7 +359,7 @@ export default function CalendarPage() {
           </div>
         ) : (
           <div className="calendar-layout">
-            <div className="card" style={{ padding: 16 }}>
+            <div className="card dashboard-section-card" style={{ padding: 16 }}>
               <div className="calendar-weekdays">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
                   <div key={label}>{label}</div>
@@ -395,7 +395,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: 16 }}>
+            <div className="card dashboard-section-card" style={{ padding: 16 }}>
               {selectedDay ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -427,7 +427,9 @@ export default function CalendarPage() {
                       <Link
                         key={task.id}
                         to={viewHref(task.href)}
+                        className="journey-day-card"
                         style={{
+                          '--day-index': 0,
                           textDecoration: 'none',
                           color: '#0f172a',
                           border: '1px solid #e2e8f0',

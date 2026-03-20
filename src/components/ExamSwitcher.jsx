@@ -11,7 +11,8 @@ export default function ExamSwitcher({ currentExam = 'sat', satHref = '/dashboar
     { id: 'act', label: 'ACT', sub: 'Dashboard', href: actHref },
   ]
   return (
-    <div className="exam-switcher" role="tablist" aria-label="Switch exam dashboard">
+    <div className={`exam-switcher exam-switcher-${normalizedExam}`} role="tablist" aria-label="Switch exam dashboard">
+      <span className="exam-switcher-indicator" aria-hidden="true" />
       {tabs.map((tab) => {
         const active = tab.id === normalizedExam
         return (

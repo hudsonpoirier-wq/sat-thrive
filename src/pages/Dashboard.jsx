@@ -8,6 +8,7 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
+import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import {
@@ -70,7 +71,7 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
 
 function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
   const content = (
-    <div className={`stat-box${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', height: '100%' }}>
+    <div className={`stat-box stat-box-animated${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', height: '100%' }}>
       <div style={{
         width: 42,
         height: 42,
@@ -85,7 +86,9 @@ function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
       </div>
       <div style={{ minWidth: 0 }}>
         <div className="stat-label">{label}</div>
-        <div className="stat-num" style={{ fontSize: 22 }}>{value}</div>
+        <div className="stat-num" style={{ fontSize: 22 }}>
+          <AnimatedNumber value={value} />
+        </div>
         <div className="stat-sub">{sub}</div>
       </div>
     </div>
@@ -565,7 +568,7 @@ export default function Dashboard() {
 
 	        {/* Pre Test CTA (hidden after completion) */}
         {(completedPre.length === 0 || preInProgress) && (
-	          <div className="card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
+	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
 	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
 	              <div>
 	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
@@ -611,7 +614,7 @@ export default function Dashboard() {
 
         {/* Today / work-ahead */}
         {hasTakenPretest && journeySchedule && (
-          <div id="today-tasks-card" className="card" style={{ marginBottom: 24 }}>
+          <div id="today-tasks-card" className="card dashboard-section-card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -650,6 +653,7 @@ export default function Dashboard() {
               {scheduleDayCards.map((day, idx) => (
                 <div
                   key={day.key}
+                  className="journey-day-card"
                   role="link"
                   tabIndex={0}
                   onClick={() => navigate(viewHref(`/calendar?day=${encodeURIComponent(day.key)}`))}
@@ -660,6 +664,7 @@ export default function Dashboard() {
                     }
                   }}
                   style={{
+                    '--day-index': idx,
                     border: '1px solid #e2e8f0',
                     borderRadius: 14,
                     padding: 14,
@@ -704,7 +709,7 @@ export default function Dashboard() {
         )}
 
         {/* Journey tracker + Study Guide */}
-        <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card dashboard-section-card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
               <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -786,6 +791,7 @@ export default function Dashboard() {
                 return (
                   <button
                     key={s.title}
+                    className={`journey-step-card journey-step-${String(s.status || '').toLowerCase().replace(/\s+/g, '-')}`}
                     onClick={s.onClick}
                     disabled={disabled}
                     style={{
@@ -843,7 +849,7 @@ export default function Dashboard() {
         {hasTakenPretest && (
           <>
             {extraTests.length > 0 && (
-              <div className="card dashboard-practice-card" style={{ marginBottom: 24 }}>
+              <div className="card dashboard-practice-card dashboard-section-card" style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
                     <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -934,7 +940,7 @@ export default function Dashboard() {
 
         {/* Completed tests */}
         {completed.length > 0 && (
-          <div className="card">
+          <div className="card dashboard-section-card">
             <h2 style={{fontFamily:'Sora,sans-serif', fontSize:16, fontWeight:700, marginBottom:16}}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Icon name="results" size={18} />
@@ -1030,7 +1036,7 @@ export default function Dashboard() {
 
         {/* Score trend (hidden until pretest is taken) */}
         {hasTakenPretest && trendData && (
-          <div className="card" style={{ marginTop: 24 }}>
+          <div className="card dashboard-section-card" style={{ marginTop: 24 }}>
             <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="chart" size={18} />
               Your Improvement

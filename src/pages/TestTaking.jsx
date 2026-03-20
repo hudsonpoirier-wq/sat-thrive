@@ -62,6 +62,7 @@ function BreakScreen({ nextModule, onContinue, modules }) {
   }, [])
   const mins = Math.floor(breakTime / 60)
   const secs = breakTime % 60
+  const breakProgress = Math.max(0, Math.min(100, (breakTime / 600) * 100))
   return (
     <div className="break-screen">
       <div className="break-panel">
@@ -70,8 +71,10 @@ function BreakScreen({ nextModule, onContinue, modules }) {
         <div className="break-sub">
           Take your 10-minute reset. Next up: <b>{modules?.[nextModule]?.label}</b> — {modules?.[nextModule]?.module}
         </div>
-        <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+        <div className={`break-ring${breakTime <= 120 ? ' warning' : ''}`} style={{ '--break-progress': breakProgress }}>
+          <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
+            {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+          </div>
         </div>
         <div className="break-actions">
           <button className="btn btn-primary" style={{ padding: '14px 40px', fontSize: 16 }} onClick={onContinue}>

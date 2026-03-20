@@ -296,7 +296,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts, exam, c
   }), [exam, chapter, concepts, idx, isMC, problem?.q])
 
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
+    <div className={show ? (isCorrect ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: 'white' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
         <div style={{ fontWeight: 800, color: '#1a2744' }}>
           {problem?.mode === 'redo' ? `Mastery Redo ${problem?.redoIndex || 1}` : `Core Problem ${idx + 1}`}
