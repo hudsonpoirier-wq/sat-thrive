@@ -979,6 +979,15 @@ button,
   z-index: 2;
   transform-origin: center center;
 }
+.login-brand-row.intro-phase-center,
+.login-brand-row.intro-phase-move {
+  position: fixed;
+  left: var(--intro-final-left);
+  top: var(--intro-final-top);
+  width: var(--intro-final-width);
+  margin-bottom: 0;
+  z-index: 40;
+}
 .login-brand-row.intro-phase-center {
   animation: loginBrandCenter 2.35s cubic-bezier(.22,1,.36,1) forwards;
 }

@@ -14,7 +14,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [introPhase, setIntroPhase] = useState('center')
-  const [introOffset, setIntroOffset] = useState({ x: 0, y: 0 })
+  const [introMetrics, setIntroMetrics] = useState({
+    x: 0,
+    y: 0,
+    left: 0,
+    top: 0,
+    width: 0,
+  })
   const { signIn, signUp } = useAuth()
 
   useLayoutEffect(() => {
@@ -23,15 +29,26 @@ export default function Login() {
       const rect = brandRowRef.current.getBoundingClientRect()
       const targetCenterX = rect.left + (rect.width / 2)
       const targetCenterY = rect.top + (rect.height / 2)
-      setIntroOffset({
+      setIntroMetrics({
         x: Math.round(targetCenterX - (window.innerWidth / 2)),
         y: Math.round(targetCenterY - (window.innerHeight / 2)),
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        width: Math.round(rect.width),
       })
     }
 
     updateIntroOffset()
+    const resizeObserver = brandRowRef.current ? new ResizeObserver(updateIntroOffset) : null
+    if (brandRowRef.current && resizeObserver) resizeObserver.observe(brandRowRef.current)
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(updateIntroOffset).catch(() => {})
+    }
     window.addEventListener('resize', updateIntroOffset)
-    return () => window.removeEventListener('resize', updateIntroOffset)
+    return () => {
+      window.removeEventListener('resize', updateIntroOffset)
+      resizeObserver?.disconnect()
+    }
   }, [])
 
   useEffect(() => {
@@ -45,8 +62,11 @@ export default function Login() {
 
   const showLoginContent = introPhase === 'reveal'
   const introStyle = {
-    '--intro-start-x': `${-introOffset.x}px`,
-    '--intro-start-y': `${-introOffset.y}px`,
+    '--intro-start-x': `${-introMetrics.x}px`,
+    '--intro-start-y': `${-introMetrics.y}px`,
+    '--intro-final-left': `${introMetrics.left}px`,
+    '--intro-final-top': `${introMetrics.top}px`,
+    '--intro-final-width': `${introMetrics.width}px`,
   }
 
   async function handleSubmit(e) {
