@@ -58,13 +58,15 @@ export default function Login() {
   useEffect(() => {
     const moveTimer = window.setTimeout(() => setIntroPhase('move'), 2300)
     const revealTimer = window.setTimeout(() => setIntroPhase('reveal'), 3750)
+    const doneTimer = window.setTimeout(() => setIntroPhase('done'), 4050)
     return () => {
       window.clearTimeout(moveTimer)
       window.clearTimeout(revealTimer)
+      window.clearTimeout(doneTimer)
     }
   }, [])
 
-  const showLoginContent = introPhase === 'reveal'
+  const showLoginContent = introPhase === 'reveal' || introPhase === 'done'
   const introOverlayStyle = {
     '--intro-dx': `${introMetrics.dx}px`,
     '--intro-dy': `${introMetrics.dy}px`,
@@ -108,8 +110,8 @@ export default function Login() {
   }
 
   return (
-    <div className={`login-shell ${introPhase !== 'reveal' ? 'intro-active' : ''} intro-${introPhase}`}>
-      {introPhase !== 'reveal' && (
+    <div className={`login-shell ${introPhase !== 'done' ? 'intro-active' : ''} intro-${introPhase}`}>
+      {introPhase !== 'done' && (
         <div className={`login-intro-stage intro-${introPhase}`} style={introOverlayStyle} aria-hidden="true">
           <div className={`login-intro-brand intro-${introPhase}`}>
             <img

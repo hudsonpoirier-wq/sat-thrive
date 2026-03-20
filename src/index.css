@@ -989,6 +989,11 @@ button,
   animation: loginIntroDock 1.15s cubic-bezier(.22,1,.36,1) forwards;
 }
 
+.login-intro-stage.intro-reveal {
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+
 .login-brand {
   flex: 1 1 520px;
   padding: 26px 26px 22px;
@@ -1035,21 +1040,28 @@ button,
 .login-shell.intro-reveal .intro-content-hidden,
 .login-shell.intro-reveal .login-auth-col,
 .login-shell.intro-reveal .login-points,
-.login-shell.intro-reveal .login-footnote {
+.login-shell.intro-reveal .login-footnote,
+.login-shell.intro-done .intro-content-hidden,
+.login-shell.intro-done .login-auth-col,
+.login-shell.intro-done .login-points,
+.login-shell.intro-done .login-footnote {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
 }
 
-.login-shell.intro-reveal .login-auth-col {
+.login-shell.intro-reveal .login-auth-col,
+.login-shell.intro-done .login-auth-col {
   transition-delay: .06s;
 }
 
-.login-shell.intro-reveal .login-points {
+.login-shell.intro-reveal .login-points,
+.login-shell.intro-done .login-points {
   transition-delay: .12s;
 }
 
-.login-shell.intro-reveal .login-footnote {
+.login-shell.intro-reveal .login-footnote,
+.login-shell.intro-done .login-footnote {
   transition-delay: .18s;
 }
 
