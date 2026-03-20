@@ -1022,33 +1022,6 @@ button,
   height: 168px;
   margin-bottom: 18px;
 }
-.login-logo-wrap {
-  position: relative;
-  width: 150px;
-  height: 150px;
-  flex-shrink: 0;
-}
-.login-intro-brand.intro-center {
-  overflow: hidden;
-}
-.login-intro-brand::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(110deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 70%);
-  transform: translateX(-150%);
-  pointer-events: none;
-  mix-blend-mode: overlay;
-  opacity: 0;
-}
-.login-intro-brand.intro-center::after {
-  animation: logoGlimmer 0.75s cubic-bezier(.4,0,.2,1) 1.6s forwards;
-}
-@keyframes logoGlimmer {
-  0%   { transform: translateX(-150%); opacity: 1; }
-  85%  { opacity: 1; }
-  100% { transform: translateX(200%); opacity: 0; }
-}
 .login-logo {
   width: 150px;
   height: 150px;
