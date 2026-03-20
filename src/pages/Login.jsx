@@ -44,6 +44,10 @@ export default function Login() {
   }, [])
 
   const showLoginContent = introPhase === 'reveal'
+  const introStyle = {
+    '--intro-start-x': `${-introOffset.x}px`,
+    '--intro-start-y': `${-introOffset.y}px`,
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -80,36 +84,13 @@ export default function Login() {
 
   return (
     <div className={`login-shell ${introPhase !== 'reveal' ? 'intro-active' : ''} intro-${introPhase}`}>
-      <div
-        className={`login-intro-overlay ${introPhase}`}
-        style={{
-          '--intro-offset-x': `${introOffset.x}px`,
-          '--intro-offset-y': `${introOffset.y}px`,
-        }}
-        aria-hidden="true"
-      >
-        <div className="login-intro-brand">
-          <img
-            src="/logo.png"
-            alt=""
-            className="login-logo"
-          />
-          <div className="login-brand-text">
-            <div className="login-title">
-              The Agora Project
-            </div>
-            <div className="login-subtitle">
-              Built for speed, focus, and results.
-            </div>
-          </div>
-        </div>
-      </div>
       <div className={`login-wrap intro-phase-${introPhase}`}>
         {/* Branding */}
         <div className="login-brand">
           <div
             ref={brandRowRef}
-            className={`login-brand-row ${!showLoginContent ? 'intro-hidden' : ''}`}
+            className={`login-brand-row intro-phase-${introPhase}`}
+            style={introStyle}
           >
             <img
               src="/logo.png"
