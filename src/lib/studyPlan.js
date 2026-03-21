@@ -180,9 +180,12 @@ function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
     const title = isAct
       ? `${topic.subject || 'ACT'} · ${label}`
       : `Study Guide · Chapter ${chKey}`
-    const subtitle = isAct
-      ? `${topic.domain || topic.subject || 'ACT'} · ${topic.count || 0} missed`
-      : `${topic.name || 'Topic'} · ${topic.count || 0} missed`
+    const isDone = Boolean(studiedMap[chKey])
+    const subtitle = isDone
+      ? 'Completed'
+      : isAct
+        ? `${topic.domain || topic.subject || 'ACT'} · ${topic.count || 0} missed`
+        : `${topic.name || 'Topic'} · ${topic.count || 0} missed`
     const task = {
       type: 'guide',
       id: chKey,
@@ -192,8 +195,8 @@ function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
       href: `/guide?chapter=${encodeURIComponent(chKey)}`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
-      estimatedMinutes: Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
-      completed: false,
+      estimatedMinutes: isDone ? 0 : Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
+      completed: isDone,
     }
     const subject = task.subject || 'Mixed'
     if (!buckets[subject]) buckets[subject] = []

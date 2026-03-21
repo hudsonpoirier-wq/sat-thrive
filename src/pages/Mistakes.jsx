@@ -486,9 +486,9 @@ export default function Mistakes() {
                       return updatedReview?.[k]?.last_correct !== true
                     }).filter(m => String(m?.test_id || '').startsWith('act') ? exam === 'act' : exam === 'sat').length
                     if (remaining === 0) {
-                      addToast('All missed questions reviewed — amazing work!', 'success')
+                      addToast("Good job on Q" + selected.q_num + "! You've completed all your missed questions!", 'success')
                     } else {
-                      addToast(`Q${selected.q_num} validated! ${remaining} remaining.`, 'success')
+                      addToast("Good job on Q" + selected.q_num + "! " + remaining + " question" + (remaining === 1 ? "" : "s") + " left in your Mistake Notebook.", 'success')
                     }
                   }
                 } finally {

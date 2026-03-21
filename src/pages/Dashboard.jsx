@@ -484,8 +484,18 @@ export default function Dashboard() {
   const addToast = useToast()
   const prevStudiedRef = useRef(null)
   const prevReviewTodoRef = useRef(null)
+  // Reset toast refs when exam changes so stale cross-exam deltas don't fire
+  const prevExamRef = useRef(exam)
   useEffect(() => {
-    if (!addToast) return
+    if (prevExamRef.current !== exam) {
+      prevStudiedRef.current = null
+      prevReviewTodoRef.current = null
+      prevExamRef.current = exam
+    }
+  }, [exam])
+
+  useEffect(() => {
+    if (!addToast || !hasTakenPretest) return
     const currentKeys = new Set(Object.keys(studiedForExam).filter((k) => studiedForExam[k]))
     if (prevStudiedRef.current) {
       for (const key of currentKeys) {
@@ -497,10 +507,10 @@ export default function Dashboard() {
       }
     }
     prevStudiedRef.current = currentKeys
-  }, [studiedForExam, chaptersForExam, addToast])
+  }, [studiedForExam, chaptersForExam, addToast, hasTakenPretest])
 
   useEffect(() => {
-    if (!addToast) return
+    if (!addToast || !hasTakenPretest) return
     if (prevReviewTodoRef.current !== null && reviewTodoCount < prevReviewTodoRef.current) {
       const diff = prevReviewTodoRef.current - reviewTodoCount
       if (reviewTodoCount === 0) {
@@ -510,7 +520,7 @@ export default function Dashboard() {
       }
     }
     prevReviewTodoRef.current = reviewTodoCount
-  }, [reviewTodoCount, addToast])
+  }, [reviewTodoCount, addToast, hasTakenPretest])
 
   function scheduleCardTitle(day, idx) {
     if (idx === 0 && day?.isToday) return 'Today'
