@@ -8,6 +8,7 @@ import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
 import { getChaptersForExam, getGuideContentForExam } from '../data/examData.js'
+import { useToast } from '../components/Toast.jsx'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
@@ -439,6 +440,7 @@ export default function Guide() {
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
   )
+  const addToast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
   const [practiceByChapter, setPracticeByChapter] = useState({})
@@ -589,6 +591,11 @@ export default function Guide() {
                     const updated = { ...completedMap, [selectedId]: next }
                     setCompletedMap(updated)
                     await setStudiedTopic(viewUserId, selectedId, next)
+                    if (next && addToast) {
+                      const ch = chapters?.[selectedId]
+                      const label = ch?.name || `Chapter ${selectedId}`
+                      addToast(`${label} — completed!`, 'success')
+                    }
                   }}
                 >
                   {isAdminPreview ? 'Preview only' : completedMap[selectedId] ? 'Marked Complete' : 'Mark Chapter Complete'}

@@ -214,6 +214,7 @@ export function buildAdaptiveSchedule({
   weakTopics,
   studiedMap,
   reviewCount = 0,
+  totalReviewCount = 0,
   hasTakenPretest = false,
   prefs,
   testDate,
@@ -247,11 +248,16 @@ export function buildAdaptiveSchedule({
   const activeDays = days.filter((d) => d.isActive)
   const usableDays = activeDays.length ? activeDays : days
   const subjectQueues = buildChapterQueues(weakTopics, studiedMap || {}, exam)
+  // Use totalReviewCount (all mistakes from the test) for creating review blocks,
+  // then mark blocks as completed based on how many have been validated.
+  const totalReview = Math.max(0, Number(totalReviewCount || reviewCount || 0))
   const pendingReviewCount = Math.max(0, Number(reviewCount || 0))
-  let reviewBlocks = Math.ceil(pendingReviewCount / 5)
-  let reviewLeft = pendingReviewCount
+  const reviewsCompleted = Math.max(0, totalReview - pendingReviewCount)
+  let reviewBlocks = Math.ceil(totalReview / 5)
+  let reviewLeft = totalReview
+  let reviewCompletedLeft = reviewsCompleted
   const reviewMinutes = Array.from({ length: reviewBlocks }, (_, index) => {
-    const amount = Math.min(5, Math.max(1, pendingReviewCount - index * 5 || 5))
+    const amount = Math.min(5, Math.max(1, totalReview - index * 5 || 5))
     return Math.max(12, amount * 3)
   }).reduce((sum, value) => sum + value, 0)
   const allTasks = Object.values(subjectQueues).flat()
@@ -274,18 +280,24 @@ export function buildAdaptiveSchedule({
 
     if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
       const amount = Math.min(5, Math.max(1, reviewLeft || 5))
+      const isDone = reviewCompletedLeft >= amount
+      if (isDone) reviewCompletedLeft -= amount
       const reviewTask = {
         id: `review-${day.key}`,
         type: 'mistakes',
         subject: 'Mixed',
         title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
-        subtitle: `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
+        subtitle: isDone
+          ? `Completed — ${amount} question${amount === 1 ? '' : 's'} validated.`
+          : `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
         href: '/mistakes',
-        estimatedMinutes: Math.max(12, amount * 3),
+        estimatedMinutes: isDone ? 0 : Math.max(12, amount * 3),
+        completed: isDone,
+        amount,
       }
-      if (!tasks.length || usedMinutes + reviewTask.estimatedMinutes <= effectiveMinutesPerDay) {
+      if (!tasks.length || isDone || usedMinutes + reviewTask.estimatedMinutes <= effectiveMinutesPerDay) {
         tasks.push(reviewTask)
-        usedMinutes += reviewTask.estimatedMinutes
+        if (!isDone) usedMinutes += reviewTask.estimatedMinutes
       }
       reviewLeft = Math.max(0, reviewLeft - amount)
       reviewBlocks -= 1
@@ -325,14 +337,20 @@ export function buildAdaptiveSchedule({
   const overflowTasks = []
   while (reviewBlocks > 0) {
     const amount = Math.min(5, Math.max(1, reviewLeft || 5))
+    const isDone = reviewCompletedLeft >= amount
+    if (isDone) reviewCompletedLeft -= amount
     overflowTasks.push({
       id: `review-overflow-${overflowTasks.length + 1}`,
       type: 'mistakes',
       subject: 'Mixed',
       title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
-      subtitle: `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
+      subtitle: isDone
+        ? `Completed — ${amount} question${amount === 1 ? '' : 's'} validated.`
+        : `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
       href: '/mistakes',
-      estimatedMinutes: Math.max(12, amount * 3),
+      estimatedMinutes: isDone ? 0 : Math.max(12, amount * 3),
+      completed: isDone,
+      amount,
     })
     reviewLeft = Math.max(0, reviewLeft - amount)
     reviewBlocks -= 1

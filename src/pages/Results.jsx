@@ -305,12 +305,13 @@ export default function Results() {
     weakTopics,
     studiedMap,
     reviewCount: reviewTodoCount,
+    totalReviewCount: reviewCount,
     hasViewedResults: true,
     hasTakenPretest: true,
     prefs,
     testDate: satDate,
     exam,
-  }), [weakTopics, studiedMap, reviewTodoCount, prefs, satDate, exam])
+  }), [weakTopics, studiedMap, reviewTodoCount, reviewCount, prefs, satDate, exam])
 
   const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
 

@@ -21,7 +21,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={addToast}>
       {children}
-      <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, display: 'grid', gap: 10, pointerEvents: 'none' }}>
+      <div style={{ position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'grid', gap: 10, pointerEvents: 'none' }}>
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onDismiss={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))} />
         ))}
@@ -58,7 +58,7 @@ function ToastItem({ toast, onDismiss }) {
         alignItems: 'center',
         gap: 10,
         cursor: 'pointer',
-        transform: visible ? 'translateX(0)' : 'translateX(120%)',
+        transform: visible ? 'translateY(0)' : 'translateY(-120%)',
         opacity: visible ? 1 : 0,
         transition: 'all .35s cubic-bezier(.22,1,.36,1)',
         maxWidth: 340,

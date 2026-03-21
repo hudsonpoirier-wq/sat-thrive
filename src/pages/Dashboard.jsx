@@ -425,6 +425,7 @@ export default function Dashboard() {
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
+      totalReviewCount: latestMistakes?.length || 0,
       hasViewedResults: viewedLatestResults,
       hasTakenPretest: true,
       prefs: studyPrefs,

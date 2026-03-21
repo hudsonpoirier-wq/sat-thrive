@@ -153,6 +153,7 @@ export default function CalendarPage() {
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
+      totalReviewCount: latestMistakes.length,
       hasTakenPretest: true,
       prefs: studyPrefs,
       testDate: satDate,

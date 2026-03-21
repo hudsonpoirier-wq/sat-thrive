@@ -17,6 +17,7 @@ import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
+import { useToast } from '../components/Toast.jsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -233,6 +234,7 @@ export default function Mistakes() {
   const [hintStep, setHintStep] = useState(0)
   const [questionContextText, setQuestionContextText] = useState('')
 
+  const addToast = useToast()
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
@@ -311,10 +313,12 @@ export default function Mistakes() {
   }, [selectedItemKey])
 
   useEffect(() => {
+    // Don't auto-deselect if user just answered correctly (let them pick Next or Back)
+    if (redoFeedback?.ok) return
     if (selected && !filtered.some((item) => item.id === selected.id)) {
       setSelected(null)
     }
-  }, [filtered, selected])
+  }, [filtered, selected, redoFeedback])
 
   useEffect(() => {
     if (!selected) {
@@ -473,8 +477,20 @@ export default function Mistakes() {
                   const currentItem = reviewItems?.[selectedItemKey] || { due_at: new Date().toISOString() }
                   const next = applyReviewResult(currentItem, true)
                   await saveReviewItem(viewUserId, selectedItemKey, next)
-                  setReviewItems(prev => ({ ...(prev || {}), [selectedItemKey]: next }))
-                  setItems(prev => (prev || []).filter(m => m.id !== selected.id))
+                  const updatedReview = { ...(reviewItems || {}), [selectedItemKey]: next }
+                  setReviewItems(updatedReview)
+                  // Don't remove from items yet — let user pick "Next" or "Back to list"
+                  if (addToast) {
+                    const remaining = (items || []).filter(m => m.id !== selected.id).filter(m => {
+                      const k = `${m.test_id}:${m.section}:${m.q_num}`
+                      return updatedReview?.[k]?.last_correct !== true
+                    }).filter(m => String(m?.test_id || '').startsWith('act') ? exam === 'act' : exam === 'sat').length
+                    if (remaining === 0) {
+                      addToast('All missed questions reviewed — amazing work!', 'success')
+                    } else {
+                      addToast(`Q${selected.q_num} validated! ${remaining} remaining.`, 'success')
+                    }
+                  }
                 } finally {
                   setRedoSaving(false)
                 }
