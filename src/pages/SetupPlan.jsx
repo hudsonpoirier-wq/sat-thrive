@@ -1,0 +1,181 @@
+import { useState, useEffect, useMemo } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.jsx'
+import { supabase } from '../lib/supabase.js'
+import { loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, defaultStudyPrefs } from '../lib/studyPlan.js'
+import { getExamConfigForTest } from '../data/examData.js'
+import Icon from '../components/AppIcons.jsx'
+
+export default function SetupPlan() {
+  const { attemptId } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const userId = user?.id
+
+  const [attempt, setAttempt] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [testDate, setTestDate] = useState('')
+  const [prefs, setPrefs] = useState(null)
+
+  const exam = attempt ? getExamConfigForTest(attempt.test_id).exam : null
+  const examConfig = attempt ? getExamConfigForTest(attempt.test_id) : null
+
+  // Load attempt
+  useEffect(() => {
+    if (!supabase || !userId || !attemptId) return
+    let cancelled = false
+    supabase.from('test_attempts').select('*').eq('id', attemptId).eq('user_id', userId).single()
+      .then(({ data }) => {
+        if (cancelled) return
+        if (!data || !data.completed_at) {
+          navigate('/dashboard', { replace: true })
+          return
+        }
+        setAttempt(data)
+        const ex = getExamConfigForTest(data.test_id).exam
+        setTestDate(loadSatTestDate(userId, ex))
+        setPrefs(loadStudyPrefs(userId, ex))
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) navigate('/dashboard', { replace: true })
+      })
+    return () => { cancelled = true }
+  }, [attemptId, userId, navigate])
+
+  function handleContinue() {
+    navigate(`/results/${attemptId}`)
+  }
+
+  if (loading || !attempt || !exam) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontFamily: 'Sora,sans-serif' }}>
+        Loading…
+      </div>
+    )
+  }
+
+  const days = prefs?.days || defaultStudyPrefs(exam).days
+  const anyDaySelected = days.some(Boolean)
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(170deg, #0f172a 0%, #1e3a5f 40%, #0ea5e9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ width: '100%', maxWidth: 560, background: 'white', borderRadius: 24, boxShadow: '0 25px 60px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '36px 32px 24px', background: 'linear-gradient(135deg, rgba(14,165,233,.08), rgba(99,102,241,.06))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+              <Icon name="calendar" size={22} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#0f172a' }}>
+                Set Up Your Study Plan
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+                One quick step before your results
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '24px 32px 36px' }}>
+          {/* Test Date */}
+          <div style={{ marginBottom: 28 }}>
+            <label style={{ display: 'block', fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+              When is your {examConfig.label} test?
+            </label>
+            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 12 }}>
+              Enter your official or estimated test date. We'll build a personalized day-by-day plan to get you ready.
+            </div>
+            <input
+              type="date"
+              value={testDate}
+              onChange={(e) => {
+                const value = e.target.value
+                setTestDate(value)
+                saveSatTestDate(userId, value, exam)
+              }}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: 12,
+                fontSize: 15,
+                background: 'white',
+                boxSizing: 'border-box',
+                color: '#0f172a',
+              }}
+            />
+          </div>
+
+          {/* Available Days */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+              Which days can you study?
+            </div>
+            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 12 }}>
+              Select the days you're available each week. Your schedule adapts automatically if you miss a day.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {dayLabels().map((d, i) => {
+                const enabled = !!days[i]
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...(prefs || defaultStudyPrefs(exam)) }
+                      next.days = [...days]
+                      next.days[i] = !next.days[i]
+                      setPrefs(next)
+                      try { saveStudyPrefs(userId, next, exam) } catch {}
+                    }}
+                    style={{
+                      flex: '1 1 0',
+                      minWidth: 56,
+                      padding: '12px 6px',
+                      fontSize: 13,
+                      fontWeight: 800,
+                      border: enabled ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
+                      borderRadius: 12,
+                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
+                      color: enabled ? '#0369a1' : '#94a3b8',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Continue Button */}
+          <button
+            className="btn btn-primary"
+            onClick={handleContinue}
+            disabled={!testDate || !anyDaySelected}
+            style={{
+              width: '100%',
+              padding: '15px',
+              fontSize: 16,
+              fontWeight: 800,
+              borderRadius: 14,
+              opacity: (!testDate || !anyDaySelected) ? 0.5 : 1,
+            }}
+          >
+            See My Results →
+          </button>
+
+          {(!testDate || !anyDaySelected) && (
+            <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: '#94a3b8' }}>
+              {!testDate ? 'Pick a test date to continue' : 'Select at least one study day'}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  )
+}

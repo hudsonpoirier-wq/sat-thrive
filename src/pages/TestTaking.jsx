@@ -653,7 +653,7 @@ export default function TestTaking() {
       }
     } catch {}
 
-    navigate(`/results/${attemptId}`)
+    navigate(`/setup-plan/${attemptId}`)
   }
 
   function handleTimerExpire() {
@@ -781,16 +781,18 @@ export default function TestTaking() {
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>
             {Object.keys(modAnswers).length}/{totalQ} answered
           </div>
-          <a
-            className="btn btn-outline"
-            href={`/guide?exam=${encodeURIComponent(examConfig.exam)}`}
-            target="_blank"
-            rel="noreferrer"
-            style={{ padding: '6px 10px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.18)', background: 'rgba(255,255,255,.08)' }}
-            title="Open the Study Guide in a new tab (your test stays running here)"
-          >
-            Study Guide ↗
-          </a>
+          {currentTestId !== examConfig.preTestId && (
+            <a
+              className="btn btn-outline"
+              href={`/guide?exam=${encodeURIComponent(examConfig.exam)}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ padding: '6px 10px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.18)', background: 'rgba(255,255,255,.08)' }}
+              title="Open the Study Guide in a new tab (your test stays running here)"
+            >
+              Study Guide ↗
+            </a>
+          )}
           {isLastModule && (
             <button className="btn" onClick={submitTest} disabled={submitting}
               style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 700, padding: '7px 16px', fontSize: 13 }}>
@@ -903,7 +905,7 @@ export default function TestTaking() {
                   pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'}
                   startPage={sectionRange[0]}
                   endPage={sectionRange[1]}
-                  containerStyle={{ width: '100%' }}
+                  containerStyle={{ width: '100%', height: 'auto', overflowY: 'visible' }}
                 />
               ) : (
 	              <PDFPage key={`${currentModule}:${pdfPage}`} pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'} pageIndex={pdfPage} />

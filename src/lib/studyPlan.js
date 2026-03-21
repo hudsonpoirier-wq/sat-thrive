@@ -167,18 +167,11 @@ export function chapterSubject(input) {
   return READING_DOMAINS.has(domain) ? 'Reading' : 'Math'
 }
 
-function chapterTaskUnits(count) {
-  const n = Number(count || 0)
-  if (n >= 6) return 3
-  if (n >= 3) return 2
-  return 1
-}
-
 function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
   const buckets = {}
   for (const topic of normalizeWeakTopics(weakTopics)) {
-    if (!topic?.ch || studiedMap?.[String(topic.ch)]) continue
-    const units = chapterTaskUnits(topic.count)
+    if (!topic?.ch) continue
+    const isCompleted = Boolean(studiedMap?.[String(topic.ch)])
     const isAct = exam === 'act'
     const label = isAct ? (topic.name || 'ACT Module') : `Chapter ${topic.ch}`
     const title = isAct
@@ -187,26 +180,27 @@ function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
     const subtitle = isAct
       ? `${topic.domain || topic.subject || 'ACT'} · ${topic.count || 0} missed`
       : `${topic.name || 'Topic'} · ${topic.count || 0} missed`
-    const base = {
+    const task = {
       type: 'guide',
+      id: String(topic.ch),
       chapterId: String(topic.ch),
       title,
       subtitle,
       href: `/guide?chapter=${encodeURIComponent(String(topic.ch))}`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
-      estimatedMinutes: Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
+      estimatedMinutes: isCompleted ? 0 : Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
+      completed: isCompleted,
     }
-    for (let i = 0; i < units; i++) {
-      const task = units > 1
-        ? { ...base, id: `${base.chapterId}-${i + 1}`, subtitle: `${base.subtitle} · Session ${i + 1}/${units}` }
-        : { ...base, id: base.chapterId }
-      const subject = task.subject || 'Mixed'
-      if (!buckets[subject]) buckets[subject] = []
-      buckets[subject].push(task)
-    }
+    const subject = task.subject || 'Mixed'
+    if (!buckets[subject]) buckets[subject] = []
+    buckets[subject].push(task)
   }
-  const byWeight = (a, b) => (b.weight - a.weight) || String(a.chapterId).localeCompare(String(b.chapterId))
+  const byWeight = (a, b) => {
+    // Completed tasks sort to the end
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
+    return (b.weight - a.weight) || String(a.chapterId).localeCompare(String(b.chapterId))
+  }
   Object.values(buckets).forEach((bucket) => bucket.sort(byWeight))
   return buckets
 }
@@ -263,8 +257,9 @@ export function buildAdaptiveSchedule({
     return Math.max(12, amount * 3)
   }).reduce((sum, value) => sum + value, 0)
   const allTasks = Object.values(subjectQueues).flat()
-  const totalUnits = allTasks.length + reviewBlocks
-  const totalMinutes = allTasks.reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
+  const pendingTasks = allTasks.filter((t) => !t.completed)
+  const totalUnits = pendingTasks.length + reviewBlocks
+  const totalMinutes = pendingTasks.reduce((sum, task) => sum + Number(task.estimatedMinutes || 0), 0) + reviewMinutes
   const requiredMinutesPerDay = Math.max(20, Math.ceil((totalMinutes / Math.max(1, usableDays.length)) / 5) * 5)
   const effectiveMinutesPerDay = requiredMinutesPerDay
   const avgTasksNeeded = Math.ceil(totalUnits / Math.max(1, usableDays.length))
@@ -299,7 +294,8 @@ export function buildAdaptiveSchedule({
       reviewBlocks -= 1
     }
 
-    while (tasks.length < tasksPerDay && Object.values(subjectQueues).some((queue) => queue.length)) {
+    const activeTasks = () => tasks.filter((t) => !t.completed).length
+    while (activeTasks() < tasksPerDay && Object.values(subjectQueues).some((queue) => queue.length)) {
       const orderedSubjects = subjectOrder.length
         ? [...subjectOrder.slice(subjectCursor), ...subjectOrder.slice(0, subjectCursor)]
         : ['Mixed']
@@ -312,8 +308,14 @@ export function buildAdaptiveSchedule({
         }
       }
       if (!task) break
+      // Completed tasks don't use time budget
+      if (task.completed) {
+        tasks.push(task)
+        if (task.chapterId) chapterIdsUsedToday.add(String(task.chapterId))
+        continue
+      }
       const estimatedMinutes = Number(task.estimatedMinutes || 20)
-      if (tasks.length > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
+      if (activeTasks() > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
         const subject = task.subject || 'Mixed'
         if (!subjectQueues[subject]) subjectQueues[subject] = []
         subjectQueues[subject].unshift(task)
@@ -483,7 +485,7 @@ export function buildStudyPlanToTestDate({ scores, weakTopics, prefs, testDate }
   const lines = []
   lines.push('STUDY PLAN (TO TEST DATE)')
   lines.push(`SAT test date: ${fmtDate(target)} · Plan runs until: ${fmtDate(end)} (3-day taper)`)
-  const recommendedMinutes = Math.max(20, Math.ceil((top.reduce((sum, t) => sum + chapterTaskUnits(t.count) * Math.max(15, Math.min(32, 14 + Number(t.count || 1) * 3)), 0) / Math.max(1, sessions)) / 5) * 5)
+  const recommendedMinutes = Math.max(20, Math.ceil((top.reduce((sum, t) => sum + Math.max(15, Math.min(32, 14 + Number(t.count || 1) * 3)), 0) / Math.max(1, sessions)) / 5) * 5)
   lines.push(`Recommended pace: about ${recommendedMinutes} min per study day · ${sessions} sessions planned`)
   if (scores?.total) lines.push(`Last score: ${scores.total} (R&W ${scores.rw || '—'} / Math ${scores.math || '—'})`)
   lines.push('')

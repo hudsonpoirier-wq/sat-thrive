@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import AppErrorBoundary from './components/AppErrorBoundary.jsx'
+import { ToastProvider } from './components/Toast.jsx'
 import Login from './pages/Login.jsx'
 
 const loadDashboard = () => import('./pages/Dashboard.jsx')
@@ -18,6 +19,7 @@ const loadAuthCallback = () => import('./pages/AuthCallback.jsx')
 const loadResetPassword = () => import('./pages/ResetPassword.jsx')
 const loadChooseTest = () => import('./pages/ChooseTest.jsx')
 const loadCompareTests = () => import('./pages/CompareTests.jsx')
+const loadSetupPlan = () => import('./pages/SetupPlan.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -33,6 +35,7 @@ const AuthCallback = lazy(loadAuthCallback)
 const ResetPassword = lazy(loadResetPassword)
 const ChooseTest = lazy(loadChooseTest)
 const CompareTests = lazy(loadCompareTests)
+const SetupPlan = lazy(loadSetupPlan)
 
 function RouteLoader() {
   return (
@@ -85,6 +88,7 @@ function AppWarmup() {
 export default function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <BrowserRouter>
         <AppErrorBoundary>
           <AppWarmup />
@@ -97,6 +101,7 @@ export default function App() {
               <Route path="/choose-test" element={<ProtectedRoute><ChooseTest /></ProtectedRoute>} />
               <Route path="/compare-tests" element={<ProtectedRoute><CompareTests /></ProtectedRoute>} />
               <Route path="/test/:attemptId" element={<ProtectedRoute><TestTaking /></ProtectedRoute>} />
+              <Route path="/setup-plan/:attemptId" element={<ProtectedRoute><SetupPlan /></ProtectedRoute>} />
               <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
@@ -110,6 +115,7 @@ export default function App() {
           </Suspense>
         </AppErrorBoundary>
       </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   )
 }

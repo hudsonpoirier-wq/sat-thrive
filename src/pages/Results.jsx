@@ -5,12 +5,13 @@ import { supabase } from '../lib/supabase.js'
 import { answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
-import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
 import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.js'
+import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintSummary } from '../lib/questionHints.js'
@@ -146,8 +147,10 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
 }
 
 function ResultScheduleTaskLink({ task, viewHref }) {
-  const accent = task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9'
-  const icon = task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results'
+  const done = !!task.completed
+  const doneAccent = '#059669'
+  const accent = done ? doneAccent : (task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9')
+  const icon = done ? 'check' : (task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results')
   return (
     <Link
       to={viewHref(task.href)}
@@ -156,11 +159,11 @@ function ResultScheduleTaskLink({ task, viewHref }) {
         alignItems: 'flex-start',
         gap: 10,
         padding: '10px 12px',
-        border: '1px solid #e2e8f0',
+        border: done ? '1px solid rgba(5,150,105,.3)' : '1px solid #e2e8f0',
         borderRadius: 12,
         textDecoration: 'none',
-        color: '#0f172a',
-        background: 'white',
+        color: done ? '#059669' : '#0f172a',
+        background: done ? 'rgba(5,150,105,.06)' : 'white',
       }}
     >
       <span style={{
@@ -170,15 +173,15 @@ function ResultScheduleTaskLink({ task, viewHref }) {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `${accent}14`,
+        background: done ? 'rgba(5,150,105,.15)' : `${accent}14`,
         color: accent,
         flexShrink: 0,
       }}>
         <Icon name={icon} size={15} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 900, color: '#1a2744', lineHeight: 1.35 }}>{task.title}</div>
-        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
+        <div style={{ fontSize: 13, fontWeight: 900, color: done ? '#059669' : '#1a2744', lineHeight: 1.35 }}>{done && '✓ '}{task.title}</div>
+        <div style={{ fontSize: 12, color: done ? '#6ee7b7' : '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
       </span>
     </Link>
   )
@@ -199,7 +202,9 @@ export default function Results() {
   const examConfig = getExamConfigForTest(attempt?.test_id || (exam === 'act' ? 'act1' : 'pre_test'))
   const [prefs, setPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
-  const [showDatePrompt, setShowDatePrompt] = useState(false)
+  const [studiedMap, setStudiedMap] = useState({})
+  const [reviewItems, setReviewItems] = useState({})
+  // showDatePrompt removed — handled by /setup-plan screen
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
@@ -208,6 +213,21 @@ export default function Results() {
   useEffect(() => {
     setPrefs(loadStudyPrefs(viewUserId, exam))
     setSatDate(loadSatTestDate(viewUserId, exam))
+  }, [viewUserId, exam])
+
+  useEffect(() => {
+    if (!viewUserId) return
+    let cancelled = false
+    loadDashboardViewData(viewUserId).then((data) => {
+      if (cancelled) return
+      const chaptersForExam = examConfig.chapters || {}
+      const filtered = Object.fromEntries(
+        Object.entries(data?.studiedMap || {}).filter(([ch]) => Boolean(chaptersForExam[ch]))
+      )
+      setStudiedMap(filtered)
+      setReviewItems(data?.reviewItems || {})
+    }).catch(() => {})
+    return () => { cancelled = true }
   }, [viewUserId, exam])
 
   useEffect(() => {
@@ -265,16 +285,32 @@ export default function Results() {
     return wrong
   }, [answers, keyBySection])
 
+  const reviewTodoCount = useMemo(() => {
+    if (!keyBySection) return reviewCount
+    let validated = 0
+    for (const [section, key] of Object.entries(keyBySection || {})) {
+      for (const [q, right] of Object.entries(key || {})) {
+        const given = answers?.[section]?.[q]
+        if (given == null || String(given).trim() === '') continue
+        if (!answerMatches(given, right)) {
+          const k = `${attempt?.test_id}:${section}:${q}`
+          if (reviewItems?.[k]?.last_correct === true) validated += 1
+        }
+      }
+    }
+    return Math.max(0, reviewCount - validated)
+  }, [reviewCount, reviewItems, keyBySection, answers, attempt?.test_id])
+
   const journeySchedule = useMemo(() => buildAdaptiveSchedule({
     weakTopics,
-    studiedMap: {},
-    reviewCount,
+    studiedMap,
+    reviewCount: reviewTodoCount,
     hasViewedResults: true,
     hasTakenPretest: true,
     prefs,
     testDate: satDate,
     exam,
-  }), [weakTopics, reviewCount, prefs, satDate, exam])
+  }), [weakTopics, studiedMap, reviewTodoCount, prefs, satDate, exam])
 
   const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
 
@@ -284,13 +320,7 @@ export default function Results() {
     }
   }, [attempt?.completed_at, isPreTest, viewUserId, exam])
 
-  useEffect(() => {
-    if (readOnlyView) {
-      setShowDatePrompt(false)
-      return
-    }
-    setShowDatePrompt(Boolean(isPreTest && attempt?.completed_at && !satDate))
-  }, [readOnlyView, isPreTest, attempt?.completed_at, satDate])
+  // Date prompt and availability are now handled by the /setup-plan screen before results.
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>
@@ -340,39 +370,6 @@ export default function Results() {
       </nav>
 
       <div className="page fade-up">
-        {showDatePrompt && (
-          <div className="card" style={{ marginBottom: 18, border: '1px solid rgba(14,165,233,.24)', background: 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.08))' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ minWidth: 280, flex: '1 1 320px' }}>
-                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>
-                  Before we build your Smart Journey calendar…
-                </div>
-                <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.65 }}>
-                  Enter your <b>official or estimated {examConfig.label} test date</b>. We use it to build your day-by-day plan before you open the calendar.
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <input
-                  type="date"
-                  value={satDate || ''}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setSatDate(value)
-                    saveSatTestDate(viewUserId, value, exam)
-                  }}
-                  style={{ padding: '10px 12px', border: '1.5px solid #cbd5e1', borderRadius: 12, fontSize: 14, background: 'white', minWidth: 180 }}
-                />
-                <button
-                  className="btn btn-primary"
-                  disabled={!satDate}
-                  onClick={() => setShowDatePrompt(false)}
-                >
-                  Continue →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
             <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
@@ -482,69 +479,31 @@ export default function Results() {
                 Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target {examConfig.label} date.
               </p>
             </div>
-            {showDatePrompt ? (
-              <button className="btn btn-outline" style={{ flexShrink: 0 }} disabled>
-                Set Test Date First
-              </button>
-            ) : (
-              <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
-                Open Full Calendar →
-              </Link>
-            )}
+            <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
+              Open Full Calendar →
+            </Link>
           </div>
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc', marginBottom: 14 }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Official or estimated test date:
-                <input
-                  type="date"
-                  value={satDate || ''}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setSatDate(value)
-                    saveSatTestDate(viewUserId, value, exam)
-                  }}
-                  disabled={readOnlyView}
-                  style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
-                />
-              </label>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#64748b' }}>
+              {satDate && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="calendar" size={14} />
+                  <span style={{ fontWeight: 900 }}>Test date:</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{new Date(satDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontWeight: 900 }}>Study days:</span>
+                <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                  {dayLabels().filter((_, i) => prefs?.days?.[i]).join(', ') || 'None set'}
+                </span>
+              </div>
             </div>
-
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
-              {dayLabels().map((d, i) => {
-                const enabled = !!prefs?.days?.[i]
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={readOnlyView}
-                    onClick={() => {
-                      const next = { ...(prefs || loadStudyPrefs(viewUserId)) }
-                      next.days = (next.days || Array(7).fill(false)).map(Boolean)
-                      next.days[i] = !next.days[i]
-                      setPrefs(next)
-                      try { saveStudyPrefs(viewUserId, next, exam) } catch {}
-                    }}
-                    style={{
-                      padding: '7px 12px',
-                      fontSize: 12,
-                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
-                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
-                      color: enabled ? '#0f172a' : '#64748b',
-                    }}
-                  >
-                    {d}
-                  </button>
-                )
-              })}
-            </div>
-            <div style={{ marginTop: 12, fontSize: 12, color: journeySchedule?.needsMoreTime ? '#92400e' : '#64748b', lineHeight: 1.6 }}>
+            <div style={{ marginTop: 10, fontSize: 12, color: journeySchedule?.needsMoreTime ? '#92400e' : '#64748b', lineHeight: 1.6 }}>
               {journeySchedule?.needsMoreTime
-                ? <>Plan for about <b>{journeySchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.</>
-                : <>This plan updates from your latest results, and any missed day rolls forward into the next available study day automatically.</>}
+                ? <>Plan for about <b>{journeySchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. You can adjust your date and availability from the <Link to={viewHref('/calendar')} style={{ color: '#0ea5e9', fontWeight: 700 }}>Calendar</Link>.</>
+                : <>This plan updates from your latest results. Missed days roll forward automatically.</>}
             </div>
           </div>
 
@@ -562,7 +521,7 @@ export default function Results() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                   <div>
                     <div style={{ fontWeight: 900, color: '#1a2744' }}>
-                      {idx === 0 ? 'Today' : idx === 1 ? 'Tomorrow' : 'The Day After'}
+                      {idx === 0 ? 'Today' : idx === 1 ? 'Following Study Day' : 'Coming Up'}
                     </div>
                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
                   </div>

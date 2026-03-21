@@ -1,0 +1,82 @@
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import Icon from './AppIcons.jsx'
+
+const ToastContext = createContext(null)
+
+export function useToast() {
+  return useContext(ToastContext)
+}
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([])
+
+  const addToast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random()
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3500)
+  }, [])
+
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, display: 'grid', gap: 10, pointerEvents: 'none' }}>
+        {toasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onDismiss={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))} />
+        ))}
+      </div>
+    </ToastContext.Provider>
+  )
+}
+
+function ToastItem({ toast, onDismiss }) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true))
+    const timer = setTimeout(() => setVisible(false), 3000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return (
+    <div
+      onClick={onDismiss}
+      style={{
+        pointerEvents: 'auto',
+        padding: '12px 18px',
+        borderRadius: 14,
+        background: toast.type === 'success'
+          ? 'linear-gradient(135deg, #059669, #10b981)'
+          : 'linear-gradient(135deg, #1a2744, #334155)',
+        color: 'white',
+        fontFamily: 'Sora, sans-serif',
+        fontSize: 13,
+        fontWeight: 700,
+        boxShadow: '0 12px 32px rgba(0,0,0,.2)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
+        transform: visible ? 'translateX(0)' : 'translateX(120%)',
+        opacity: visible ? 1 : 0,
+        transition: 'all .35s cubic-bezier(.22,1,.36,1)',
+        maxWidth: 340,
+      }}
+    >
+      <span style={{
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(255,255,255,.2)',
+        flexShrink: 0,
+      }}>
+        <Icon name={toast.type === 'success' ? 'check' : 'info'} size={16} />
+      </span>
+      {toast.message}
+    </div>
+  )
+}

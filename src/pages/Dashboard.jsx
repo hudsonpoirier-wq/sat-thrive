@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
@@ -8,6 +8,7 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
+import { useToast } from '../components/Toast.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -102,9 +103,10 @@ function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
   )
 }
 
-function ScheduleTaskLink({ task, compact = false, stopParentClick = false }) {
-  const accent = task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9'
-  const icon = task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results'
+function ScheduleTaskLink({ task, compact = false, stopParentClick = false, completed = false }) {
+  const doneAccent = '#059669'
+  const accent = completed ? doneAccent : (task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9')
+  const icon = completed ? 'check' : (task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results')
   return (
     <Link
       to={task.href}
@@ -114,11 +116,11 @@ function ScheduleTaskLink({ task, compact = false, stopParentClick = false }) {
         alignItems: 'flex-start',
         gap: 10,
         padding: compact ? '8px 10px' : '10px 12px',
-        border: '1px solid #e2e8f0',
+        border: completed ? '1px solid rgba(5,150,105,.3)' : '1px solid #e2e8f0',
         borderRadius: 12,
         textDecoration: 'none',
-        color: '#0f172a',
-        background: 'white',
+        color: completed ? '#059669' : '#0f172a',
+        background: completed ? 'rgba(5,150,105,.06)' : 'white',
       }}
     >
       <span style={{
@@ -128,15 +130,17 @@ function ScheduleTaskLink({ task, compact = false, stopParentClick = false }) {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `${accent}14`,
+        background: completed ? 'rgba(5,150,105,.15)' : `${accent}14`,
         color: accent,
         flexShrink: 0,
       }}>
         <Icon name={icon} size={compact ? 15 : 16} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <div style={{ fontSize: compact ? 12 : 13, fontWeight: 900, color: '#1a2744', lineHeight: 1.35 }}>{task.title}</div>
-        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
+        <div style={{ fontSize: compact ? 12 : 13, fontWeight: 900, color: completed ? '#059669' : '#1a2744', lineHeight: 1.35 }}>
+          {completed && '✓ '}{task.title}
+        </div>
+        <div style={{ fontSize: 12, color: completed ? '#6ee7b7' : '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
       </span>
     </Link>
   )
@@ -451,6 +455,38 @@ export default function Dashboard() {
     setUnlockedResources(viewUserId, exam, hasTakenPretest)
   }, [viewUserId, exam, hasTakenPretest])
 
+  // Toast notifications for newly completed tasks
+  const addToast = useToast()
+  const prevStudiedRef = useRef(null)
+  const prevReviewTodoRef = useRef(null)
+  useEffect(() => {
+    if (!addToast) return
+    const currentKeys = new Set(Object.keys(studiedForExam).filter((k) => studiedForExam[k]))
+    if (prevStudiedRef.current) {
+      for (const key of currentKeys) {
+        if (!prevStudiedRef.current.has(key)) {
+          const ch = chaptersForExam?.[key]
+          const label = ch?.name || `Chapter ${key}`
+          addToast(`${label} — completed!`, 'success')
+        }
+      }
+    }
+    prevStudiedRef.current = currentKeys
+  }, [studiedForExam, chaptersForExam, addToast])
+
+  useEffect(() => {
+    if (!addToast) return
+    if (prevReviewTodoRef.current !== null && reviewTodoCount < prevReviewTodoRef.current) {
+      const diff = prevReviewTodoRef.current - reviewTodoCount
+      if (reviewTodoCount === 0) {
+        addToast('All missed questions reviewed — great work!', 'success')
+      } else {
+        addToast(`${diff} missed question${diff === 1 ? '' : 's'} validated!`, 'success')
+      }
+    }
+    prevReviewTodoRef.current = reviewTodoCount
+  }, [reviewTodoCount, addToast])
+
   function scheduleCardTitle(day, idx) {
     if (idx === 0 && day?.isToday) return 'Today'
     if (idx === 0) return 'Next Study Day'
@@ -622,7 +658,7 @@ export default function Dashboard() {
                   Today’s Tasks
                 </h2>
                 <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening tomorrow’s tasks early.
+                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening the following study day’s tasks early.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -695,7 +731,7 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'grid', gap: 8 }}>
                     {day.tasks.length ? day.tasks.map((task) => (
-                      <ScheduleTaskLink key={task.id} task={task} compact stopParentClick />
+                      <ScheduleTaskLink key={task.id} task={task} compact stopParentClick completed={!!task.completed} />
                     )) : (
                       <div style={{ padding: '12px', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
                         No assigned tasks for this day. Use it as a catch-up or light review day.

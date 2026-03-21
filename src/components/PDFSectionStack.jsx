@@ -16,11 +16,25 @@ export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zo
     if (!node || !root) return
     const scrollRatio = Math.max(0, Math.min(0.95, Number(initialScrollRatio || 0)))
     const scrollToTarget = () => {
-      try {
-        const top = node.offsetTop + ((node.offsetHeight || 0) * scrollRatio)
-        root.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' })
-      } catch {
-        root.scrollTop = Math.max(0, node.offsetTop + ((node.offsetHeight || 0) * scrollRatio) - 24)
+      // Check if root itself scrolls or if we need to scroll a parent/window
+      const rootScrolls = root.scrollHeight > root.clientHeight + 2
+      if (rootScrolls) {
+        try {
+          const top = node.offsetTop + ((node.offsetHeight || 0) * scrollRatio)
+          root.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' })
+        } catch {
+          root.scrollTop = Math.max(0, node.offsetTop + ((node.offsetHeight || 0) * scrollRatio) - 24)
+        }
+      } else {
+        // Container doesn't scroll (overflow: visible) — scroll the page instead
+        try {
+          const rect = node.getBoundingClientRect()
+          const offsetWithinNode = (node.offsetHeight || 0) * scrollRatio
+          const scrollY = window.scrollY + rect.top + offsetWithinNode - 320
+          window.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' })
+        } catch {
+          node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
       }
     }
     requestAnimationFrame(scrollToTarget)

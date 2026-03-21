@@ -280,7 +280,19 @@ export default function Mistakes() {
   const selectedExamConfig = selected ? getExamConfigForTest(selected.test_id) : null
   const selectedModule = selectedExamConfig?.modules?.[selected?.section]
   const selectedViewerMode = selected ? getPdfViewerModeForTest(selected.test_id) : 'single'
-  const selectedSectionRange = selected ? getSectionPageRangesForTest(selected.test_id)?.[selected.section] : null
+  const selectedSectionRange = useMemo(() => {
+    if (!selected) return null
+    // Use configured ranges if available (ACT)
+    const configured = getSectionPageRangesForTest(selected.test_id)?.[selected.section]
+    if (configured) return configured
+    // For SAT, compute range from PDF page maps
+    const map = (selected.test_id === 'pre_test' || selected.test_id === 'practice_test_11')
+      ? (PDF_PAGE_MAP?.[selected.section] || {})
+      : (EXTRA_PDF_PAGE_MAPS?.[selected.test_id]?.[selected.section] || {})
+    const pages = Object.values(map).filter((p) => Number.isFinite(Number(p)) && Number(p) > 0)
+    if (!pages.length) return null
+    return [Math.min(...pages), Math.max(...pages)]
+  }, [selected?.test_id, selected?.section])
   const [resolvedPdfTarget, setResolvedPdfTarget] = useState({ pageIndex: 0, scrollRatio: 0 })
   const selectedItemKey = selected ? `${selected.test_id}:${selected.section}:${selected.q_num}` : null
   const selectedKeyBySection = selected ? getAnswerKeyBySection(selected.test_id) : null
@@ -315,7 +327,7 @@ export default function Mistakes() {
   useEffect(() => {
     let cancelled = false
     async function refineTarget() {
-      if (!selectedCfg?.pdfUrl || selectedViewerMode !== 'stack' || !Array.isArray(selectedSectionRange)) return
+      if (!selectedCfg?.pdfUrl || !Array.isArray(selectedSectionRange)) return
       try {
         const target = await findQuestionPageInSection(
           selectedCfg.pdfUrl,
@@ -345,9 +357,9 @@ export default function Mistakes() {
     async function loadContext() {
       if (!selected || !selectedCfg?.pdfUrl) return
       try {
-        if (selectedViewerMode === 'stack' && questionContextText) return
+        if (Array.isArray(selectedSectionRange) && questionContextText) return
         const start = resolvedPdfTarget.pageIndex
-        const end = selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange)
+        const end = Array.isArray(selectedSectionRange)
           ? Math.min(selectedSectionRange[1], start + 1)
           : start
         const text = await loadPdfTextRange(selectedCfg.pdfUrl, start, end)
@@ -378,7 +390,7 @@ export default function Mistakes() {
   })()
 
   const answerPanel = selected ? (
-    <div className={`mistake-answer-box${exam === 'act' ? ' act-floating' : ''} ${redoFeedback ? (redoFeedback.ok ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: exam === 'act' ? 10 : 14, background: '#f8fafc' }}>
+    <div className={`mistake-answer-box act-floating ${redoFeedback ? (redoFeedback.ok ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
         <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
@@ -478,31 +490,29 @@ export default function Mistakes() {
           </div>
 
           {redoFeedback && !redoFeedback.ok && (
-            <div style={{ marginTop: 14, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ fontWeight: 900, color: '#9a3412' }}>Hints (optional)</div>
-                <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 700 }}>
-                  Use these before checking again.
+            <div style={{ marginTop: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <div style={{ fontWeight: 900, color: '#9a3412', fontSize: 12 }}>Hints</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      className="btn btn-outline"
+                      style={{ padding: '4px 8px', fontSize: 11, background: 'white' }}
+                      onClick={() => setHintStep((step) => Math.max(step, n))}
+                    >
+                      {n}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                {[1, 2, 3].map((n) => (
-                  <button
-                    key={n}
-                    className="btn btn-outline"
-                    style={{ padding: '7px 12px', fontSize: 12, background: 'white' }}
-                    onClick={() => setHintStep((step) => Math.max(step, n))}
-                  >
-                    Hint {n}
-                  </button>
-                ))}
-              </div>
-              <ul style={{ marginTop: 10, marginLeft: 18, color: '#7c2d12', fontSize: 13, lineHeight: 1.65 }}>
-                {buildMistakeHints(selected, selectedIsMC, questionContextText).slice(0, hintStep).map((hint, index) => (
-                  <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 6 }}>{hint}</li>
-                ))}
-                {hintStep === 0 && <li>Start with Hint 1 if you want guidance before rechecking.</li>}
-              </ul>
+              {hintStep > 0 && (
+                <ul style={{ margin: '6px 0 0 14px', padding: 0, color: '#7c2d12', fontSize: 12, lineHeight: 1.5 }}>
+                  {buildMistakeHints(selected, selectedIsMC, questionContextText).slice(0, hintStep).map((hint, index) => (
+                    <li key={`${selectedItemKey}-hint-${index}`} style={{ marginBottom: 3 }}>{hint}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -648,10 +658,10 @@ export default function Mistakes() {
                   </div>
                 </div>
 
-                {exam === 'act' && answerPanel}
+                {answerPanel}
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: 'white', marginBottom: 14 }}>
-                  {selectedViewerMode === 'stack' && Array.isArray(selectedSectionRange) ? (
+                  {Array.isArray(selectedSectionRange) ? (
                     <PDFSectionStack
                       pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
                       startPage={selectedSectionRange[0]}
@@ -659,9 +669,7 @@ export default function Mistakes() {
                       zoom={zoom}
                       initialPageIndex={resolvedPdfTarget.pageIndex}
                       initialScrollRatio={resolvedPdfTarget.scrollRatio}
-                      containerStyle={exam === 'act'
-                        ? { maxHeight: 'none', height: 'auto', overflowY: 'visible', padding: 10, paddingTop: 0 }
-                        : { maxHeight: '62vh', padding: 10 }}
+                      containerStyle={{ maxHeight: 'none', height: 'auto', overflowY: 'visible', padding: 10, paddingTop: 0 }}
                     />
                   ) : (
                     <PDFPage
@@ -672,8 +680,6 @@ export default function Mistakes() {
                     />
                   )}
                 </div>
-
-                {exam !== 'act' && answerPanel}
 
                 {exam !== 'act' && (
                   <div style={{ marginTop: 12 }}>
