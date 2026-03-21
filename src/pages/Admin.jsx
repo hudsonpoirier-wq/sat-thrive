@@ -188,15 +188,19 @@ export default function Admin() {
   const [analyticsExam, setAnalyticsExam] = useState('sat')
 
   const fetchAdminSnapshot = useCallback(async () => {
-    const [p, a, ps] = await Promise.allSettled([
+    const [p, a, ps, ak] = await Promise.allSettled([
       supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
       supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
       supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
+      supabase.from('test_answer_keys').select('*'),
     ])
+    const akMap = {}
+    for (const row of (ak.status === 'fulfilled' ? (ak.value.data || []) : [])) akMap[row.test_id] = row.answer_key
     return {
       students: p.status === 'fulfilled' ? (p.value.data || []) : [],
       attempts: a.status === 'fulfilled' ? (a.value.data || []) : [],
       postScores: ps.status === 'fulfilled' ? (ps.value.data || []) : [],
+      keysByTest: akMap,
     }
   }, [])
 
@@ -214,6 +218,7 @@ export default function Admin() {
       setStudents(snapshot.students)
       setAttempts(snapshot.attempts)
       setPostScores(snapshot.postScores)
+      setKeysByTest(snapshot.keysByTest || {})
       setLoading(false)
     }
     load().catch(() => {
@@ -236,6 +241,7 @@ export default function Admin() {
         setStudents(snapshot.students)
         setAttempts(snapshot.attempts)
         setPostScores(snapshot.postScores)
+        setKeysByTest(snapshot.keysByTest || {})
       } catch {}
     }
 
@@ -244,13 +250,17 @@ export default function Admin() {
       debounce = setTimeout(refresh, 250)
     }
 
+    // Unique channel name per browser tab so multiple admins don't conflict
+    const channelId = `admin-live:${Date.now()}-${Math.random().toString(36).slice(2)}`
     const channel = supabase
-      .channel(`admin-live:${profile?.id || 'shared'}`)
+      .channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, queueRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'test_attempts' }, queueRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'post_scores' }, queueRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, queueRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'studied_topics' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'review_items' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'test_answer_keys' }, queueRefresh)
       .subscribe()
 
     const interval = setInterval(refresh, 15000)
@@ -261,7 +271,7 @@ export default function Admin() {
       clearInterval(interval)
       supabase.removeChannel(channel)
     }
-  }, [isAdmin, profile?.id, fetchAdminSnapshot])
+  }, [isAdmin, fetchAdminSnapshot])
 
   async function resetStudentData(userId, email) {
     if (!supabase || !isAdmin) return
@@ -425,16 +435,7 @@ export default function Admin() {
     }
   }, [isAdmin, profile?.id])
 
-  useEffect(() => {
-    if (!supabase || profile?.role !== 'admin') return
-    supabase.from('test_answer_keys').select('*')
-      .then(({ data }) => {
-        const map = {}
-        for (const row of data || []) map[row.test_id] = row.answer_key
-        setKeysByTest(map)
-      })
-      .catch(() => {})
-  }, [profile?.role])
+  // keysByTest is now loaded as part of fetchAdminSnapshot and refreshed in real-time
 
   // Build paired data
   const computed = useMemo(() => {
