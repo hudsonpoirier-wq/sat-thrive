@@ -271,19 +271,15 @@ export function buildAdaptiveSchedule({
   const subjectOrder = Object.entries(subjectQueues)
     .sort((a, b) => b[1].length - a[1].length)
     .map(([subject]) => subject)
-  let subjectCursor = 0
-
-  for (const day of usableDays) {
-    const tasks = []
-    let usedMinutes = 0
-    const chapterIdsUsedToday = new Set()
-
-    if (reviewBlocks > 0 && tasks.length < tasksPerDay) {
-      const amount = Math.min(5, Math.max(1, reviewLeft || 5))
-      const isDone = reviewCompletedLeft >= amount
-      if (isDone) reviewCompletedLeft -= amount
-      const reviewTask = {
-        id: `review-${day.key}`,
+  // --- Build all review tasks ---
+  const allReviewTasks = []
+  {
+    let rl = totalReview, rcl = reviewsCompleted, rb = reviewBlocks
+    while (rb > 0) {
+      const amount = Math.min(5, Math.max(1, rl || 5))
+      const isDone = rcl >= amount
+      if (isDone) rcl -= amount
+      allReviewTasks.push({
         type: 'mistakes',
         subject: 'Mixed',
         title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
@@ -294,80 +290,89 @@ export function buildAdaptiveSchedule({
         estimatedMinutes: isDone ? 0 : Math.max(12, amount * 3),
         completed: isDone,
         amount,
-      }
-      if (!tasks.length || isDone || usedMinutes + reviewTask.estimatedMinutes <= effectiveMinutesPerDay) {
-        tasks.push(reviewTask)
-        if (!isDone) usedMinutes += reviewTask.estimatedMinutes
-      }
-      reviewLeft = Math.max(0, reviewLeft - amount)
-      reviewBlocks -= 1
+      })
+      rl = Math.max(0, rl - amount)
+      rb -= 1
     }
+  }
 
-    while (tasks.length < tasksPerDay && Object.values(subjectQueues).some((queue) => queue.length)) {
-      const orderedSubjects = subjectOrder.length
-        ? [...subjectOrder.slice(subjectCursor), ...subjectOrder.slice(0, subjectCursor)]
+  // --- Build all guide tasks (round-robin from subject queues) ---
+  const allGuideTasks = []
+  {
+    let sc = 0
+    while (Object.values(subjectQueues).some((q) => q.length)) {
+      const ordered = subjectOrder.length
+        ? [...subjectOrder.slice(sc), ...subjectOrder.slice(0, sc)]
         : ['Mixed']
-      let task = null
-      for (const subject of orderedSubjects) {
-        task = takeNextTask(subjectQueues[subject], chapterIdsUsedToday)
-        if (task) {
-          subjectCursor = (subjectOrder.indexOf(subject) + 1 + subjectOrder.length) % Math.max(1, subjectOrder.length)
+      let found = false
+      for (const subject of ordered) {
+        if (subjectQueues[subject]?.length) {
+          allGuideTasks.push(subjectQueues[subject].shift())
+          sc = (subjectOrder.indexOf(subject) + 1) % Math.max(1, subjectOrder.length)
+          found = true
           break
         }
       }
-      if (!task) break
-      const estimatedMinutes = Number(task.estimatedMinutes || 20)
-      if (tasks.length > 0 && usedMinutes + estimatedMinutes > effectiveMinutesPerDay) {
-        const subject = task.subject || 'Mixed'
-        if (!subjectQueues[subject]) subjectQueues[subject] = []
-        subjectQueues[subject].unshift(task)
-        break
-      }
-      tasks.push(task)
-      if (task.chapterId) chapterIdsUsedToday.add(String(task.chapterId))
-      usedMinutes += estimatedMinutes
+      if (!found) break
     }
+  }
 
+  // --- Interleave review and guide tasks evenly (Bresenham-style) ---
+  // Instead of front-loading all reviews then all modules, this spreads
+  // review tasks evenly throughout the full task list for better learning.
+  const interleaved = []
+  {
+    const rLen = allReviewTasks.length, gLen = allGuideTasks.length
+    let ri = 0, gi = 0
+    for (let i = 0; i < rLen + gLen; i++) {
+      const rFrac = rLen > 0 ? ri / rLen : 1
+      const gFrac = gLen > 0 ? gi / gLen : 1
+      if (ri < rLen && (gi >= gLen || rFrac <= gFrac)) {
+        interleaved.push(allReviewTasks[ri++])
+      } else if (gi < gLen) {
+        interleaved.push(allGuideTasks[gi++])
+      }
+    }
+  }
+
+  // --- Distribute interleaved tasks across usable days ---
+  let taskIdx = 0
+  for (const day of usableDays) {
+    const tasks = []
+    let usedMinutes = 0
+    while (taskIdx < interleaved.length && tasks.length < tasksPerDay) {
+      const task = interleaved[taskIdx]
+      const est = Number(task.estimatedMinutes || 20)
+      if (tasks.length > 0 && usedMinutes + est > effectiveMinutesPerDay) break
+      const assigned = task.type === 'mistakes'
+        ? { ...task, id: `review-${day.key}-${tasks.length}` }
+        : task
+      tasks.push(assigned)
+      if (!task.completed) usedMinutes += est
+      taskIdx++
+    }
     day.tasks = tasks
-    const subjects = new Set(tasks.map((task) => task.subject).filter(Boolean))
-    day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((task) => task.subject)?.subject || (tasks.length ? 'Mixed' : 'Rest')
+    const subjects = new Set(tasks.map((t) => t.subject).filter(Boolean))
+    day.focus = subjects.size > 1 ? 'Mixed' : tasks.find((t) => t.subject)?.subject || (tasks.length ? 'Mixed' : 'Rest')
     day.estimatedMinutes = usedMinutes
   }
 
-  const overflowTasks = []
-  while (reviewBlocks > 0) {
-    const amount = Math.min(5, Math.max(1, reviewLeft || 5))
-    const isDone = reviewCompletedLeft >= amount
-    if (isDone) reviewCompletedLeft -= amount
-    overflowTasks.push({
-      id: `review-overflow-${overflowTasks.length + 1}`,
-      type: 'mistakes',
-      subject: 'Mixed',
-      title: `Review ${amount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${amount === 1 ? '' : 's'}`,
-      subtitle: isDone
-        ? `Completed — ${amount} question${amount === 1 ? '' : 's'} validated.`
-        : `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
-      href: '/mistakes',
-      estimatedMinutes: isDone ? 0 : Math.max(12, amount * 3),
-      completed: isDone,
-      amount,
-    })
-    reviewLeft = Math.max(0, reviewLeft - amount)
-    reviewBlocks -= 1
-  }
-  overflowTasks.push(...Object.values(subjectQueues).flat())
-
-  if (overflowTasks.length && usableDays.length) {
+  // --- Overflow: distribute remaining tasks round-robin ---
+  if (taskIdx < interleaved.length && usableDays.length) {
     let dayIndex = 0
-    for (const task of overflowTasks) {
+    while (taskIdx < interleaved.length) {
+      const task = interleaved[taskIdx++]
       const targetDay = usableDays[dayIndex % usableDays.length]
-      targetDay.tasks.push(task)
+      const assigned = task.type === 'mistakes'
+        ? { ...task, id: `review-overflow-${dayIndex}` }
+        : task
+      targetDay.tasks.push(assigned)
       targetDay.estimatedMinutes = Number(targetDay.estimatedMinutes || 0) + Number(task.estimatedMinutes || 0)
       const subjects = new Set(targetDay.tasks.map((item) => item.subject).filter(Boolean))
       targetDay.focus = subjects.size > 1
         ? 'Mixed'
         : targetDay.tasks.find((item) => item.subject)?.subject || (targetDay.tasks.length ? 'Mixed' : 'Rest')
-      dayIndex += 1
+      dayIndex++
     }
   }
 
