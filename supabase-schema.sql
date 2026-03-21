@@ -202,6 +202,7 @@ create policy "Admins can update scores" on public.post_scores for update using 
 
 drop policy if exists "Users can view own studied topics" on public.studied_topics;
 drop policy if exists "Users can upsert own studied topics" on public.studied_topics;
+drop policy if exists "Users can update own studied topics" on public.studied_topics;
 drop policy if exists "Admins can clear own studied topics" on public.studied_topics;
 drop policy if exists "Admins can delete any studied topics" on public.studied_topics;
 drop policy if exists "Admins see all studied topics" on public.studied_topics;
@@ -214,6 +215,7 @@ create policy "Admins see all studied topics" on public.studied_topics for selec
 
 drop policy if exists "Users can view test answer keys" on public.test_answer_keys;
 drop policy if exists "Admins can upsert test answer keys" on public.test_answer_keys;
+drop policy if exists "Admins can update test answer keys" on public.test_answer_keys;
 create policy "Users can view test answer keys" on public.test_answer_keys for select using (auth.role() = 'authenticated');
 create policy "Admins can upsert test answer keys" on public.test_answer_keys for insert with check (public.is_admin());
 create policy "Admins can update test answer keys" on public.test_answer_keys for update using (public.is_admin()) with check (public.is_admin());
@@ -229,6 +231,8 @@ create policy "Admins see all mistakes" on public.mistakes for select using (pub
 
 drop policy if exists "Users can view own review items" on public.review_items;
 drop policy if exists "Users can upsert own review items" on public.review_items;
+drop policy if exists "Users can insert own review items" on public.review_items;
+drop policy if exists "Users can update own review items" on public.review_items;
 drop policy if exists "Admins see all review items" on public.review_items;
 create policy "Users can view own review items" on public.review_items for select using (auth.uid() = user_id);
 create policy "Users can insert own review items" on public.review_items for insert with check (auth.uid() = user_id);
