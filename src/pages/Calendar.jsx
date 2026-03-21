@@ -127,11 +127,13 @@ export default function CalendarPage() {
   const latestCompleted = completedForExam[0] || null
   const hasTakenPretest = completedForExam.some(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
   const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
-  const latestValidated = latestMistakes.filter((m) => {
+  // Use ALL mistakes for the exam so review count matches the Mistake Notebook
+  const allExamMistakes = (mistakes || []).filter((m) => getExamFromTestId(m?.test_id) === exam)
+  const allExamValidated = allExamMistakes.filter((m) => {
     const key = `${m.test_id}:${m.section}:${m.q_num}`
     return reviewItems?.[key]?.last_correct === true
   }).length
-  const reviewTodoCount = Math.max(0, latestMistakes.length - latestValidated)
+  const reviewTodoCount = Math.max(0, allExamMistakes.length - allExamValidated)
 
   const deriveWeakTopicsForAttempt = (attempt) => {
     // Always recompute from raw answers + answer key for accuracy.
@@ -163,7 +165,7 @@ export default function CalendarPage() {
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
-      totalReviewCount: latestMistakes.length,
+      totalReviewCount: allExamMistakes.length,
       hasTakenPretest: true,
       prefs: studyPrefs,
       testDate: satDate,

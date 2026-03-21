@@ -406,6 +406,13 @@ export default function Dashboard() {
     : `${completed.length} completed · ${inProgress.length} in progress`
   const viewedLatestResults = latestCompleted ? hasViewedResultsForAttempt(latestCompleted.id) : false
   const latestMistakes = latestCompleted ? mistakesForExam.filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
+  // Use ALL mistakes for the exam (not just latest test) so the review count
+  // matches what the Mistake Notebook actually shows.
+  const allExamMistakes = mistakesForExam || []
+  const allExamValidated = allExamMistakes.filter((m) => {
+    const k = `${m.test_id}:${m.section}:${m.q_num}`
+    return reviewItems?.[k]?.last_correct === true
+  }).length
   const latestValidated = latestMistakes.filter((m) => {
     const k = `${m.test_id}:${m.section}:${m.q_num}`
     return reviewItems?.[k]?.last_correct === true
@@ -418,7 +425,7 @@ export default function Dashboard() {
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
   })()
-  const reviewTodoCount = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
+  const reviewTodoCount = Math.max(0, allExamMistakes.length - allExamValidated)
 
   const journeySchedule = useMemo(() => {
     if (!hasTakenPretest || !latestCompleted) return null
@@ -426,7 +433,7 @@ export default function Dashboard() {
       weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
-      totalReviewCount: latestMistakes?.length || 0,
+      totalReviewCount: allExamMistakes.length,
       hasViewedResults: viewedLatestResults,
       hasTakenPretest: true,
       prefs: studyPrefs,

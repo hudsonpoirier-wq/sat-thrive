@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
-import { getTestConfig } from '../data/tests.js'
+import { getTestConfig, getExamFromTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, dayLabels, normalizeWeakTopics } from '../lib/studyPlan.js'
 import BrandLink from '../components/BrandLink.jsx'
@@ -204,6 +204,7 @@ export default function Results() {
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
   const [studiedMap, setStudiedMap] = useState({})
   const [reviewItems, setReviewItems] = useState({})
+  const [allMistakes, setAllMistakes] = useState([])
   // showDatePrompt removed — handled by /setup-plan screen
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
@@ -226,6 +227,7 @@ export default function Results() {
       )
       setStudiedMap(filtered)
       setReviewItems(data?.reviewItems || {})
+      setAllMistakes(data?.mistakes || [])
     }).catch(() => {})
     return () => { cancelled = true }
   }, [viewUserId, exam])
@@ -308,17 +310,31 @@ export default function Results() {
     return Math.max(0, reviewCount - validated)
   }, [reviewCount, reviewItems, keyBySection, answers, attempt?.test_id])
 
+  // Use ALL mistakes for the exam so review count matches the Mistake Notebook
+  const allExamMistakes = useMemo(() =>
+    (allMistakes || []).filter((m) => getExamFromTestId(m?.test_id) === exam),
+    [allMistakes, exam]
+  )
+  const allExamValidated = useMemo(() =>
+    allExamMistakes.filter((m) => {
+      const k = `${m.test_id}:${m.section}:${m.q_num}`
+      return reviewItems?.[k]?.last_correct === true
+    }).length,
+    [allExamMistakes, reviewItems]
+  )
+  const allExamReviewTodo = Math.max(0, allExamMistakes.length - allExamValidated)
+
   const journeySchedule = useMemo(() => buildAdaptiveSchedule({
     weakTopics,
     studiedMap,
-    reviewCount: reviewTodoCount,
-    totalReviewCount: reviewCount,
+    reviewCount: allExamReviewTodo,
+    totalReviewCount: allExamMistakes.length,
     hasViewedResults: true,
     hasTakenPretest: true,
     prefs,
     testDate: satDate,
     exam,
-  }), [weakTopics, studiedMap, reviewTodoCount, reviewCount, prefs, satDate, exam])
+  }), [weakTopics, studiedMap, allExamReviewTodo, allExamMistakes.length, prefs, satDate, exam])
 
   const resultDayCards = journeySchedule?.days?.slice(0, 3) || []
 

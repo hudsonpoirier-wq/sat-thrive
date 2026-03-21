@@ -169,26 +169,27 @@ export function chapterSubject(input) {
 
 function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
   const buckets = {}
+  const seen = new Set()
   for (const topic of normalizeWeakTopics(weakTopics)) {
     if (!topic?.ch) continue
-    // Weak topics are chapters the student MISSED questions on — always active tasks.
-    // studiedMap (guide completion) does NOT validate a chapter if the student still misses
-    // questions for it on their latest test. Only getting ALL questions correct validates it.
+    const chKey = String(topic.ch)
+    if (seen.has(chKey)) continue
+    seen.add(chKey)
     const isAct = exam === 'act'
-    const label = isAct ? (topic.name || 'ACT Module') : `Chapter ${topic.ch}`
+    const label = isAct ? (topic.name || 'ACT Module') : `Chapter ${chKey}`
     const title = isAct
       ? `${topic.subject || 'ACT'} · ${label}`
-      : `Study Guide · Chapter ${topic.ch}`
+      : `Study Guide · Chapter ${chKey}`
     const subtitle = isAct
       ? `${topic.domain || topic.subject || 'ACT'} · ${topic.count || 0} missed`
       : `${topic.name || 'Topic'} · ${topic.count || 0} missed`
     const task = {
       type: 'guide',
-      id: String(topic.ch),
-      chapterId: String(topic.ch),
+      id: chKey,
+      chapterId: chKey,
       title,
       subtitle,
-      href: `/guide?chapter=${encodeURIComponent(String(topic.ch))}`,
+      href: `/guide?chapter=${encodeURIComponent(chKey)}`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
       estimatedMinutes: Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),
