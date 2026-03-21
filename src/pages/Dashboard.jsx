@@ -45,8 +45,27 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
     <nav className="nav">
       <BrandLink to={withViewUser(withExam('/dashboard', currentExam), viewUserId, isAdminPreview)} />
       <div className="nav-actions">
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <TopResourceNav hidden={!showResources} calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
+        {!isAdmin && !isTutor && (
+          <Link
+            to={withViewUser(withExam('/overview', currentExam), viewUserId, isAdminPreview)}
+            className="btn btn-outline"
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              color: 'rgba(255,255,255,.9)',
+              borderColor: 'rgba(14,165,233,.4)',
+              background: 'rgba(14,165,233,.12)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <Icon name="chart" size={14} />
+            Overview
+          </Link>
+        )}
         {isTutor && (
           <Link
             to="/tutor"

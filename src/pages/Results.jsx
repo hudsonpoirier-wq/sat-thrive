@@ -375,8 +375,8 @@ export default function Results() {
       <nav className="nav">
         <BrandLink to={viewHref('/dashboard')} />
         <div className="nav-actions">
-          <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
           <TopResourceNav hidden={!showResourceNav} calendarHref={viewHref('/calendar')} guideHref={viewHref('/guide')} mistakesHref={viewHref('/mistakes')} />
+          <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
           <button
             className="btn btn-outline"
             onClick={() => navigate(-1)}

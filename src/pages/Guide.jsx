@@ -20,8 +20,8 @@ function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, currentExam, 
     <nav className="nav">
       <BrandLink to={homeHref} />
       <div className="nav-actions">
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <TopResourceNav hidden={!showResources} current="guide" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <button
           className="btn btn-outline"
           onClick={() => navigate(-1)}

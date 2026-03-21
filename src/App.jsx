@@ -21,6 +21,7 @@ const loadChooseTest = () => import('./pages/ChooseTest.jsx')
 const loadCompareTests = () => import('./pages/CompareTests.jsx')
 const loadSetupPlan = () => import('./pages/SetupPlan.jsx')
 const loadTutorDashboard = () => import('./pages/TutorDashboard.jsx')
+const loadOverview = () => import('./pages/Overview.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -38,6 +39,7 @@ const ChooseTest = lazy(loadChooseTest)
 const CompareTests = lazy(loadCompareTests)
 const SetupPlan = lazy(loadSetupPlan)
 const TutorDashboard = lazy(loadTutorDashboard)
+const Overview = lazy(loadOverview)
 
 function RouteLoader() {
   return (
@@ -68,7 +70,7 @@ function AppWarmup() {
 
     const preload = () => {
       const loaders = user
-        ? [loadDashboard, loadGuide, loadMistakes, loadResults, loadReport, loadCalendar, loadChooseTest, loadCompareTests]
+        ? [loadDashboard, loadGuide, loadMistakes, loadResults, loadReport, loadCalendar, loadChooseTest, loadCompareTests, loadOverview]
         : [loadDashboard]
       loaders.forEach((load) => {
         try { load().catch(() => {}) } catch {}
@@ -107,6 +109,7 @@ export default function App() {
               <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/tutor" element={<ProtectedRoute><TutorDashboard /></ProtectedRoute>} />
+              <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
               <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
               <Route path="/final" element={<ProtectedRoute><FinalTest /></ProtectedRoute>} />
               <Route path="/mistakes" element={<ProtectedRoute><Mistakes /></ProtectedRoute>} />

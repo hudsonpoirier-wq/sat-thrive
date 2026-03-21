@@ -1,3 +1,15 @@
+import { ACT_ENGLISH_QUESTIONS } from './actEnglishQuestions.js'
+import { ACT_MATH_QUESTIONS } from './actMathQuestions.js'
+import { ACT_READING_QUESTIONS } from './actReadingQuestions.js'
+import { ACT_SCIENCE_QUESTIONS } from './actScienceQuestions.js'
+
+const ACT_ALL_QUESTIONS = {
+  ...ACT_ENGLISH_QUESTIONS,
+  ...ACT_MATH_QUESTIONS,
+  ...ACT_READING_QUESTIONS,
+  ...ACT_SCIENCE_QUESTIONS,
+}
+
 function mc(q, choices, correct, exp) {
   return { q, choices, correct, exp }
 }
@@ -19,6 +31,7 @@ function buildContent({ intro, lesson, strategy, check, problems }) {
 }
 
 function englishModule({ id, code, name, range, intro, lesson, strategy, check, problems }) {
+  const allProblems = ACT_ALL_QUESTIONS[id] || problems
   return {
     id,
     code,
@@ -27,12 +40,13 @@ function englishModule({ id, code, name, range, intro, lesson, strategy, check, 
     domain: 'ACT English',
     color: '#2563eb',
     questions: range,
-    ...buildContent({ intro, lesson, strategy, check, problems }),
+    ...buildContent({ intro, lesson, strategy, check, problems: allProblems }),
     name,
   }
 }
 
 function mathModule({ id, code, name, range, intro, lesson, strategy, check, problems }) {
+  const allProblems = ACT_ALL_QUESTIONS[id] || problems
   return {
     id,
     code,
@@ -41,12 +55,13 @@ function mathModule({ id, code, name, range, intro, lesson, strategy, check, pro
     domain: 'ACT Math',
     color: '#10b981',
     questions: range,
-    ...buildContent({ intro, lesson, strategy, check, problems }),
+    ...buildContent({ intro, lesson, strategy, check, problems: allProblems }),
     name,
   }
 }
 
 function readingModule({ id, code, name, range, intro, lesson, strategy, check, problems }) {
+  const allProblems = ACT_ALL_QUESTIONS[id] || problems
   return {
     id,
     code,
@@ -55,12 +70,13 @@ function readingModule({ id, code, name, range, intro, lesson, strategy, check, 
     domain: 'ACT Reading',
     color: '#8b5cf6',
     questions: range,
-    ...buildContent({ intro, lesson, strategy, check, problems }),
+    ...buildContent({ intro, lesson, strategy, check, problems: allProblems }),
     name,
   }
 }
 
 function scienceModule({ id, code, name, range, intro, lesson, strategy, check, problems }) {
+  const allProblems = ACT_ALL_QUESTIONS[id] || problems
   return {
     id,
     code,
@@ -69,7 +85,7 @@ function scienceModule({ id, code, name, range, intro, lesson, strategy, check, 
     domain: 'ACT Science',
     color: '#f97316',
     questions: range,
-    ...buildContent({ intro, lesson, strategy, check, problems }),
+    ...buildContent({ intro, lesson, strategy, check, problems: allProblems }),
     name,
   }
 }
