@@ -17,7 +17,7 @@ function lsKeyTestDate(userId, exam = 'sat') {
 
 export function defaultStudyPrefs(_exam = 'sat') {
   return {
-    days: [true, true, true, true, true, false, false], // Mon–Fri
+    days: [true, true, true, true, true, true, true], // All days
   }
 }
 

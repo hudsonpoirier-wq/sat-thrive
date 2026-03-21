@@ -89,7 +89,7 @@ const bigNumStyle = { fontSize: 28, fontWeight: 800, color: '#fff' }
 export default function TutorDashboard() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const isTutor = profile?.role === 'tutor' && profile?.affiliation
+  const isTutor = profile?.role === 'tutor'
   const [students, setStudents] = useState([])
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])

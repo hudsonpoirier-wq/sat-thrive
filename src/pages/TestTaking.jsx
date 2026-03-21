@@ -56,12 +56,19 @@ function Timer({ seconds, onExpire, onTick }) {
 
 function BreakScreen({ nextModule, onContinue, modules }) {
   const [breakTime, setBreakTime] = useState(600) // 10 min break
+  const startRef = useRef(Date.now())
   useEffect(() => {
-    const iv = setInterval(() => setBreakTime(t => Math.max(0, t - 1)), 1000)
-    return () => clearInterval(iv)
+    let raf
+    const tick = () => {
+      const elapsed = (Date.now() - startRef.current) / 1000
+      setBreakTime(Math.max(0, 600 - elapsed))
+      if (elapsed < 600) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
   }, [])
   const mins = Math.floor(breakTime / 60)
-  const secs = breakTime % 60
+  const secs = Math.floor(breakTime % 60)
   const breakProgress = Math.max(0, Math.min(100, (breakTime / 600) * 100))
   return (
     <div className="break-screen">

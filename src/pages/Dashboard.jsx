@@ -35,7 +35,7 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
-  const isTutor = profile?.role === 'tutor' && profile?.affiliation
+  const isTutor = profile?.role === 'tutor'
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
   const calendarHref = withViewUser(withExam('/calendar', currentExam), viewUserId, isAdminPreview)
@@ -296,7 +296,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user || loading) return
-    if (userNeedsExamChoice(user, attempts) && !requestedExam) {
+    if (userNeedsExamChoice(user, attempts) && !requestedExam && profile?.role !== 'tutor') {
       navigate('/choose-test', { replace: true })
       return
     }

@@ -82,12 +82,17 @@ export default function Login() {
       else {
         // If "Confirm email" is OFF in Supabase, signUp returns a session immediately.
         if (data?.session) {
-          setSuccess('Account created! Let’s choose your first test…')
           setLoading(false)
-          navigate('/choose-test', { replace: true })
+          if (signupRole === "tutor") {
+            setSuccess("Account created! Redirecting to your dashboard...")
+            navigate("/dashboard", { replace: true })
+          } else {
+            setSuccess("Account created! Let’s choose your first test...")
+            navigate("/choose-test", { replace: true })
+          }
           return
         }
-        setSuccess('Account created! Sign in, then choose whether you want to start with SAT or ACT.')
+        setSuccess("Account created! Sign in, then choose whether you want to start with SAT or ACT.")
         // Most users expect to sign in next; keep their email filled.
         setMode('signin')
         setPassword('')
@@ -172,7 +177,7 @@ export default function Login() {
             <form onSubmit={handleSubmit}>
               {mode === 'signup' && (
                 <>
-                  <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.22)', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(14,165,233,.35)', marginBottom: 16 }}>
                     {['student', 'tutor'].map((r) => (
                       <button
                         key={r}
@@ -186,11 +191,11 @@ export default function Login() {
                           fontFamily: 'Sora, sans-serif',
                           border: 'none',
                           cursor: 'pointer',
-                          background: signupRole === r ? '#1a2744' : 'rgba(255,255,255,.04)',
+                          background: signupRole === r ? 'linear-gradient(135deg, #0ea5e9, #6366f1)' : 'rgba(255,255,255,.06)',
                           color: signupRole === r ? '#fff' : 'rgba(255,255,255,.85)',
                           transition: 'all .2s',
                           letterSpacing: '.3px',
-                          borderRight: r === 'student' ? '1px solid rgba(255,255,255,.15)' : 'none',
+                          borderRight: r === 'student' ? '1px solid rgba(14,165,233,.25)' : 'none',
                         }}
                       >
                         {r === 'student' ? 'Student' : 'Tutor'}
