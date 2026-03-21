@@ -172,7 +172,7 @@ export default function Login() {
             <form onSubmit={handleSubmit}>
               {mode === 'signup' && (
                 <>
-                  <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.18)', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.22)', marginBottom: 16 }}>
                     {['student', 'tutor'].map((r) => (
                       <button
                         key={r}
@@ -180,15 +180,17 @@ export default function Login() {
                         onClick={() => setSignupRole(r)}
                         style={{
                           flex: 1,
-                          padding: '10px 0',
+                          padding: '11px 0',
                           fontSize: 13,
                           fontWeight: 700,
                           fontFamily: 'Sora, sans-serif',
                           border: 'none',
                           cursor: 'pointer',
-                          background: signupRole === r ? '#1a2744' : 'rgba(255,255,255,.06)',
-                          color: signupRole === r ? '#fff' : 'rgba(255,255,255,.5)',
+                          background: signupRole === r ? '#1a2744' : 'rgba(255,255,255,.04)',
+                          color: signupRole === r ? '#fff' : 'rgba(255,255,255,.85)',
                           transition: 'all .2s',
+                          letterSpacing: '.3px',
+                          borderRight: r === 'student' ? '1px solid rgba(255,255,255,.15)' : 'none',
                         }}
                       >
                         {r === 'student' ? 'Student' : 'Tutor'}
@@ -218,8 +220,8 @@ export default function Login() {
               </div>
               {mode === 'signup' && (
                 <div className="input-wrap">
-                  <label className="input-label">School / Affiliation <span style={{ color: 'rgba(255,255,255,.35)', fontWeight: 400 }}>(optional)</span></label>
-                  <input className="input-field" type="text" placeholder="e.g. ABC Prep" value={affiliation} onChange={e => setAffiliation(e.target.value)} />
+                  <label className="input-label">School / Affiliation <span style={{ color: 'rgba(255,255,255,.35)', fontWeight: 400 }}>(Optional)</span></label>
+                  <input className="input-field" type="text" placeholder="Your School / Affiliation" value={affiliation} onChange={e => setAffiliation(e.target.value)} />
                 </div>
               )}
 

@@ -552,12 +552,17 @@ export default function Admin() {
     { id: 'tests', label: 'Tests', icon: 'test' },
   ]
 
-  // Compute all unique affiliations and per-affiliation stats
+  // Compute all unique affiliations and per-affiliation stats (including unaffiliated)
   const affiliationData = useMemo(() => {
     const affiliations = new Map()
+    const unaffiliated = { name: 'Unaffiliated', students: [], studentIds: new Set() }
     for (const s of students) {
       const aff = (s.affiliation || '').trim()
-      if (!aff) continue
+      if (!aff) {
+        unaffiliated.students.push(s)
+        unaffiliated.studentIds.add(s.id)
+        continue
+      }
       const key = aff.toLowerCase()
       if (!affiliations.has(key)) affiliations.set(key, { name: aff, students: [], studentIds: new Set() })
       affiliations.get(key).students.push(s)
@@ -579,6 +584,22 @@ export default function Admin() {
       })
     }
     result.sort((a, b) => b.studentCount - a.studentCount)
+    // Add unaffiliated group at the end if any exist
+    if (unaffiliated.students.length > 0) {
+      const groupAttempts = attempts.filter(a => unaffiliated.studentIds.has(a.user_id))
+      const totals = groupAttempts.map(a => Number(a.scores?.composite || a.scores?.total || 0)).filter(t => t > 0)
+      const sorted = totals.slice().sort((a, b) => a - b)
+      const avg = totals.length ? totals.reduce((s, v) => s + v, 0) / totals.length : null
+      result.push({
+        name: 'Unaffiliated',
+        studentCount: unaffiliated.students.length,
+        attemptCount: groupAttempts.length,
+        avgScore: avg,
+        median: sorted.length ? quantile(sorted, 0.5) : null,
+        studentIds: unaffiliated.studentIds,
+        isUnaffiliated: true,
+      })
+    }
     return result
   }, [students, attempts])
 
@@ -587,6 +608,7 @@ export default function Admin() {
   // Filter students/attempts by selected affiliation for the main analytics
   const filteredStudents = useMemo(() => {
     if (!affiliationFilter) return students
+    if (affiliationFilter === '__unaffiliated__') return students.filter(s => !(s.affiliation || '').trim())
     const key = affiliationFilter.toLowerCase()
     return students.filter(s => (s.affiliation || '').toLowerCase() === key)
   }, [students, affiliationFilter])
@@ -930,9 +952,12 @@ export default function Admin() {
                   style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, fontFamily: 'Sora,sans-serif', fontWeight: 600, background: '#fff', color: '#1a2744', cursor: 'pointer' }}
                 >
                   <option value="">All Affiliations</option>
-                  {affiliationNames.map((name) => (
-                    <option key={name} value={name}>{name}</option>
+                  {affiliationData.filter(a => !a.isUnaffiliated).map((a) => (
+                    <option key={a.name} value={a.name}>{a.name}</option>
                   ))}
+                  {affiliationData.some(a => a.isUnaffiliated) && (
+                    <option value="__unaffiliated__">Unaffiliated</option>
+                  )}
                 </select>
               )}
             </div>
@@ -1306,7 +1331,7 @@ export default function Admin() {
                 {/* Per-affiliation stat cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                   {affiliationData.map((aff) => (
-                    <div key={aff.name} className="card" style={{ cursor: 'pointer' }} onClick={() => { setAffiliationFilter(aff.name); setTab('students') }}>
+                    <div key={aff.name} className="card" style={{ cursor: 'pointer', borderLeft: aff.isUnaffiliated ? '3px solid #94a3b8' : undefined }} onClick={() => { setAffiliationFilter(aff.isUnaffiliated ? '__unaffiliated__' : aff.name); setTab('students') }}>
                       <h4 style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#1a2744' }}>{aff.name}</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                         <div style={{ textAlign: 'center' }}>
