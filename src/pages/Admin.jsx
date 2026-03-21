@@ -189,8 +189,12 @@ export default function Admin() {
   const [affiliationFilter, setAffiliationFilter] = useState('')
 
   const fetchAdminSnapshot = useCallback(async () => {
-    const [p, a, ps, ak] = await Promise.allSettled([
-      supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false }),
+    // Try profiles with affiliation column first; fall back to without it if the column doesn't exist yet
+    let profileResult = await supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false })
+    if (profileResult.error && !profileResult.data) {
+      profileResult = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
+    }
+    const [a, ps, ak] = await Promise.allSettled([
       supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
       supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
       supabase.from('test_answer_keys').select('*'),
@@ -198,7 +202,7 @@ export default function Admin() {
     const akMap = {}
     for (const row of (ak.status === 'fulfilled' ? (ak.value.data || []) : [])) akMap[row.test_id] = row.answer_key
     return {
-      students: p.status === 'fulfilled' ? (p.value.data || []) : [],
+      students: profileResult.data || [],
       attempts: a.status === 'fulfilled' ? (a.value.data || []) : [],
       postScores: ps.status === 'fulfilled' ? (ps.value.data || []) : [],
       keysByTest: akMap,
@@ -914,7 +918,9 @@ export default function Admin() {
         {/* Summary stats */}
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           {[
-            { label: 'Total Students', val: students.length, icon: 'students', dark: false },
+            { label: 'Total Registered', val: students.length, icon: 'students', dark: false },
+            { label: 'Students', val: students.filter(s => s.role !== 'admin' && s.role !== 'tutor').length, icon: 'students', dark: false },
+            { label: 'Tutors', val: students.filter(s => s.role === 'tutor').length, icon: 'students', dark: false },
             { label: 'Completed Tests', val: attempts.length, icon: 'check', dark: false },
             { label: 'Paired Records', val: pairs.length, icon: 'chart', dark: false },
             { label: 'Avg Improvement', val: avgImprovement !== null ? `+${avgImprovement} pts` : '—', icon: 'trend', dark: !!avgImprovement },
