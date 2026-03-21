@@ -92,12 +92,14 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  async function signUp(email, password, fullName) {
+  async function signUp(email, password, fullName, role = 'student', affiliation = '') {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
+    const meta = { full_name: fullName, role: role === 'tutor' ? 'tutor' : 'student' }
+    if (affiliation) meta.affiliation = affiliation
     const { data, error } = await supabase.auth.signUp({
       email, password,
       options: {
-        data: { full_name: fullName },
+        data: meta,
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       }
     })

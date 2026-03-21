@@ -11,6 +11,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [signupRole, setSignupRole] = useState('student')
+  const [affiliation, setAffiliation] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
@@ -75,7 +77,7 @@ export default function Login() {
     setError(''); setSuccess(''); setLoading(true)
     if (mode === 'signup') {
       if (!fullName.trim()) { setError('Please enter your full name'); setLoading(false); return }
-      const { data, error } = await signUp(email, password, fullName)
+      const { data, error } = await signUp(email, password, fullName, signupRole, affiliation.trim())
       if (error) setError(error.message)
       else {
         // If "Confirm email" is OFF in Supabase, signUp returns a session immediately.
@@ -169,10 +171,35 @@ export default function Login() {
 
             <form onSubmit={handleSubmit}>
               {mode === 'signup' && (
-                <div className="input-wrap">
-                  <label className="input-label">Full Name</label>
-                  <input className="input-field" type="text" placeholder="Jane Smith" value={fullName} onChange={e => setFullName(e.target.value)} required />
-                </div>
+                <>
+                  <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.18)', marginBottom: 16 }}>
+                    {['student', 'tutor'].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setSignupRole(r)}
+                        style={{
+                          flex: 1,
+                          padding: '10px 0',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          fontFamily: 'Sora, sans-serif',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: signupRole === r ? '#1a2744' : 'rgba(255,255,255,.06)',
+                          color: signupRole === r ? '#fff' : 'rgba(255,255,255,.5)',
+                          transition: 'all .2s',
+                        }}
+                      >
+                        {r === 'student' ? 'Student' : 'Tutor'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="input-wrap">
+                    <label className="input-label">Full Name</label>
+                    <input className="input-field" type="text" placeholder="Jane Smith" value={fullName} onChange={e => setFullName(e.target.value)} required />
+                  </div>
+                </>
               )}
               <div className="input-wrap">
                 <label className="input-label">Email</label>
@@ -189,6 +216,12 @@ export default function Login() {
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                 />
               </div>
+              {mode === 'signup' && (
+                <div className="input-wrap">
+                  <label className="input-label">School / Affiliation <span style={{ color: 'rgba(255,255,255,.35)', fontWeight: 400 }}>(optional)</span></label>
+                  <input className="input-field" type="text" placeholder="e.g. ABC Prep" value={affiliation} onChange={e => setAffiliation(e.target.value)} />
+                </div>
+              )}
 
               {error && <div className="error-msg" style={{marginBottom:14}}>Error: {error}</div>}
               {success && <div style={{color:'#10b981', fontSize:13, marginBottom:14}}>Success: {success}</div>}

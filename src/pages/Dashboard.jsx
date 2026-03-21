@@ -35,6 +35,7 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
+  const isTutor = profile?.role === 'tutor' && profile?.affiliation
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
   const calendarHref = withViewUser(withExam('/calendar', currentExam), viewUserId, isAdminPreview)
@@ -46,6 +47,21 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
       <div className="nav-actions">
         <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
         <TopResourceNav hidden={!showResources} calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
+        {isTutor && (
+          <Link
+            to="/tutor"
+            className="btn btn-outline"
+            style={{
+              padding: '6px 14px',
+              fontSize: 12,
+              color: 'rgba(255,255,255,.9)',
+              borderColor: 'rgba(139,92,246,.5)',
+              background: 'rgba(139,92,246,.15)'
+            }}
+          >
+            Students
+          </Link>
+        )}
         {isAdmin && (
           <Link
             to="/admin"

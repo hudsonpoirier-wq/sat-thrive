@@ -89,6 +89,7 @@ create table if not exists public.review_items (
 alter table public.test_attempts add column if not exists is_sandbox boolean not null default false;
 alter table public.post_scores add column if not exists is_sandbox boolean not null default false;
 alter table public.studied_topics add column if not exists practice jsonb not null default '{}';
+alter table public.profiles add column if not exists affiliation text;
 
 -- Helpful indexes for scale
 create index if not exists idx_test_attempts_user_started on public.test_attempts(user_id, started_at desc);
@@ -240,9 +241,19 @@ returns trigger
 language plpgsql
 security definer
 as $$
+declare
+  signup_role text;
 begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  signup_role := coalesce(new.raw_user_meta_data->>'role', 'student');
+  if signup_role not in ('student', 'tutor') then signup_role := 'student'; end if;
+  insert into public.profiles (id, email, full_name, role, affiliation)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'full_name',
+    signup_role,
+    nullif(trim(coalesce(new.raw_user_meta_data->>'affiliation', '')), '')
+  );
   return new;
 end;
 $$;
@@ -251,6 +262,57 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Tutor helper: returns the tutor's affiliation (null if not a tutor or no affiliation)
+create or replace function public.tutor_affiliation()
+returns text
+language sql
+stable
+as $$
+  select affiliation from public.profiles
+  where id = auth.uid() and role = 'tutor' and affiliation is not null and affiliation <> '';
+$$;
+
+-- Tutor RLS: tutors can view profiles/data of students with the same affiliation
+drop policy if exists "Tutors see affiliated profiles" on public.profiles;
+create policy "Tutors see affiliated profiles" on public.profiles for select using (
+  public.tutor_affiliation() is not null and lower(affiliation) = lower(public.tutor_affiliation())
+);
+
+drop policy if exists "Tutors see affiliated attempts" on public.test_attempts;
+create policy "Tutors see affiliated attempts" on public.test_attempts for select using (
+  public.tutor_affiliation() is not null and user_id in (
+    select id from public.profiles where lower(affiliation) = lower(public.tutor_affiliation())
+  )
+);
+
+drop policy if exists "Tutors see affiliated scores" on public.post_scores;
+create policy "Tutors see affiliated scores" on public.post_scores for select using (
+  public.tutor_affiliation() is not null and user_id in (
+    select id from public.profiles where lower(affiliation) = lower(public.tutor_affiliation())
+  )
+);
+
+drop policy if exists "Tutors see affiliated mistakes" on public.mistakes;
+create policy "Tutors see affiliated mistakes" on public.mistakes for select using (
+  public.tutor_affiliation() is not null and user_id in (
+    select id from public.profiles where lower(affiliation) = lower(public.tutor_affiliation())
+  )
+);
+
+drop policy if exists "Tutors see affiliated studied topics" on public.studied_topics;
+create policy "Tutors see affiliated studied topics" on public.studied_topics for select using (
+  public.tutor_affiliation() is not null and user_id in (
+    select id from public.profiles where lower(affiliation) = lower(public.tutor_affiliation())
+  )
+);
+
+drop policy if exists "Tutors see affiliated review items" on public.review_items;
+create policy "Tutors see affiliated review items" on public.review_items for select using (
+  public.tutor_affiliation() is not null and user_id in (
+    select id from public.profiles where lower(affiliation) = lower(public.tutor_affiliation())
+  )
+);
 
 -- One-time setup: promote the Agora admin account (safe to run repeatedly).
 update public.profiles

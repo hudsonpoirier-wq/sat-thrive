@@ -186,10 +186,11 @@ export default function Admin() {
   const [resetMsg, setResetMsg] = useState('')
   const [regrading, setRegrading] = useState(false)
   const [analyticsExam, setAnalyticsExam] = useState('sat')
+  const [affiliationFilter, setAffiliationFilter] = useState('')
 
   const fetchAdminSnapshot = useCallback(async () => {
     const [p, a, ps, ak] = await Promise.allSettled([
-      supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false }),
       supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
       supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
       supabase.from('test_answer_keys').select('*'),
@@ -546,9 +547,56 @@ export default function Admin() {
     { id: 'students', label: 'Students', icon: 'students' },
     { id: 'results', label: 'Test Results', icon: 'results' },
     { id: 'analytics', label: 'Analytics', icon: 'chart' },
+    { id: 'affiliations', label: 'Affiliations', icon: 'students' },
     { id: 'impact', label: 'Proof of Impact', icon: 'report' },
     { id: 'tests', label: 'Tests', icon: 'test' },
   ]
+
+  // Compute all unique affiliations and per-affiliation stats
+  const affiliationData = useMemo(() => {
+    const affiliations = new Map()
+    for (const s of students) {
+      const aff = (s.affiliation || '').trim()
+      if (!aff) continue
+      const key = aff.toLowerCase()
+      if (!affiliations.has(key)) affiliations.set(key, { name: aff, students: [], studentIds: new Set() })
+      affiliations.get(key).students.push(s)
+      affiliations.get(key).studentIds.add(s.id)
+    }
+    const result = []
+    for (const [, group] of affiliations) {
+      const groupAttempts = attempts.filter(a => group.studentIds.has(a.user_id))
+      const totals = groupAttempts.map(a => Number(a.scores?.composite || a.scores?.total || 0)).filter(t => t > 0)
+      const sorted = totals.slice().sort((a, b) => a - b)
+      const avg = totals.length ? totals.reduce((s, v) => s + v, 0) / totals.length : null
+      result.push({
+        name: group.name,
+        studentCount: group.students.length,
+        attemptCount: groupAttempts.length,
+        avgScore: avg,
+        median: sorted.length ? quantile(sorted, 0.5) : null,
+        studentIds: group.studentIds,
+      })
+    }
+    result.sort((a, b) => b.studentCount - a.studentCount)
+    return result
+  }, [students, attempts])
+
+  const affiliationNames = useMemo(() => affiliationData.map(a => a.name), [affiliationData])
+
+  // Filter students/attempts by selected affiliation for the main analytics
+  const filteredStudents = useMemo(() => {
+    if (!affiliationFilter) return students
+    const key = affiliationFilter.toLowerCase()
+    return students.filter(s => (s.affiliation || '').toLowerCase() === key)
+  }, [students, affiliationFilter])
+
+  const filteredStudentIds = useMemo(() => new Set(filteredStudents.map(s => s.id)), [filteredStudents])
+
+  const filteredAttempts = useMemo(() => {
+    if (!affiliationFilter) return attempts
+    return attempts.filter(a => filteredStudentIds.has(a.user_id))
+  }, [attempts, affiliationFilter, filteredStudentIds])
 
   const analytics = useMemo(() => {
     const examMode = analyticsExam === 'act' ? 'act' : 'sat'
@@ -559,7 +607,7 @@ export default function Admin() {
     const recent7 = daysAgo(7)
     const recent30 = daysAgo(30)
 
-    const allAttempts = (attempts || []).filter((attempt) => getExamFromTestId(attempt?.test_id) === examMode)
+    const allAttempts = (filteredAttempts || []).filter((attempt) => getExamFromTestId(attempt?.test_id) === examMode)
     const totals = []
     const totalsPre = []
     const totalsExtra = []
@@ -788,7 +836,7 @@ export default function Admin() {
     }
 
     return { summary, testRows, histogram, byTestChart, domainsChart, chaptersChart, activitySeries, topChapters, topDomains, scoreColumns: analyticsScoreColumns }
-  }, [attempts, analyticsExam])
+  }, [filteredAttempts, analyticsExam])
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Loading…</div>
@@ -873,7 +921,21 @@ export default function Admin() {
         {/* Students tab */}
         {tab === 'students' && (
           <div className="card" style={{ overflowX: 'auto' }}>
-            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>All Students</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, margin: 0 }}>All Students</h3>
+              {affiliationNames.length > 0 && (
+                <select
+                  value={affiliationFilter}
+                  onChange={(e) => setAffiliationFilter(e.target.value)}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, fontFamily: 'Sora,sans-serif', fontWeight: 600, background: '#fff', color: '#1a2744', cursor: 'pointer' }}
+                >
+                  <option value="">All Affiliations</option>
+                  {affiliationNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             {resetMsg && (
               <div style={{ marginBottom: 12, fontSize: 13, color: resetMsg.toLowerCase().startsWith('success:') ? '#10b981' : '#ef4444', fontWeight: 700 }}>
                 {resetMsg}
@@ -882,13 +944,13 @@ export default function Admin() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Name', 'Email', 'Role', 'Joined', 'Tests', 'Best Score', 'Actions'].map(h => (
+                  {['Name', 'Email', 'Role', 'Affiliation', 'Joined', 'Tests', 'Best Score', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {students.map(s => {
+                {filteredStudents.map(s => {
                   const userAttempts = computed.attemptsByUser.get(s.id) || []
                   const best = computed.bestByUser.get(s.id) || null
                   const isSelf = s.id === profile?.id
@@ -905,6 +967,7 @@ export default function Admin() {
                           {s.role}
                         </span>
                       </td>
+                      <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{s.affiliation || '—'}</td>
                       <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td style={{ padding: '12px' }}>{userAttempts.length}</td>
                       <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }} title={best ? `${best.raw}/${best.totalQuestions} correct` : undefined}>
@@ -1195,6 +1258,78 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Affiliations tab */}
+        {tab === 'affiliations' && (
+          <div style={{ display: 'grid', gap: 20 }}>
+            {affiliationData.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No affiliations found. Students and tutors can set their affiliation on signup.</div>
+            ) : (
+              <>
+                {/* Comparison bar chart */}
+                <div className="card">
+                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Affiliation Comparison</h3>
+                  <Bar
+                    data={{
+                      labels: affiliationData.map(a => a.name),
+                      datasets: [
+                        { label: 'Students', data: affiliationData.map(a => a.studentCount), backgroundColor: '#3b82f6', borderRadius: 6, borderSkipped: false },
+                        { label: 'Test Attempts', data: affiliationData.map(a => a.attemptCount), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false },
+                      ],
+                    }}
+                    options={{ responsive: true, plugins: { legend: { labels: { font: { size: 11 } } } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true, ticks: { font: { size: 10 } } } } }}
+                  />
+                </div>
+
+                {/* Avg score comparison */}
+                {affiliationData.some(a => a.avgScore) && (
+                  <div className="card">
+                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Average Score by Affiliation</h3>
+                    <Bar
+                      data={{
+                        labels: affiliationData.filter(a => a.avgScore).map(a => a.name),
+                        datasets: [{
+                          label: 'Avg Score',
+                          data: affiliationData.filter(a => a.avgScore).map(a => Math.round(a.avgScore)),
+                          backgroundColor: affiliationData.filter(a => a.avgScore).map((_, i) => ['#1a2744', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#ef4444'][i % 8]),
+                          borderRadius: 6,
+                          borderSkipped: false,
+                        }],
+                      }}
+                      options={{ responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: false, ticks: { font: { size: 10 } } } } }}
+                    />
+                  </div>
+                )}
+
+                {/* Per-affiliation stat cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                  {affiliationData.map((aff) => (
+                    <div key={aff.name} className="card" style={{ cursor: 'pointer' }} onClick={() => { setAffiliationFilter(aff.name); setTab('students') }}>
+                      <h4 style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#1a2744' }}>{aff.name}</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Students</div>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.studentCount}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Tests</div>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.attemptCount}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Avg Score</div>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.avgScore ? Math.round(aff.avgScore) : '—'}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
+                        {aff.median ? `Median: ${Math.round(aff.median)}` : ''} · Click to filter
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
