@@ -47,10 +47,17 @@ export function AuthProvider({ children }) {
       if (!supabase || !userId) return
       const requestId = ++latestProfileRequest
       try {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+        if (error) console.warn('[Agora] Profile load error:', error.message || error)
         if (cancelled || requestId !== latestProfileRequest) return
+        if (data) {
+          console.log('[Agora] Profile loaded:', { role: data.role, email: data.email, affiliation: data.affiliation })
+        } else {
+          console.warn('[Agora] No profile row found for user', userId)
+        }
         setProfile(data || null)
-      } catch {
+      } catch (e) {
+        console.warn('[Agora] Profile load exception:', e)
         if (cancelled || requestId !== latestProfileRequest) return
         setProfile(null)
       }
