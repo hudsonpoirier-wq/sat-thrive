@@ -20,6 +20,7 @@ import {
   getQuestionCountForTest,
   getScoreColumnsForExam,
   scoreAttemptFromKey,
+  calcWeakTopicsForTest,
 } from '../data/examData.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withViewUser, withExam } from '../lib/viewAs.js'
@@ -500,8 +501,17 @@ export default function Dashboard() {
   }, [hasTakenPretest])
 
   function deriveWeakTopicsForAttempt(attempt) {
+    // Always recompute from raw answers + answer key for accuracy.
+    // This guarantees every missed chapter appears regardless of what was stored.
+    const keyBySection = getAnswerKeyBySection(attempt?.test_id)
+    if (keyBySection && attempt?.answers && Object.keys(attempt.answers).length) {
+      const computed = calcWeakTopicsForTest(attempt.test_id, attempt.answers, keyBySection)
+      if (computed.length) return computed
+    }
+    // Fallback to stored weak_topics if recomputation isn't possible
     const normalized = normalizeWeakTopics(attempt?.weak_topics || [])
     if (normalized.length) return normalized
+    // Last resort: derive from mistakes table
     const list = (mistakes || [])
       .filter((m) => String(m.attempt_id || '') === String(attempt?.id || '') && m.chapter_id)
     const counts = {}

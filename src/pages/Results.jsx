@@ -10,7 +10,7 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
-import { getExamConfigForTest, getScoreColumnsForExam } from '../data/examData.js'
+import { getExamConfigForTest, getScoreColumnsForExam, calcWeakTopicsForTest } from '../data/examData.js'
 import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
@@ -265,9 +265,16 @@ export default function Results() {
 
   const scores = attempt?.scores || {}
   const currentTestConfig = getTestConfig(attempt?.test_id)
-  const weakTopics = normalizeWeakTopics(attempt?.weak_topics || [])
   const answers = attempt?.answers || {}
   const keyBySection = getAnswerKeyBySection(attempt?.test_id)
+  const weakTopics = useMemo(() => {
+    // Always recompute from raw answers + answer key for accuracy
+    if (keyBySection && answers && Object.keys(answers).length) {
+      const computed = calcWeakTopicsForTest(attempt?.test_id, answers, keyBySection)
+      if (computed.length) return computed
+    }
+    return normalizeWeakTopics(attempt?.weak_topics || [])
+  }, [attempt?.test_id, answers, keyBySection, attempt?.weak_topics])
   const isPreTest = (attempt?.test_id === examConfig.preTestId) || (attempt?.test_id === 'practice_test_11' && exam === 'sat') || !attempt?.test_id
   const showResourceNav = hasUnlockedResources(viewUserId, exam) || Boolean(isPreTest && attempt?.completed_at)
   const scoreColumns = getScoreColumnsForExam(exam)
