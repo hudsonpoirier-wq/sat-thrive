@@ -813,26 +813,28 @@ export default function TestTaking() {
                     <>
                       Section pages <span style={{ color: '#0f172a' }}>{sectionRange[0] + 1}–{sectionRange[1] + 1}</span>
                     </>
-                  ) : (
+                  ) : profile?.role === 'admin' ? (
                     <>
                       PDF page <span style={{ color: '#0f172a' }}>{pdfPage + 1}</span>
                       <span style={{ color: '#94a3b8', fontWeight: 700 }}>
                         {Number.isFinite(Number(overridePage)) ? ' · (override)' : ` · offset ${pdfOffset >= 0 ? `+${pdfOffset}` : pdfOffset}`}
                       </span>
                     </>
-                  )}
+                  ) : null}
 	              </div>
 	              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <a
-                    className="btn btn-outline"
-                    style={{ padding: '6px 10px', fontSize: 12 }}
-                    href={testConfig?.pdfUrl || '/practice-test-11.pdf'}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Open the full test PDF in a new tab"
-                  >
-                    Open PDF →
-                  </a>
+                  {profile?.role === 'admin' && (
+                    <a
+                      className="btn btn-outline"
+                      style={{ padding: '6px 10px', fontSize: 12 }}
+                      href={testConfig?.pdfUrl || '/practice-test-11.pdf'}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open the full test PDF in a new tab"
+                    >
+                      Open PDF →
+                    </a>
+                  )}
                   {profile?.role === 'admin' && testConfig?.akUrl && (
                     <a
                       className="btn btn-outline"
@@ -845,7 +847,7 @@ export default function TestTaking() {
 	                      Open AK →
 	                    </a>
 	                  )}
-                  {viewerMode === 'single' && (
+                  {profile?.role === 'admin' && viewerMode === 'single' && (
                     <>
 	                  <button
 	                    className="btn btn-outline"
