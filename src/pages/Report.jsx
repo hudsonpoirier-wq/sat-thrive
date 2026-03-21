@@ -57,9 +57,9 @@ export default function Report() {
   const requestedExam = String(q.get('exam') || '').toLowerCase()
   const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
   const examConfig = getExamConfig(exam)
-  const { viewUserId, isAdminPreview, isAdmin } = resolveViewContext({ userId: user?.id, profile, search: q.toString() ? `?${q.toString()}` : '' })
+  const { viewUserId, isAdminPreview, isAdmin, isTutor } = resolveViewContext({ userId: user?.id, profile, search: q.toString() ? `?${q.toString()}` : '' })
   const targetUser = viewUserId || user?.id
-  const canView = (String(targetUser) === String(user?.id)) || isAdmin
+  const canView = (String(targetUser) === String(user?.id)) || isAdmin || isTutor
   const viewHref = (path) => withViewUser(withExam(path, exam), targetUser, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), targetUser, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), targetUser, isAdminPreview)
@@ -236,14 +236,23 @@ export default function Report() {
     <div style={{ minHeight: '100vh', background: 'transparent' }}>
       <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} currentExam={exam} satHref={satHref} actHref={actHref} />
       <div className="page fade-up">
-        {isAdminPreview && (
-          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
-            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-              You’re viewing this student’s report. Use the result links below to open the same detailed post-test screens they see.
+        {isAdminPreview && (() => {
+          return (
+          <div className="card" style={{ marginBottom: 16, background: "linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))", color: "white" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutor ? "Tutor View" : "Admin View"}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+                  {"You\u0027re viewing this student\u0027s report. Use the result links below to open the same detailed post-test screens they see."}
+                </div>
+              </div>
+              <Link className="btn btn-outline" to={isTutor ? "/tutor" : "/admin"} style={{ color: "white", borderColor: "rgba(255,255,255,.24)", background: "rgba(255,255,255,.08)" }}>
+                {isTutor ? "Back to Students" : "Back to Admin"}
+              </Link>
             </div>
           </div>
-        )}
+          )
+        })()}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
             <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>

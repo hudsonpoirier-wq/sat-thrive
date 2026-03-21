@@ -394,14 +394,24 @@ export default function Results() {
       </nav>
 
       <div className="page fade-up">
-        {isAdminPreview && (
-          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
-            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-              You’re viewing this student’s post-test results in read-only mode.
+        {isAdminPreview && (() => {
+          const isTutorUser = profile?.role === "tutor"
+          return (
+          <div className="card" style={{ marginBottom: 16, background: "linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))", color: "white" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutorUser ? "Tutor View" : "Admin View"}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
+                  {"You\u0027re viewing this student\u0027s post-test results in read-only mode."}
+                </div>
+              </div>
+              <Link className="btn btn-outline" to={isTutorUser ? "/tutor" : "/admin"} style={{ color: "white", borderColor: "rgba(255,255,255,.24)", background: "rgba(255,255,255,.08)" }}>
+                {isTutorUser ? "Back to Students" : "Back to Admin"}
+              </Link>
             </div>
           </div>
-        )}
+          )
+        })()}
         {/* Score Hero */}
         <div className="results-score-hero" style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', opacity: .6, marginBottom: 8 }}>

@@ -579,21 +579,24 @@ export default function Dashboard() {
     <>
       <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} currentExam={exam} showResources={hasTakenPretest} />
       <div className="page fade-up">
-        {isAdminPreview && (
-          <div className="card" style={{ marginBottom: 18, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        {isAdminPreview && (() => {
+          const isTutorUser = profile?.role === "tutor"
+          return (
+          <div className="card" style={{ marginBottom: 18, background: "linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))", color: "white" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
+                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutorUser ? "Tutor View" : "Admin View"}</div>
                 <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-                  You’re previewing {displayProfile?.full_name || 'this student'}’s dashboard. Troubleshooting links work, but data-changing actions are read-only here.
+                  {"You\u0027re previewing "}{displayProfile?.full_name || "this student"}{"’s dashboard. Troubleshooting links work, but data-changing actions are read-only here."}
                 </div>
               </div>
-              <Link className="btn btn-outline" to="/admin" style={{ color: 'white', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}>
-                Back to Admin
+              <Link className="btn btn-outline" to={isTutorUser ? "/tutor" : "/admin"} style={{ color: "white", borderColor: "rgba(255,255,255,.24)", background: "rgba(255,255,255,.08)" }}>
+                {isTutorUser ? "Back to Students" : "Back to Admin"}
               </Link>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* Welcome */}
         <div style={{marginBottom:28}}>

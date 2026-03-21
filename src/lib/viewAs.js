@@ -2,14 +2,19 @@ export function isAgoraAdmin(profile) {
   return profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
 }
 
+export function isTutorRole(profile) {
+  return profile?.role === 'tutor'
+}
+
 export function resolveViewContext({ userId, profile, search = '' }) {
   const params = new URLSearchParams(search || '')
   const requestedUserId = String(params.get('user') || '').trim()
   const isAdmin = isAgoraAdmin(profile)
-  const canPreview = Boolean(isAdmin && requestedUserId)
+  const isTutor = isTutorRole(profile)
+  const canPreview = Boolean((isAdmin || isTutor) && requestedUserId)
   const viewUserId = canPreview ? requestedUserId : (userId || '')
   const isAdminPreview = Boolean(canPreview && String(requestedUserId) !== String(userId || ''))
-  return { requestedUserId, viewUserId, isAdminPreview, isAdmin }
+  return { requestedUserId, viewUserId, isAdminPreview, isAdmin, isTutor }
 }
 
 export function withViewUser(path, viewUserId, isAdminPreview) {
