@@ -377,6 +377,29 @@ export function buildAdaptiveSchedule({
     }
   }
 
+  // --- Merge multiple review tasks on the same day into one ---
+  for (const day of usableDays) {
+    const reviewTasks = day.tasks.filter((t) => t.type === 'mistakes')
+    if (reviewTasks.length <= 1) continue
+    const totalAmount = reviewTasks.reduce((sum, t) => sum + (t.amount || 0), 0)
+    const allDone = reviewTasks.every((t) => t.completed)
+    const merged = {
+      ...reviewTasks[0],
+      id: `review-${day.key}`,
+      amount: totalAmount,
+      title: `Review ${totalAmount} ${exam === 'act' ? 'ACT' : 'SAT'} missed question${totalAmount === 1 ? '' : 's'}`,
+      subtitle: allDone
+        ? `Completed — ${totalAmount} question${totalAmount === 1 ? '' : 's'} validated.`
+        : `Use the ${exam === 'act' ? 'ACT ' : ''}Mistake Notebook and validate each one you fix.`,
+      estimatedMinutes: allDone ? 0 : reviewTasks.reduce((sum, t) => sum + (t.completed ? 0 : Number(t.estimatedMinutes || 0)), 0),
+      completed: allDone,
+    }
+    // Replace all review tasks with the single merged one at the position of the first
+    const firstIdx = day.tasks.findIndex((t) => t.type === 'mistakes')
+    day.tasks = day.tasks.filter((t) => t.type !== 'mistakes')
+    day.tasks.splice(firstIdx, 0, merged)
+  }
+
   return {
     startKey: days[0]?.key || '',
     endKey: days[days.length - 1]?.key || '',
