@@ -111,11 +111,13 @@ alter table public.test_answer_keys enable row level security;
 alter table public.mistakes enable row level security;
 alter table public.review_items enable row level security;
 
--- Role helper (admin only)
+-- Role helper (admin only) — SECURITY DEFINER to bypass RLS and avoid infinite recursion
 create or replace function public.is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1 from public.profiles
@@ -267,11 +269,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- Tutor helper: returns the tutor's affiliation (null if not a tutor or no affiliation)
+-- Tutor helper — SECURITY DEFINER to bypass RLS and avoid infinite recursion
 create or replace function public.tutor_affiliation()
 returns text
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select affiliation from public.profiles
   where id = auth.uid() and role = 'tutor' and affiliation is not null and affiliation <> '';
