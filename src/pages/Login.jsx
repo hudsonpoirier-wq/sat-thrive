@@ -75,9 +75,18 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError(''); setSuccess(''); setLoading(true)
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address'); setLoading(false); return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters'); setLoading(false); return
+    }
     if (mode === 'signup') {
       if (!fullName.trim()) { setError('Please enter your full name'); setLoading(false); return }
-      const { data, error } = await signUp(email, password, fullName, signupRole, affiliation.trim())
+      if (fullName.trim().length > 100) { setError('Name must be 100 characters or fewer'); setLoading(false); return }
+      if (affiliation.trim().length > 100) { setError('Affiliation must be 100 characters or fewer'); setLoading(false); return }
+      const { data, error } = await signUp(trimmedEmail, password, fullName, signupRole, affiliation.trim())
       if (error) setError(error.message)
       else {
         // If "Confirm email" is OFF in Supabase, signUp returns a session immediately.
@@ -98,7 +107,7 @@ export default function Login() {
         setPassword('')
       }
     } else {
-      const { error } = await signIn(email, password)
+      const { error } = await signIn(trimmedEmail, password)
       if (error) {
         const msg = String(error.message || 'Sign in failed')
         setError(msg)

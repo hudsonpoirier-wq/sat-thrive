@@ -1,3 +1,5 @@
+import { isValidUUID, isValidExam } from './validate.js'
+
 export function isAgoraAdmin(profile) {
   return profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
 }
@@ -8,7 +10,9 @@ export function isTutorRole(profile) {
 
 export function resolveViewContext({ userId, profile, search = '' }) {
   const params = new URLSearchParams(search || '')
-  const requestedUserId = String(params.get('user') || '').trim()
+  const raw = String(params.get('user') || '').trim()
+  // Only accept valid UUIDs for the user parameter
+  const requestedUserId = isValidUUID(raw) ? raw : ''
   const isAdmin = isAgoraAdmin(profile)
   const isTutor = isTutorRole(profile)
   const canPreview = Boolean((isAdmin || isTutor) && requestedUserId)
@@ -19,6 +23,7 @@ export function resolveViewContext({ userId, profile, search = '' }) {
 
 export function withViewUser(path, viewUserId, isAdminPreview) {
   if (!path || !viewUserId || !isAdminPreview) return path
+  if (!isValidUUID(viewUserId)) return path
   return withQueryParam(path, 'user', viewUserId)
 }
 
@@ -27,11 +32,12 @@ export function withQueryParam(path, key, value) {
   const [pathname, hash = ''] = String(path).split('#')
   const [base, query = ''] = pathname.split('?')
   const params = new URLSearchParams(query)
-  params.set(key, value)
+  params.set(key, String(value).slice(0, 200))
   const next = `${base}?${params.toString()}`
   return hash ? `${next}#${hash}` : next
 }
 
 export function withExam(path, exam) {
+  if (!isValidExam(exam)) return path
   return withQueryParam(path, 'exam', exam)
 }

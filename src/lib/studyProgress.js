@@ -39,7 +39,7 @@ export async function getStudiedTopics(userId) {
 }
 
 export async function setStudiedTopic(userId, chapterId, completed) {
-  if (!userId || !chapterId) return
+  if (!userId || !chapterId || typeof chapterId !== 'string' || chapterId.length > 60) return
   const local = readLocal(userId)
   local[chapterId] = Boolean(completed)
   writeLocal(userId, local)
@@ -56,7 +56,8 @@ export async function setStudiedTopic(userId, chapterId, completed) {
 }
 
 export async function setChapterGuidePractice(userId, chapterId, guideMap, existingPractice) {
-  if (!userId || !chapterId || !guideMap || typeof guideMap !== 'object') return
+  if (!userId || !chapterId || typeof chapterId !== 'string' || chapterId.length > 60) return
+  if (!guideMap || typeof guideMap !== 'object' || Array.isArray(guideMap)) return
   const nextPractice = {
     ...(existingPractice && typeof existingPractice === 'object' ? existingPractice : {}),
     guide: guideMap,
@@ -73,7 +74,7 @@ export async function setChapterGuidePractice(userId, chapterId, guideMap, exist
 }
 
 export async function markChapterGuideStarted(userId, chapterId, existingPractice) {
-  if (!userId || !chapterId) return
+  if (!userId || !chapterId || typeof chapterId !== 'string' || chapterId.length > 60) return
   const nowIso = new Date().toISOString()
   const base = (existingPractice && typeof existingPractice === 'object') ? existingPractice : {}
   const meta = (base.meta && typeof base.meta === 'object') ? base.meta : {}

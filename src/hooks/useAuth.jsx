@@ -101,10 +101,16 @@ export function AuthProvider({ children }) {
 
   async function signUp(email, password, fullName, role = 'student', affiliation = '') {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
-    const meta = { full_name: fullName, role: role === 'tutor' ? 'tutor' : 'student' }
-    if (affiliation) meta.affiliation = affiliation
+    const cleanEmail = String(email || '').trim().toLowerCase().slice(0, 254)
+    const cleanName = String(fullName || '').replace(/[<>]/g, '').trim().slice(0, 100)
+    const cleanRole = role === 'tutor' ? 'tutor' : 'student'
+    const cleanAffiliation = String(affiliation || '').replace(/[<>]/g, '').trim().slice(0, 100)
+    if (!cleanEmail || !cleanName) return { data: null, error: new Error('Email and name are required') }
+    if (String(password || '').length < 8) return { data: null, error: new Error('Password must be at least 8 characters') }
+    const meta = { full_name: cleanName, role: cleanRole }
+    if (cleanAffiliation) meta.affiliation = cleanAffiliation
     const { data, error } = await supabase.auth.signUp({
-      email, password,
+      email: cleanEmail, password,
       options: {
         data: meta,
         emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -115,7 +121,9 @@ export function AuthProvider({ children }) {
 
   async function signIn(email, password) {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const cleanEmail = String(email || '').trim().toLowerCase().slice(0, 254)
+    if (!cleanEmail) return { data: null, error: new Error('Email is required') }
+    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password })
     return { data, error }
   }
 
@@ -145,10 +153,9 @@ export function AuthProvider({ children }) {
 
   async function setPreferredExam(exam) {
     if (!supabase) return { data: null, error: new Error('Supabase is not configured') }
+    const clean = exam === 'act' ? 'act' : 'sat'
     const { data, error } = await supabase.auth.updateUser({
-      data: {
-        preferred_exam: exam,
-      },
+      data: { preferred_exam: clean },
     })
     if (!error && data?.user) setUser(data.user)
     return { data, error }

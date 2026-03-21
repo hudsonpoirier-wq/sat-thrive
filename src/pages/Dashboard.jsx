@@ -368,14 +368,14 @@ export default function Dashboard() {
   }
 
   async function savePostScore(attemptId) {
-    if (readOnlyView) return
-    const sc = parseInt(postInput)
-    if (isNaN(sc)) return alert(exam === 'act' ? 'Enter a valid ACT composite (1–36)' : 'Enter a valid score (400–1600)')
+    if (readOnlyView || !user?.id || !attemptId) return
+    const sc = parseInt(String(postInput).replace(/[^0-9-]/g, ''), 10)
+    if (!Number.isFinite(sc)) return alert(exam === 'act' ? 'Enter a valid ACT composite (1–36)' : 'Enter a valid score (400–1600)')
     if (exam === 'act' && (sc < 1 || sc > 36)) return alert('Enter a valid ACT composite (1–36)')
     if (exam === 'sat' && (sc < 400 || sc > 1600)) return alert('Enter a valid score (400–1600)')
     const rw = exam === 'sat' ? Math.round(sc * 0.5 / 10) * 10 : null
     const math = exam === 'sat' ? sc - rw : null
-    const payload = { user_id: user.id, attempt_id: attemptId, post_score: sc, post_rw: rw, post_math: math }
+    const payload = { user_id: user.id, attempt_id: String(attemptId), post_score: sc, post_rw: rw, post_math: math }
     const ins = await supabase.from('post_scores').insert(payload)
     if (ins.error) alert(ins.error.message)
     const { data } = await supabase.from('post_scores').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false })

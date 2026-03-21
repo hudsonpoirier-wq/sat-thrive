@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { sanitizeNote, isValidUUID, isValidTestId } from './validate.js'
 
 const LS_MISTAKES_PREFIX = 'agora_mistakes_v1:'
 const LS_REVIEW_PREFIX = 'agora_review_v1:'
@@ -50,18 +51,19 @@ export function upsertLocalReviewItems(userId, patch) {
 }
 
 export async function saveMistakes(userId, mistakes) {
+  if (!userId) return { source: 'none', items: [] }
   const nowIso = new Date().toISOString()
-  const normalized = (mistakes || []).map((m) => ({
+  const normalized = (mistakes || []).slice(0, 500).map((m) => ({
     id: m.id || crypto.randomUUID(),
     user_id: userId,
-    test_id: String(m.test_id || 'pre_test'),
+    test_id: String(m.test_id || 'pre_test').slice(0, 50),
     attempt_id: m.attempt_id || null,
-    section: String(m.section || ''),
-    q_num: Number(m.q_num || 0),
-    given: String(m.given ?? ''),
-    correct: String(m.correct ?? ''),
-    chapter_id: m.chapter_id ? String(m.chapter_id) : null,
-    note: m.note != null ? String(m.note) : null,
+    section: String(m.section || '').slice(0, 50),
+    q_num: Math.max(0, Math.min(999, Math.round(Number(m.q_num || 0)))),
+    given: String(m.given ?? '').slice(0, 100),
+    correct: String(m.correct ?? '').slice(0, 100),
+    chapter_id: m.chapter_id ? String(m.chapter_id).slice(0, 60) : null,
+    note: m.note != null ? sanitizeNote(m.note) : null,
     created_at: m.created_at || nowIso,
     updated_at: nowIso,
   }))
@@ -79,15 +81,17 @@ export async function saveMistakes(userId, mistakes) {
 }
 
 export async function updateMistakeNote(userId, mistakeId, note) {
+  if (!userId || !mistakeId) return { source: 'none' }
+  const cleanNote = sanitizeNote(note)
   const nowIso = new Date().toISOString()
   if (supabase && userId) {
     try {
-      const up = await supabase.from('mistakes').update({ note: String(note || ''), updated_at: nowIso }).eq('id', mistakeId)
+      const up = await supabase.from('mistakes').update({ note: cleanNote, updated_at: nowIso }).eq('id', mistakeId)
       if (!up.error) return { source: 'supabase' }
     } catch {}
   }
   const existing = listLocalMistakes(userId)
-  const next = existing.map(m => m.id === mistakeId ? { ...m, note: String(note || ''), updated_at: nowIso } : m)
+  const next = existing.map(m => m.id === mistakeId ? { ...m, note: cleanNote, updated_at: nowIso } : m)
   writeJson(keyFor(userId, LS_MISTAKES_PREFIX), next)
   return { source: 'local' }
 }
