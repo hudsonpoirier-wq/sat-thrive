@@ -85,13 +85,16 @@ function attemptAccuracyRecord(attempt) {
   const exam = getExamFromTestId(testId)
   const totalQuestions = Math.max(1, Number(getQuestionCountForTest(testId) || 0))
   let raw = Number(attempt?.scores?.raw || 0)
-  const total = attemptTotalScore(attempt)
-  if (!raw && attempt?.answers) {
+  let total = attemptTotalScore(attempt)
+  if (attempt?.answers && Object.keys(attempt.answers).length) {
     try {
       const rescored = scoreAttemptFromKey(testId, attempt.answers, getAnswerKeyBySection(testId) || {})
-      raw = Number(rescored?.raw || 0)
+      if (rescored) {
+        if (!raw) raw = Number(rescored.raw || 0)
+        if (!total) total = Number(rescored.composite || rescored.total || 0)
+      }
     } catch {
-      raw = 0
+      // answer key not available for this test
     }
   }
   const percent = raw > 0 ? raw / totalQuestions : 0
@@ -101,7 +104,9 @@ function attemptAccuracyRecord(attempt) {
     total,
     totalQuestions,
     percent,
-    display: percent > 0 ? `${Math.round(percent * 100)}% · ${String(exam || 'sat').toUpperCase()} ${total || '—'}` : null,
+    display: total > 0
+      ? `${String(exam || 'sat').toUpperCase()} ${total}`
+      : (percent > 0 ? `${Math.round(percent * 100)}% correct` : null),
   }
 }
 

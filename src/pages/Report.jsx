@@ -10,8 +10,9 @@ import { encodeReportToQuery } from '../lib/reportShare.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
-import { getExamConfig } from '../data/examData.js'
+import { getExamConfig, scoreAttemptFromKey } from '../data/examData.js'
 import { getExamFromTestId } from '../data/tests.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { Line } from 'react-chartjs-2'
@@ -100,11 +101,29 @@ export default function Report() {
     }
   }, [targetUser, canView])
 
+  function resolveScores(attempt) {
+    if (attempt?.scores?.total || attempt?.scores?.composite) return attempt.scores
+    if (attempt?.answers && Object.keys(attempt.answers).length) {
+      try {
+        const testId = attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id
+        const keyBySection = getAnswerKeyBySection(testId)
+        if (keyBySection) {
+          const rescored = scoreAttemptFromKey(testId, attempt.answers, keyBySection)
+          if (rescored?.total || rescored?.composite) return rescored
+        }
+      } catch {}
+    }
+    return attempt?.scores || {}
+  }
+
   const report = useMemo(() => {
     const completed = (attempts || []).filter(a => (a.completed_at || a.scores?.total) && getExamFromTestId(a.test_id) === exam)
     const completedPre = completed.filter(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
     const bestPre = completedPre
-      .map(a => a.scores?.total || 0)
+      .map(a => {
+        const sc = resolveScores(a)
+        return Number(sc?.composite || sc?.total || 0)
+      })
       .filter(Boolean)
       .reduce((m, v) => Math.max(m, v), 0) || null
     const latestPost = postScores?.[0]?.post_score || null
@@ -138,12 +157,16 @@ export default function Report() {
     const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id)).length
 
     const series = completed
-      .filter(a => a.scores?.total)
-      .slice()
-      .sort((x, y) => new Date(x.started_at).getTime() - new Date(y.started_at).getTime())
-      .map((a) => {
+      .map(a => {
+        const sc = resolveScores(a)
+        const total = Number(sc?.composite || sc?.total || 0)
+        return { a, total }
+      })
+      .filter(({ total }) => total > 0)
+      .sort((x, y) => new Date(x.a.started_at).getTime() - new Date(y.a.started_at).getTime())
+      .map(({ a, total }) => {
         const t = TESTS.find(tt => tt.id === (a.test_id === 'practice_test_11' ? 'pre_test' : a.test_id))
-        return { label: t?.label || a.test_id, date: new Date(a.started_at).toLocaleDateString(), total: a.scores.total }
+        return { label: t?.label || a.test_id, date: new Date(a.started_at).toLocaleDateString(), total }
       })
 
     return {
@@ -309,7 +332,7 @@ export default function Report() {
                     <div>
                       <div style={{ fontWeight: 900, color: '#1a2744' }}>{label}</div>
                       <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-                        {new Date(attempt.started_at).toLocaleDateString()} · Total {attempt.scores?.total || '—'}
+                        {new Date(attempt.started_at).toLocaleDateString()} · Total {resolveScores(attempt)?.total || resolveScores(attempt)?.composite || '—'}
                       </div>
                     </div>
                     <Link className="btn btn-outline" to={viewHref(`/results/${attempt.id}`)}>
