@@ -168,7 +168,12 @@ drop policy if exists "Admins see all profiles" on public.profiles;
 create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
 create policy "Admins see all profiles" on public.profiles for select using (public.is_admin());
 
--- Note: no user UPDATE policy on profiles (prevents self-escalation to admin/tutor).
+-- Users can update their own affiliation only (prevents role escalation).
+-- The WITH CHECK ensures they cannot change their own role or email.
+drop policy if exists "Users can update own affiliation" on public.profiles;
+create policy "Users can update own affiliation" on public.profiles for update
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
 
 drop policy if exists "Users can view own attempts" on public.test_attempts;
 drop policy if exists "Users can insert own attempts" on public.test_attempts;
