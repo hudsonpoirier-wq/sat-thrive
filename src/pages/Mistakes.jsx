@@ -233,6 +233,7 @@ export default function Mistakes() {
   const [redoSaving, setRedoSaving] = useState(false)
   const [hintStep, setHintStep] = useState(0)
   const [questionContextText, setQuestionContextText] = useState('')
+  const [solvedIds, setSolvedIds] = useState(new Set())
 
   const addToast = useToast()
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
@@ -389,8 +390,13 @@ export default function Mistakes() {
   const nextMistake = (() => {
     if (!selected) return null
     const idx = filtered.findIndex((m) => m.id === selected.id)
-    if (idx < 0) return filtered[0] || null
-    return filtered[idx + 1] || filtered[0] || null
+    if (idx < 0) return filtered.find(m => !solvedIds.has(m.id)) || null
+    // Find next unsolved mistake after current index, then wrap around
+    for (let i = 1; i < filtered.length; i++) {
+      const candidate = filtered[(idx + i) % filtered.length]
+      if (!solvedIds.has(candidate.id)) return candidate
+    }
+    return null
   })()
 
   const answerPanel = selected ? (
@@ -471,6 +477,7 @@ export default function Mistakes() {
                 setRedoFeedback(ok ? { ok: true, msg: 'Correct — nice work.' } : { ok: false, msg: 'Not quite — try the hints and check again.' })
                 if (!ok) setHintStep((step) => Math.max(step, 1))
                 if (!ok) return
+                setSolvedIds(prev => new Set(prev).add(selected.id))
 
                 setRedoSaving(true)
                 try {
@@ -540,12 +547,12 @@ export default function Mistakes() {
               </button>
               <button
                 className="btn btn-primary"
-                disabled={!nextMistake || nextMistake?.id === selected.id}
+                disabled={!nextMistake}
                 onClick={() => {
                   if (nextMistake) setSelected(nextMistake)
                 }}
               >
-                Next question →
+                {nextMistake ? 'Next unsolved →' : 'All done!'}
               </button>
             </div>
           )}
@@ -624,14 +631,17 @@ export default function Mistakes() {
                           padding: 14,
                           border: 0,
                           borderBottom: '1px solid #e2e8f0',
-                          background: 'transparent',
-                          cursor: 'pointer'
+                          background: solvedIds.has(m.id) ? '#f0fdf4' : 'transparent',
+                          cursor: 'pointer',
+                          opacity: solvedIds.has(m.id) ? 0.7 : 1,
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ fontWeight: 900, color: '#1a2744' }}>{cfg.label} · {secLabel} · Q{m.q_num}</div>
-                          <div style={{ fontSize: 12, fontWeight: 900, color: dueSoon ? '#ef4444' : '#94a3b8' }}>
-                            {dueSoon ? 'DUE' : '—'}
+                          <div style={{ fontWeight: 900, color: solvedIds.has(m.id) ? '#10b981' : '#1a2744' }}>
+                            {solvedIds.has(m.id) ? '✓ ' : ''}{cfg.label} · {secLabel} · Q{m.q_num}
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: solvedIds.has(m.id) ? '#10b981' : (dueSoon ? '#ef4444' : '#94a3b8') }}>
+                            {solvedIds.has(m.id) ? 'DONE' : (dueSoon ? 'DUE' : '—')}
                           </div>
                         </div>
                         <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>

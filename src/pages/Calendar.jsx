@@ -210,6 +210,23 @@ export default function CalendarPage() {
     return schedule.days.find((day) => day.key === selectedDayKey) || schedule.days[0] || null
   }, [schedule, selectedDayKey])
 
+  // Arrow key navigation between calendar days
+  useEffect(() => {
+    if (!schedule?.days?.length) return
+    function handleKeyDown(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      e.preventDefault()
+      const days = schedule.days
+      const idx = days.findIndex((d) => d.key === selectedDayKey)
+      if (idx < 0) return
+      const next = e.key === 'ArrowLeft' ? idx - 1 : idx + 1
+      if (next >= 0 && next < days.length) setSelectedDayKey(days[next].key)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [schedule, selectedDayKey])
+
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   function updateJourneyDate(nextDate) {
     if (isAdminPreview) return

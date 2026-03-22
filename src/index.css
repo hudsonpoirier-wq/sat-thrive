@@ -750,8 +750,8 @@ button,
 .q-nav-btn:hover { border-color: #94a3b8; }
 .q-nav-btn.current { border-color: var(--sat-blue); background: var(--sat-blue); color: white; }
 .q-nav-btn.answered { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
-.q-nav-btn.marked { border-color: var(--sat-accent); }
-.q-nav-btn.answered.marked { background: #fef3c7; border-color: var(--sat-accent); }
+.q-nav-btn.marked { border-color: var(--sat-accent); background: #fef9c3; color: #92400e; }
+.q-nav-btn.answered.marked { background: #fde68a; border-color: var(--sat-accent); color: #92400e; }
 
 /* PDF canvas */
 .pdf-canvas-wrap {

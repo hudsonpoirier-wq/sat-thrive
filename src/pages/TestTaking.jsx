@@ -471,6 +471,26 @@ export default function TestTaking() {
     }
   }, [])
 
+  // Arrow key navigation between questions
+  useEffect(() => {
+    function handleKeyDown(e) {
+      // Don't intercept if user is typing in an input/textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setCurrentQ(q => Math.max(1, q - 1))
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setCurrentQ(q => {
+          const mod = modules[currentModule]
+          return mod ? Math.min(mod.questions, q + 1) : q
+        })
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentModule, modules])
+
   function toggleMark(qNum) {
     setMarkedForReview(prev => {
       const list = prev[currentModule] || []
