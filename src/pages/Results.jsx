@@ -14,7 +14,7 @@ import { getExamConfigForTest, getScoreColumnsForExam, calcWeakTopicsForTest } f
 import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
-import { buildQuestionHintSummary } from '../lib/questionHints.js'
+
 import { hasUnlockedResources, setUnlockedResources } from '../lib/pretestGate.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
@@ -103,17 +103,8 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
             </button>
             {expanded === mod && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {wrongs.map(({ q, given, right, ch }) => {
+                {wrongs.map(({ q, given, ch }) => {
                   const chData = chapters?.[ch]
-                  const hint = buildQuestionHintSummary({
-                    exam: String(mod).startsWith('act') ? 'act' : 'sat',
-                    section: mod,
-                    qNum: q,
-                    isMC: isMultipleChoiceAnswer(right),
-                    chapterName: chData?.name || '',
-                    chapterCode: chData?.code || '',
-                    concepts: chData?.concepts || [],
-                  })
                   return (
                     <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
                       <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#dc2626', minWidth: 28 }}>Q{q}</div>
@@ -121,11 +112,8 @@ function QuestionReview({ answers, keyBySection, guideHref, moduleOrder, modules
                         <div style={{ fontSize: 12 }}>
                           Your answer: <strong style={{ color: '#dc2626' }}>{given || '—'}</strong>
                         </div>
-                        <div style={{ fontSize: 12, color: '#475569', marginTop: 4, lineHeight: 1.55 }}>
-                          <strong style={{ color: '#1a2744' }}>Hint:</strong> {hint}
-                        </div>
                         {chData && (
-                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <Icon name="guide" size={13} />
                             <span>Study Guide:</span>
                             <Link to={guideHref(ch)} style={{ color: '#1a2744', fontWeight: 800 }}>
@@ -456,25 +444,16 @@ export default function Results() {
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="warning" size={17} />
-              Weak Areas — Mapped to Your Study Guide
+              Top Weak Areas
             </h3>
-            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-              These are the chapters to focus on first. Study them in order of urgency.
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
+              Focus on these first — they're already prioritized in your study plan.
             </p>
-            <div>
-              {weakTopics.map((t, i) => (
-                <div key={t.ch} className="topic-chip" style={{ borderLeftColor: t.color || '#e2e8f0' }}>
-                  <div className="count-badge">{t.count}</div>
-                  <div>
-                    <div className="ch-name">
-                      <span style={{ color: '#94a3b8', fontSize: 11, marginRight: 6 }}>#{i + 1}</span>
-                      {t.name}
-                    </div>
-                    <div className="ch-page" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Icon name="guide" size={13} />
-                      <span>{t.code ? `ACT Module ${t.code}` : `Chapter ${t.ch}`}{t.page ? ` · Guide page ${t.page}` : ''}</span>
-                    </div>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {weakTopics.slice(0, 5).map((t, i) => (
+                <div key={t.ch} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 8, background: i < 2 ? '#fef2f2' : '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: i < 2 ? '#dc2626' : '#f59e0b', flexShrink: 0 }}>{t.count}</div>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#1a2744' }}>{t.name}</div>
                 </div>
               ))}
             </div>

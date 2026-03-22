@@ -94,12 +94,12 @@ function buildSectionHint({ exam, section, isMC, qNum, signals }) {
   if (family === 'english') {
     if (signals.transition) return 'Cover the choices first and decide whether the sentence needs contrast, continuation, cause/effect, or conclusion. Then pick the choice that matches that job.'
     if (signals.punctuation) return 'Read the sentence around the underline as one full thought. Decide whether the punctuation should join, separate, or emphasize ideas before comparing answer choices.'
-    return 'Read one sentence before and one sentence after the tested spot. On ACT English, the best answer has to fit the grammar and the paragraph’s flow at the same time.'
+    return 'Read one sentence before and one sentence after the tested spot. On ACT English, the best answer has to fit the grammar and the paragraph\'s flow at the same time.'
   }
   if (family === 'reading') {
     return signals.passage
       ? `Go back to the exact part of the passage tied to Q${qNum || ''}. Prove your answer with a word or phrase from the passage before selecting a choice.`
-      : 'Find the smallest part of the passage that answers the question directly. Don’t choose an option just because it sounds generally true.'
+      : 'Find the smallest part of the passage that answers the question directly. Don\'t choose an option just because it sounds generally true.'
   }
   if (family === 'science') {
     if (signals.graph) return 'Start with the figure or table title, then read the axes/labels and units. On ACT Science, many misses happen before the actual comparison even starts.'
@@ -137,42 +137,51 @@ function buildCheckHint({ exam, section, isMC, signals }) {
   return 'After narrowing it down, test your answer against the original problem one more time. The correct choice should satisfy every condition in the question.'
 }
 
-function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment }) {
+function buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment, concepts }) {
   const family = sectionFamily(exam, section)
   const moduleLabel = chapterCode ? `${chapterCode} — ${chapterName}` : chapterName
+  const conceptNames = (concepts || []).map(c => c?.title || '').filter(Boolean)
+  const conceptTag = conceptNames.length ? conceptNames[Math.abs(qNum) % conceptNames.length] : ''
   if (family === 'math') {
     if (anchors.numbers.length) return `For Q${qNum}, focus on what the prompt is doing with ${anchors.numbers.join(', ')}. Decide how those values relate before you calculate anything.`
     if (signals.graph) return `For Q${qNum}, start with the visual before the algebra. Read the labels, units, and what each axis or entry represents, then decide which relationship the question is asking you to use${phrases.relationship ? ` (${phrases.relationship})` : ''}.`
     if (signals.geometry) return `For Q${qNum}, sketch or relabel the figure with every given value first. Then mark the exact part you need to find so you do not solve for an intermediate quantity by mistake.`
     if (signals.percent) return `For Q${qNum}, translate the wording into a ratio or percent equation before calculating. Be careful about what is the base amount and what is the change.`
-    if (moduleLabel) return `For Q${qNum}, treat this as a ${moduleLabel} question. Write the relationship you expect from that skill first, then use the choices only to confirm your setup.`
-    return `For Q${qNum}, write the setup before doing arithmetic. If the choices are close, the setup matters more than the computation speed.`
+    if (moduleLabel) return `For Q${qNum}, treat this as a ${moduleLabel} question.${conceptTag ? ` Think about ${conceptTag}.` : ''} Write the relationship you expect from that skill first, then use the choices only to confirm your setup.`
+    return `For Q${qNum}, write the setup before doing arithmetic.${conceptTag ? ` This relates to ${conceptTag}.` : ''} If the choices are close, the setup matters more than the computation speed.`
   }
   if (family === 'english') {
-    if (fragment) return `For Q${qNum}, reread the part around “${fragment}” and decide what the sentence needs most: grammar, punctuation, or the smoother wording. Then eliminate every choice that fails that one job.`
+    if (fragment) return `For Q${qNum}, reread the part around "${fragment}" and decide what the sentence needs most: grammar, punctuation, or the smoother wording. Then eliminate every choice that fails that one job.`
     if (anchors.refs.length) return `For Q${qNum}, reread ${anchors.refs[0]} and the sentence around the underlined part. Choose the option that keeps the grammar clean and the paragraph moving logically.`
     if (signals.transition) return `For Q${qNum}, ignore the answer choices for a second and decide how the sentence should connect to the ideas around it—continuation, contrast, cause/effect, or conclusion. Then pick the choice that does exactly that.`
     if (signals.punctuation) return `For Q${qNum}, check whether the sentence has one complete thought or two. Use that to decide if the punctuation should join, separate, or set off information.`
-    return `For Q${qNum}, reread the sentence before and after the underlined part. The correct ACT English answer has to be grammatically correct and fit the paragraph’s flow.`
+    if (chapterName) return `For Q${qNum} (${chapterName}), reread the sentence before and after the underlined part.${conceptTag ? ` Apply what you know about ${conceptTag}.` : ''} The correct answer has to be grammatically correct and fit the paragraph's flow.`
+    return `For Q${qNum}, reread the sentence before and after the underlined part. The correct ACT English answer has to be grammatically correct and fit the paragraph's flow.`
   }
   if (family === 'reading-writing') {
-    if (fragment) return `For Q${qNum}, go back to “${fragment}” and decide what that sentence is supposed to do there—clarify, connect ideas, or make the point more precise.`
+    if (fragment) return `For Q${qNum}, go back to "${fragment}" and decide what that sentence is supposed to do there—clarify, connect ideas, or make the point more precise.`
     if (anchors.refs.length) return `For Q${qNum}, go back to ${anchors.refs[0]} and decide exactly what that sentence needs—clarity, support, or a better transition—before comparing choices.`
     if (signals.transition) return `For Q${qNum}, decide what the sentence or paragraph needs next—support, contrast, continuation, or conclusion—before comparing the choices.`
     if (signals.punctuation) return `For Q${qNum}, test the structure of the sentence first. Ask whether the punctuation changes meaning, separates full ideas, or simply adds extra detail.`
+    if (chapterName) return `For Q${qNum} (${chapterName}), go back to the exact sentence and ask what job the correct answer must do there.${conceptTag ? ` Think about ${conceptTag}.` : ''}`
     return `For Q${qNum}, go back to the exact sentence and ask what job the correct answer must do there: clarify, connect ideas, or improve precision.`
   }
   if (family === 'reading') {
-    if (fragment) return `For Q${qNum}, start with the lines around “${fragment}” and find the exact words in the passage that support one choice better than the others.`
+    if (fragment) return `For Q${qNum}, start with the lines around "${fragment}" and find the exact words in the passage that support one choice better than the others.`
     if (anchors.refs.length) return `For Q${qNum}, start at ${anchors.refs[0]} and locate the exact phrase that answers the question. The best choice should match the passage wording more precisely than the others.`
+    if (chapterName) return `For Q${qNum} (${chapterName}), find the exact part of the passage that answers the question${phrases.readingTask ? ` about ${phrases.readingTask}` : ''}.${conceptTag ? ` Apply ${conceptTag}.` : ''} Do not choose until you can point to the supporting words.`
     return `For Q${qNum}, find the exact part of the passage that answers the question${phrases.readingTask ? ` about ${phrases.readingTask}` : ''}. Do not choose until you can point to the supporting words in the text.`
   }
   if (family === 'science') {
-    if (fragment) return `For Q${qNum}, use the part about “${fragment}” to decide which figure, table, or experiment you should read first. Then pull only the data that answers that one point.`
+    if (fragment) return `For Q${qNum}, use the part about "${fragment}" to decide which figure, table, or experiment you should read first. Then pull only the data that answers that one point.`
     if (anchors.refs.length) return `For Q${qNum}, use ${anchors.refs[0]} first. Read the labels and units there, then pull only the data needed for this question before comparing choices.`
     if (signals.graph || phrases.scienceTask) return `For Q${qNum}, begin with ${phrases.scienceTask || 'the relevant figure or table'}. Read the labels and units, then trace only the data needed for this question before looking at the answer choices.`
+    if (chapterName) return `For Q${qNum} (${chapterName}), decide whether the question is asking about a trend, a comparison, or an experimental setup.${conceptTag ? ` Think about ${conceptTag}.` : ''} Use the data first and the vocabulary second.`
     return `For Q${qNum}, decide whether the question is asking about a trend, a comparison, or an experimental setup. Then use the data first and the science vocabulary second.`
   }
+  if (chapterName) return isMC
+    ? `For Q${qNum} (${chapterName}), predict what the correct answer should do before reading the choices.${conceptTag ? ` Consider ${conceptTag}.` : ''}`
+    : `For Q${qNum} (${chapterName}), write down the exact value or expression the question wants, solve for only that, and make sure your final response is in the right format.`
   return isMC
     ? `For Q${qNum}, predict what the correct answer should do before reading the choices. That will make it easier to eliminate choices that only sound right.`
     : `For Q${qNum}, write down the exact value or expression the question wants, solve for only that, and make sure your final response is in the right format.`
@@ -188,7 +197,7 @@ function buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors
       : 'Check each transformation in your work line by line. Most misses here come from one setup slip that carries through the rest of the problem.'
   }
   if (family === 'english' || family === 'reading-writing') {
-    if (fragment) return `Use the wording around “${fragment}” as your checkpoint. Read each option back into that exact spot and keep only the choice that is both correct and natural in context.`
+    if (fragment) return `Use the wording around "${fragment}" as your checkpoint. Read each option back into that exact spot and keep only the choice that is both correct and natural in context.`
     return phrases.grammarTask
       ? `This is a ${phrases.grammarTask} style question. Explain out loud why each wrong choice fails—grammar, logic, repetition, or flow—before you settle on the final answer.`
       : 'Eliminate answer choices with a specific reason, not a feeling. The best choice should improve both correctness and flow.'
@@ -232,7 +241,7 @@ export function buildQuestionHintLadder({
   const sectionHint = buildSectionHint({ exam, section, isMC, qNum, signals })
   const checkHint = buildCheckHint({ exam, section, isMC, signals })
 
-  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment })
+  const step1 = buildTargetedHint({ exam, section, qNum, isMC, chapterName, chapterCode, questionText, signals, phrases, anchors, fragment, concepts })
   const conceptHint = shuffledConcepts[0] ? firstSentence(shuffledConcepts[0]) : ''
   const step2 = `${buildProcessHint({ exam, section, qNum, isMC, signals, phrases, anchors, answerChoices, fragment })}${conceptHint ? ` ${conceptHint}` : ''}`
   const step3 = checkHint

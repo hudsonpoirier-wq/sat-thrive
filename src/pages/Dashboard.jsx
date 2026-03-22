@@ -230,6 +230,7 @@ export default function Dashboard() {
 
   const displayProfile = isAdminPreview ? targetProfile : profile
   const readOnlyView = isAdminPreview
+  const isTutor = profile?.role === 'tutor'
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
 
   function hasViewedResultsForAttempt(attemptId) {
@@ -635,7 +636,28 @@ export default function Dashboard() {
           <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your {examResultLabel(exam)}</p>
         </div>
 
-        {/* Score overview */}
+        {/* Tutor CTA — primary action for tutors */}
+        {isTutor && !isAdminPreview && (
+          <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, #1a2744, #312e81)', color: 'white', padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="students" size={20} />
+                  Your Students
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.6 }}>
+                  View student progress, test results, and analytics from your Tutor Dashboard.
+                </div>
+              </div>
+              <button className="btn" onClick={() => navigate('/tutor')} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
+                Open Tutor Dashboard →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Score overview — students only */}
+        {!isTutor && (
 	        <div className="stats-grid">
             <ScoreOverviewCard
               label={bestScoreLabel}
@@ -667,9 +689,10 @@ export default function Dashboard() {
               dark={improvement !== null && improvement !== 0}
             />
         </div>
+        )}
 
-	        {/* Pre Test CTA (hidden after completion) */}
-        {(completedPre.length === 0 || preInProgress) && (
+	        {/* Pre Test CTA (hidden after completion, hidden for tutors) */}
+        {!isTutor && (completedPre.length === 0 || preInProgress) && (
 	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
 	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
 	              <div>
@@ -715,7 +738,7 @@ export default function Dashboard() {
 	        )}
 
         {/* Today / work-ahead */}
-        {hasTakenPretest && journeySchedule && (
+        {!isTutor && hasTakenPretest && journeySchedule && (
           <div id="today-tasks-card" className="card dashboard-section-card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
               <div>
@@ -811,6 +834,7 @@ export default function Dashboard() {
         )}
 
         {/* Journey tracker + Study Guide */}
+        {!isTutor && (
         <div className="card dashboard-section-card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
@@ -946,9 +970,10 @@ export default function Dashboard() {
 	            </div>
 	          )}
 	        </div>
+        )}
 
         {/* Optional extra practice */}
-        {hasTakenPretest && (
+        {!isTutor && hasTakenPretest && (
           <>
             {extraTests.length > 0 && (
               <div className="card dashboard-practice-card dashboard-section-card" style={{ marginBottom: 24 }}>
@@ -1041,7 +1066,7 @@ export default function Dashboard() {
         )}
 
         {/* Completed tests */}
-        {completed.length > 0 && (
+        {!isTutor && completed.length > 0 && (
           <div className="card dashboard-section-card">
             <h2 style={{fontFamily:'Sora,sans-serif', fontSize:16, fontWeight:700, marginBottom:16}}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -1137,7 +1162,7 @@ export default function Dashboard() {
         )}
 
         {/* Score trend (hidden until pretest is taken) */}
-        {hasTakenPretest && trendData && (
+        {!isTutor && hasTakenPretest && trendData && (
           <div className="card dashboard-section-card" style={{ marginTop: 24 }}>
             <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="chart" size={18} />

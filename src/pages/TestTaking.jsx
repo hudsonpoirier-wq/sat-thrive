@@ -119,6 +119,13 @@ export default function TestTaking() {
   const pendingSave = useRef(null)
   const saveInFlight = useRef(false)
 
+  // Tutors should not take tests — redirect to dashboard
+  useEffect(() => {
+    if (profile && profile.role === 'tutor') {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [profile, navigate])
+
   function readDraft() {
     try {
       const key = `agora_attempt_draft_v1:${attemptId}`

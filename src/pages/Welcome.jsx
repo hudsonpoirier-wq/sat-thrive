@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import Icon from '../components/AppIcons.jsx'
@@ -52,7 +53,7 @@ function MiniCard({ children, style }) {
 
 /* ─── Student Sections ───────────────────────────────── */
 
-function StudentSections({ exam }) {
+function studentSlides(exam) {
   const label = exam === 'act' ? 'ACT' : 'SAT'
   const maxScore = exam === 'act' ? '36' : '1600'
   const sampleScore = exam === 'act' ? '28' : '1280'
@@ -62,9 +63,7 @@ function StudentSections({ exam }) {
     ? ['English: 29', 'Math: 27', 'Reading: 30', 'Science: 28']
     : ['Reading: 640', 'Math: 670']
 
-  return (
-    <>
-      {/* Dashboard */}
+  return [
       <Section icon="home" title="Your Dashboard" subtitle="Your home base for everything">
         <MockFrame label="Dashboard">
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -97,9 +96,8 @@ function StudentSections({ exam }) {
         <Tip n={1}>Your <strong>score cards</strong> at the top track your best, most recent, and improvement scores across all tests.</Tip>
         <Tip n={2}>Follow the <strong>5-step journey</strong>: start with the Pre-Test, then unlock your Study Plan, Results, Mistake Review, and Study Guide.</Tip>
         <Tip n={3}>Steps unlock as you go — <strong>complete the Pre-Test first</strong> to unlock everything else.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Test Taking */}
       <Section icon="test" title="Taking a Test" subtitle="Timed sections with the real test PDF">
         <MockFrame label={`Test — ${label} Pre-Test · Section 1`}>
           <div style={{ display: 'flex', gap: 14 }}>
@@ -146,9 +144,8 @@ function StudentSections({ exam }) {
         <Tip n={3}>Use <strong>"Mark to Come Back"</strong> (yellow) to flag questions you want to revisit before submitting.</Tip>
         <Tip n={4}>The <strong>timer</strong> counts down for each section. Green = answered, blue = current, gray = unanswered.</Tip>
         <Tip n={5}>Use <strong>arrow keys</strong> (← → ↑ ↓) to navigate between questions quickly.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Results */}
       <Section icon="results" title="Your Results" subtitle="See exactly where you stand">
         <MockFrame label={`Results — ${label} Pre-Test`}>
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -173,9 +170,8 @@ function StudentSections({ exam }) {
         <Tip n={1}>See your <strong>total score</strong> and <strong>per-section breakdown</strong> after every test.</Tip>
         <Tip n={2}><strong>Weak topics</strong> are identified automatically — these feed directly into your study plan.</Tip>
         <Tip n={3}>Your study calendar and guide <strong>prioritize these weak areas</strong> to help you improve fastest.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Study Guide */}
       <Section icon="guide" title="Study Guide" subtitle="Master every topic chapter by chapter">
         <MockFrame label={`Study Guide — ${label}`}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -219,9 +215,8 @@ function StudentSections({ exam }) {
         <Tip n={1}>Work through <strong>chapters</strong> organized by topic at your own pace.</Tip>
         <Tip n={2}>Each chapter has <strong>multiple-choice practice questions</strong> to test your understanding.</Tip>
         <Tip n={3}>Complete all chapters ({exam === 'act' ? '44' : '25'}) to mark the Study Guide step as done on your dashboard.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Calendar */}
       <Section icon="calendar" title="Calendar & Study Plan" subtitle="A personalized day-by-day schedule">
         <MockFrame label="Calendar">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 14 }}>
@@ -257,9 +252,8 @@ function StudentSections({ exam }) {
         <Tip n={2}>Your schedule <strong>adapts automatically</strong> based on weak topics and how much time you have left.</Tip>
         <Tip n={3}>Each task links directly to the right page — just <strong>click to start</strong>.</Tip>
         <Tip n={4}>Red dates mark your <strong>test day</strong>. Blue dates have study tasks assigned.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Mistakes */}
       <Section icon="mistakes" title="Mistake Notebook" subtitle="Review and master every missed question">
         <MockFrame label="Mistake Notebook">
           {[
@@ -281,9 +275,8 @@ function StudentSections({ exam }) {
         <Tip n={2}>Review each mistake and answer it correctly to mark it as <strong>solved</strong>.</Tip>
         <Tip n={3}><strong>"Next unsolved"</strong> jumps straight to the next question you haven't reviewed yet.</Tip>
         <Tip n={4}>Uses <strong>spaced repetition</strong> — questions resurface over time to lock in your learning.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Get around fast with the top bar">
         <MockFrame label="Navigation Bar">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
@@ -299,17 +292,14 @@ function StudentSections({ exam }) {
         <Tip n={1}>The <strong>top bar</strong> gives you one-click access to Calendar, Study Guide, and Mistakes from any page.</Tip>
         <Tip n={2}>Use the <strong>exam switcher</strong> ({label} badge) to toggle between your SAT and ACT dashboards anytime.</Tip>
         <Tip n={3}>Click the <strong>AGORA logo</strong> to return to your dashboard from anywhere.</Tip>
-      </Section>
-    </>
-  )
+      </Section>,
+  ]
 }
 
 /* ─── Tutor Sections ─────────────────────────────────── */
 
-function TutorSections() {
-  return (
-    <>
-      {/* Students */}
+function tutorSlides() {
+  return [
       <Section icon="students" title="Your Students" subtitle="View everyone affiliated with your school">
         <MockFrame label="Tutor Dashboard — Students">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -344,9 +334,8 @@ function TutorSections() {
         <Tip n={2}>Track each student's <strong>test count</strong> and <strong>best score</strong> at a glance.</Tip>
         <Tip n={3}>Click <strong>"View"</strong> to preview any student's full dashboard exactly as they see it.</Tip>
         <Tip n={4}>Click <strong>"Report"</strong> to see their detailed progress report with score breakdowns.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Test Results */}
       <Section icon="results" title="Test Results" subtitle="Every completed test from your students">
         <MockFrame label="Tutor Dashboard — Test Results">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -377,9 +366,8 @@ function TutorSections() {
         <Tip n={1}>See <strong>every completed test</strong> from your students in one place, sorted by date.</Tip>
         <Tip n={2}>Track scores, dates, and <strong>top weaknesses</strong> to identify who needs the most help.</Tip>
         <Tip n={3}>Results update <strong>in real time</strong> — new scores appear as soon as students finish a test.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Analytics */}
       <Section icon="chart" title="Analytics" subtitle="Track performance across your students">
         <MockFrame label="Tutor Dashboard — Analytics">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -419,9 +407,8 @@ function TutorSections() {
         <Tip n={2}>The <strong>score distribution</strong> chart shows how your students' scores spread out.</Tip>
         <Tip n={3}>Identify the <strong>most commonly missed topics</strong> across all students to guide group instruction.</Tip>
         <Tip n={4}>Toggle between <strong>SAT and ACT</strong> analytics separately.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Previewing */}
       <Section icon="eye" title="Previewing Student Work" subtitle="See any student's dashboard as they see it">
         <MockFrame label="Tutor View — Alex Johnson's Dashboard">
           <div style={{ background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 10, border: '1px solid #fde68a' }}>
@@ -434,9 +421,8 @@ function TutorSections() {
         <Tip n={1}>Click <strong>"View"</strong> on any student to see their exact dashboard with real data.</Tip>
         <Tip n={2}>Preview mode is <strong>read-only</strong> — you can look but can't modify their data or start tests.</Tip>
         <Tip n={3}>A yellow banner at the top always reminds you that you're in preview mode.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Find your way around">
         <MockFrame label="Navigation Bar">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
@@ -450,17 +436,14 @@ function TutorSections() {
         <Tip n={1}>Click <strong>"Students"</strong> in the top bar to access your Tutor Dashboard with student lists, results, and analytics.</Tip>
         <Tip n={2}>Click <strong>"My Dashboard"</strong> to return to the standard student view (you also have your own SAT/ACT practice dashboard).</Tip>
         <Tip n={3}>Click the <strong>AGORA logo</strong> to return to your dashboard from anywhere.</Tip>
-      </Section>
-    </>
-  )
+      </Section>,
+  ]
 }
 
 /* ─── Admin Sections ─────────────────────────────────── */
 
-function AdminSections() {
-  return (
-    <>
-      {/* Student Management */}
+function adminSlides() {
+  return [
       <Section icon="admin" title="Student Management" subtitle="Full control over all user accounts">
         <MockFrame label="Admin — Students">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -502,9 +485,8 @@ function AdminSections() {
         <Tip n={3}><strong>Reset</strong> clears a student's tests, scores, and study progress so they can start fresh.</Tip>
         <Tip n={4}><strong>View</strong> opens their dashboard in read-only preview. <strong>Report</strong> shows detailed analytics.</Tip>
         <Tip n={5}><strong>Delete</strong> permanently removes a user account — use with caution.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Analytics */}
       <Section icon="chart" title="Program Analytics" subtitle="Organization-wide performance metrics">
         <MockFrame label="Admin — Analytics">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -534,9 +516,8 @@ function AdminSections() {
         <Tip n={2}>Charts cover <strong>activity trends, score distributions, averages by test, and most missed topics</strong>.</Tip>
         <Tip n={3}>Filter analytics by <strong>affiliation</strong> to compare performance between different schools.</Tip>
         <Tip n={4}>Toggle between <strong>SAT and ACT</strong> for separate analytics views.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Affiliations */}
       <Section icon="folder" title="Affiliations" subtitle="Compare performance across schools">
         <MockFrame label="Admin — Affiliations">
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -559,9 +540,8 @@ function AdminSections() {
         <Tip n={1}>See <strong>side-by-side stats</strong> for every school or organization in your system.</Tip>
         <Tip n={2}>Click any affiliation card to <strong>filter</strong> the Students and Analytics tabs to just that group.</Tip>
         <Tip n={3}>Compare <strong>student counts, test counts, and average scores</strong> across all affiliations.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Proof of Impact */}
       <Section icon="trend" title="Proof of Impact" subtitle="Statistical evidence that the program works">
         <MockFrame label="Admin — Proof of Impact">
           <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -589,9 +569,8 @@ function AdminSections() {
         <Tip n={1}>Compare <strong>pre-test vs post-test averages</strong> across all students with paired data.</Tip>
         <Tip n={2}>See full <strong>statistical analysis</strong>: paired t-test, p-value, Cohen's d effect size, and confidence intervals.</Tip>
         <Tip n={3}>Use this data to <strong>demonstrate program effectiveness</strong> to stakeholders and funders.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Test Management */}
       <Section icon="test" title="Test Management" subtitle="Manage PDFs and answer keys">
         <MockFrame label="Admin — Tests">
           {['SAT Pre-Test', 'SAT Practice 1', 'SAT Practice 2', 'ACT Pre-Test'].map(t => (
@@ -607,9 +586,8 @@ function AdminSections() {
         <Tip n={1}>View the <strong>status of every test</strong> — which ones have PDFs and answer keys ready.</Tip>
         <Tip n={2}><strong>Upload PDFs</strong> and the system can auto-extract answer keys from scoring guides.</Tip>
         <Tip n={3}>Use <strong>"Regrade Attempts"</strong> in the toolbar to rescore all tests after updating an answer key.</Tip>
-      </Section>
+      </Section>,
 
-      {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Admin toolbar overview">
         <MockFrame label="Admin Navigation Bar">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px', flexWrap: 'wrap', gap: 8 }}>
@@ -625,9 +603,8 @@ function AdminSections() {
         <Tip n={1}><strong>"Regrade Attempts"</strong> rescores all completed tests with the latest answer key logic.</Tip>
         <Tip n={2}><strong>"Reset My Data"</strong> clears your own test data (useful when testing the platform yourself).</Tip>
         <Tip n={3}><strong>"Back to Dashboard"</strong> returns you to the standard student dashboard view.</Tip>
-      </Section>
-    </>
-  )
+      </Section>,
+  ]
 }
 
 /* ─── Main Component ─────────────────────────────────── */
@@ -639,10 +616,16 @@ export default function Welcome() {
   const params = new URLSearchParams(location.search)
   const exam = params.get('exam') || 'sat'
   const role = profile?.role || 'student'
+  const [slide, setSlide] = useState(0)
 
   const isAdmin = role === 'admin'
   const isTutor = role === 'tutor'
   const label = exam === 'act' ? 'ACT' : 'SAT'
+
+  const slides = isAdmin ? adminSlides() : isTutor ? tutorSlides() : studentSlides(exam)
+  const total = slides.length
+  const isFirst = slide === 0
+  const isLast = slide === total - 1
 
   const heroSubtitle = isAdmin
     ? "Here's a quick tour of your Admin Dashboard and all the tools at your disposal."
@@ -658,6 +641,18 @@ export default function Welcome() {
     else navigate(`/dashboard?exam=${exam}`, { replace: true })
   }
 
+  const goNext = useCallback(() => setSlide(s => Math.min(s + 1, total - 1)), [total])
+  const goPrev = useCallback(() => setSlide(s => Math.max(s - 1, 0)), [])
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); goNext() }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); goPrev() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goNext, goPrev])
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -666,7 +661,7 @@ export default function Welcome() {
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: 40, color: 'white' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32, color: 'white' }}>
           <div style={{
             display: 'inline-block', padding: '4px 14px',
             background: 'rgba(255,255,255,.12)', borderRadius: 20,
@@ -681,26 +676,84 @@ export default function Welcome() {
           <div style={{ fontSize: 15, color: 'rgba(255,255,255,.7)', lineHeight: 1.7, maxWidth: 480, margin: '0 auto' }}>
             {heroSubtitle}
           </div>
-          <div style={{ marginTop: 16, fontSize: 13, color: 'rgba(255,255,255,.45)' }}>
-            Scroll down to explore each feature ↓
+        </div>
+
+        {/* Slide counter */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, padding: '0 4px' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,.5)' }}>
+            {slide + 1} / {total}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlide(i)}
+                style={{
+                  width: i === slide ? 20 : 8,
+                  height: 8,
+                  borderRadius: 99,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: i === slide ? 'white' : 'rgba(255,255,255,.25)',
+                  transition: 'all .3s ease',
+                  padding: 0,
+                }}
+                aria-label={`Slide ${i + 1}`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Role-specific sections */}
-        {isAdmin ? <AdminSections /> : isTutor ? <TutorSections /> : <StudentSections exam={exam} />}
+        {/* Current slide */}
+        <div key={slide} className="fade-up">
+          {slides[slide]}
+        </div>
 
-        {/* CTA */}
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
+        {/* Navigation controls */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, gap: 12 }}>
           <button
-            onClick={handleGetStarted}
-            className="btn btn-primary"
+            onClick={goPrev}
+            disabled={isFirst}
+            className="btn btn-outline"
             style={{
-              padding: '16px 48px', fontSize: 17, fontWeight: 900,
-              borderRadius: 14, boxShadow: '0 8px 24px rgba(14,165,233,.4)',
+              padding: '12px 24px', fontSize: 14, fontWeight: 800,
+              color: isFirst ? 'rgba(255,255,255,.25)' : 'white',
+              borderColor: isFirst ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.3)',
+              background: 'rgba(255,255,255,.06)',
+              cursor: isFirst ? 'not-allowed' : 'pointer',
             }}
           >
-            {isAdmin ? 'Go to Admin Dashboard →' : isTutor ? 'Go to Dashboard →' : 'Get Started →'}
+            ← Back
           </button>
+
+          {isLast ? (
+            <button
+              onClick={handleGetStarted}
+              className="btn btn-primary"
+              style={{
+                padding: '14px 40px', fontSize: 16, fontWeight: 900,
+                borderRadius: 14, boxShadow: '0 8px 24px rgba(14,165,233,.4)',
+              }}
+            >
+              {isAdmin ? 'Go to Admin Dashboard →' : isTutor ? 'Go to Dashboard →' : 'Get Started →'}
+            </button>
+          ) : (
+            <button
+              onClick={goNext}
+              className="btn btn-primary"
+              style={{
+                padding: '12px 32px', fontSize: 14, fontWeight: 800,
+                borderRadius: 12,
+              }}
+            >
+              Next →
+            </button>
+          )}
+        </div>
+
+        {/* Keyboard hint */}
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,.3)' }}>
+          Use arrow keys or click to navigate
         </div>
       </div>
     </div>
