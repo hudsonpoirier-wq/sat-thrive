@@ -22,6 +22,7 @@ const loadCompareTests = () => import('./pages/CompareTests.jsx')
 const loadSetupPlan = () => import('./pages/SetupPlan.jsx')
 const loadTutorDashboard = () => import('./pages/TutorDashboard.jsx')
 const loadOverview = () => import('./pages/Overview.jsx')
+const loadWelcome = () => import('./pages/Welcome.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -40,6 +41,7 @@ const CompareTests = lazy(loadCompareTests)
 const SetupPlan = lazy(loadSetupPlan)
 const TutorDashboard = lazy(loadTutorDashboard)
 const Overview = lazy(loadOverview)
+const Welcome = lazy(loadWelcome)
 
 function RouteLoader() {
   return (
@@ -103,6 +105,7 @@ export default function App() {
               <Route path="/reset" element={<ResetPassword />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/choose-test" element={<ProtectedRoute><ChooseTest /></ProtectedRoute>} />
+              <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
               <Route path="/compare-tests" element={<ProtectedRoute><CompareTests /></ProtectedRoute>} />
               <Route path="/test/:attemptId" element={<ProtectedRoute><TestTaking /></ProtectedRoute>} />
               <Route path="/setup-plan/:attemptId" element={<ProtectedRoute><SetupPlan /></ProtectedRoute>} />

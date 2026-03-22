@@ -14,7 +14,7 @@ export default function ChooseTest() {
     setSaving(exam)
     saveLocalPreferredExam(user?.id, exam)
     await setPreferredExam(exam).catch(() => {})
-    navigate(`/dashboard?exam=${exam}`, { replace: true })
+    navigate(`/welcome?exam=${exam}`, { replace: true })
   }
 
   return (

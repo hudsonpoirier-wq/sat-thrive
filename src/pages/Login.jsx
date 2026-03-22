@@ -93,8 +93,8 @@ export default function Login() {
         if (data?.session) {
           setLoading(false)
           if (signupRole === "tutor") {
-            setSuccess("Account created! Redirecting to your dashboard...")
-            navigate("/dashboard", { replace: true })
+            setSuccess("Account created! Redirecting to your welcome tour...")
+            navigate("/welcome", { replace: true })
           } else {
             setSuccess("Account created! Let’s choose your first test...")
             navigate("/choose-test", { replace: true })
