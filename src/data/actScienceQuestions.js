@@ -146,9 +146,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'C',
       'The point (6, 3) on the graph directly shows that at 6 V the current is 3 amps.'
     ),
-    fr(
+    mc(
       'A table shows the distance a car travels over time: at 1 s it has traveled 10 m, at 2 s it has traveled 20 m, at 3 s it has traveled 30 m. Based on the table, how far has the car traveled at 5 s if the pattern continues?',
-      '50',
+      { A: '40 m', B: '45 m', C: '50 m', D: '60 m' },
+      'C',
       'The car travels 10 m each second, so at 5 s it has traveled 50 m.'
     ),
     mc(
@@ -298,9 +299,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'The coated tiles had far fewer colonies, but some remained, so the coating reduced but did not eliminate bacterial growth.'
     ),
-    fr(
+    mc(
       'An experiment tests five concentrations of a growth hormone on seedling height. The concentrations are 0 ppm, 5 ppm, 10 ppm, 15 ppm, and 20 ppm. How many different treatment levels does this experiment have?',
-      '5',
+      { A: '3', B: '4', C: '5', D: '6' },
+      'C',
       'There are five distinct concentrations being tested, so there are 5 treatment levels.'
     ),
     mc(
@@ -426,9 +428,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'A',
       'Using a different sugar amount changes a controlled variable, making that trial\'s results not directly comparable.'
     ),
-    fr(
+    mc(
       'An experiment has four test groups receiving different concentrations of fertilizer and one group receiving no fertilizer. How many groups in total are used in the experiment?',
-      '5',
+      { A: '3', B: '4', C: '5', D: '6' },
+      'C',
       'Four test groups plus one control group (no fertilizer) equals 5 groups total.'
     ),
     mc(
@@ -548,9 +551,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'A steepening curve means the rate of increase is itself growing, indicating acceleration.'
     ),
-    fr(
+    mc(
       'A line graph shows that a balloon rises from 0 m to 600 m in 3 minutes at a constant rate. Based on this trend, at what height (in meters) will the balloon be at 5 minutes?',
-      '1000',
+      { A: '800', B: '900', C: '1,000', D: '1,200' },
+      'C',
       'The balloon rises at 200 m/min (600/3). At 5 min: 200 x 5 = 1,000 m.'
     ),
     mc(
@@ -601,9 +605,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'A sharp increase in soil moisture after a sustained decline strongly suggests a rainfall event.'
     ),
-    fr(
+    mc(
       'A graph shows a linear trend where a plant grows 3 cm per week. At Week 2, the plant is 10 cm tall. Based on this trend, how tall will the plant be at Week 6?',
-      '22',
+      { A: '18', B: '22', C: '24', D: '28' },
+      'B',
       'From Week 2 to Week 6 is 4 weeks. Growth = 4 x 3 = 12 cm added to 10 cm gives 22 cm.'
     ),
     mc(
@@ -786,9 +791,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'Density = mass / volume = 45 / 15 = 3 g/cm^3.'
     ),
-    fr(
+    mc(
       'In an experiment, 60 out of 200 seeds germinated. What percentage of seeds germinated?',
-      '30',
+      { A: '20%', B: '25%', C: '30%', D: '35%' },
+      'C',
       '(60 / 200) x 100 = 30%.'
     ),
     mc(
@@ -827,9 +833,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'C',
       '4:2 simplifies to 2:1.'
     ),
-    fr(
+    mc(
       'A wave has a frequency of 500 Hz and a wavelength of 0.68 m. What is the wave speed in m/s?',
-      '340',
+      { A: '170', B: '272', C: '340', D: '500' },
+      'C',
       'Wave speed = frequency x wavelength = 500 x 0.68 = 340 m/s.'
     ),
     mc(
@@ -874,9 +881,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'C',
       'Energy = mass x specific heat x temperature change = 50 x 4.18 x 10 = 2,090 J.'
     ),
-    fr(
+    mc(
       'A solution contains 15 g of salt dissolved in 500 mL of water. What is the concentration in g/L?',
-      '30',
+      { A: '15', B: '25', C: '30', D: '45' },
+      'C',
       '500 mL = 0.5 L. Concentration = 15 g / 0.5 L = 30 g/L.'
     ),
     mc(
@@ -1044,9 +1052,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'The observed cooling after the eruption matches the prediction that ash would block sunlight and reduce temperatures.'
     ),
-    fr(
+    mc(
       'A model predicts that a sample loses half its radioactivity every 5 years. If the sample starts with 200 units of radioactivity, how many units will remain after 15 years?',
-      '25',
+      { A: '12.5', B: '25', C: '50', D: '75' },
+      'B',
       'After 5 years: 100. After 10 years: 50. After 15 years: 25 units.'
     ),
     mc(
@@ -1202,9 +1211,10 @@ export const ACT_SCIENCE_QUESTIONS = {
       'B',
       'Smaller atoms hold their electrons more tightly, requiring more energy to remove one, so ionization energy increases as radius decreases.'
     ),
-    fr(
+    mc(
       'Figure 1 shows that a reaction at 30°C produces 8 g of product. Table 1 shows that the reaction has a 40% yield at 30°C. Based on both sources, what is the theoretical maximum product (in grams) at 30°C?',
-      '20',
+      { A: '12', B: '16', C: '20', D: '24' },
+      'C',
       'If 8 g represents 40% yield, then 100% yield = 8 / 0.40 = 20 g.'
     ),
     mc(

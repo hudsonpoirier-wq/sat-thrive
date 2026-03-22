@@ -1333,11 +1333,11 @@ The content after a single dash often elaborates on or illustrates what came bef
 "The archaeologists uncovered something unexpected ___ a perfectly preserved Roman mosaic."`,
         choices: {
         A: `unexpected, a perfectly`,
-        B: `unexpected: a perfectly`,
-        C: `unexpected — a perfectly`,
-        D: `Both B and C are correct`
+        B: `unexpected; a perfectly`,
+        C: `unexpected. a perfectly`,
+        D: `Both "unexpected: a perfectly" and "unexpected — a perfectly" are correct`
         },
-        correct: 'D', exp: `Both colon and dash can introduce an explanation after a complete IC. B (colon) is formal and correct. C (dash) is emphatic and correct. Both are valid punctuation here. D is the right answer.` },
+        correct: 'D', exp: `Both colon and dash can introduce an explanation after a complete IC. A colon is formal and correct. A dash is emphatic and correct. Both are valid punctuation here. A (comma) creates a comma splice. B (semicolon) doesn't fit because the second part isn't an independent clause. C creates a fragment.` },
       { q: `"The solution to the problem was obvious ___ no one had thought to check the power supply."`,
         choices: {
         A: `obvious, no one`,
@@ -1373,11 +1373,11 @@ The content after a single dash often elaborates on or illustrates what came bef
       { q: `"She accomplished something remarkable that day ___ she convinced the entire board to change their vote."`,
         choices: {
         A: `day, she convinced`,
-        B: `day: she convinced`,
-        C: `day; she convinced`,
-        D: `Both B and C`
+        B: `day — she convinced`,
+        C: `day. she convinced`,
+        D: `Both "day: she convinced" and "day; she convinced" are correct`
         },
-        correct: 'D', exp: `Both a colon (IC: explanation) and semicolon (IC; IC) are correct here. B introduces the accomplishment with a colon. C joins two related ICs with a semicolon. A is a comma splice.` },
+        correct: 'D', exp: `Both a colon (IC: explanation) and semicolon (IC; IC) are correct here. A colon introduces the accomplishment. A semicolon joins two related ICs. A (comma) is a comma splice. B (dash) is acceptable but less standard. C creates a fragment.` },
       { q: `Which correctly uses a dash to set off a parenthetical?`,
         choices: {
         A: `The CEO — who had founded the company — stepped down unexpectedly.`,
@@ -1604,12 +1604,12 @@ If the clause is non-essential → use 'which,' with commas`, type: 'tip' },
         correct: 'C', exp: `'Built in 1889' is a non-essential participial phrase. It needs matching punctuation on both sides. C has commas on both sides. D has a dash but no matching dash — incorrect paired punctuation.` },
       { q: `"My sister ___ who lives in Boston ___ is visiting this weekend."`,
         choices: {
-        A: `, who lives in Boston, is`,
-        B: `— who lives in Boston — is`,
-        C: ` who lives in Boston, is`,
-        D: `Both A and B`
+        A: ` who lives in Boston, is`,
+        B: `, who lives in Boston — is`,
+        C: `— who lives in Boston, is`,
+        D: `Both ", who lives in Boston, is" and "— who lives in Boston — is" are correct`
         },
-        correct: 'D', exp: `Both commas-both-sides (A) and dashes-both-sides (B) are correct for non-essential clauses. D is correct — either option is valid.` },
+        correct: 'D', exp: `Both commas-both-sides and dashes-both-sides are correct for non-essential clauses. A has no opening punctuation. B and C mix comma and dash — non-essential clauses need matching punctuation on both sides.` },
       { q: `Which sentence uses "which" correctly?`,
         choices: {
         A: `The vaccine that was developed last year has proven highly effective.`,
@@ -1621,11 +1621,11 @@ If the clause is non-essential → use 'which,' with commas`, type: 'tip' },
       { q: `"The research ___ which took three years to complete ___ has finally been published."`,
         choices: {
         A: `: which took three years to complete:`,
-        B: `, which took three years to complete,`,
-        C: `— which took three years to complete —`,
-        D: `Both B and C`
+        B: `, which took three years to complete —`,
+        C: `— which took three years to complete,`,
+        D: `Both ", which took three years to complete," and "— which took three years to complete —" are correct`
         },
-        correct: 'D', exp: `Both commas (B) and dashes (C) can set off non-essential clauses. Both are correct here. D is the right answer.` },
+        correct: 'D', exp: `Both commas and dashes can set off non-essential clauses, but the punctuation must match on both sides. A uses colons — wrong for non-essential clauses. B and C mix comma and dash — inconsistent pairs.` },
       { q: `Choose the sentence with an INCORRECTLY punctuated non-essential clause.`,
         choices: {
         A: `The treaty, signed in 1918, ended World War I.`,

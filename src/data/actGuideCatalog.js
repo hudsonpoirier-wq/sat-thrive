@@ -221,7 +221,7 @@ export const ACT_GUIDE_MODULES = [
     strategy: 'Keep units visible and reduce fractions early so the arithmetic stays clean.',
     check: 'Before moving on, confirm the final answer matches the requested unit and the direction of the change.',
     problems: [
-      fr('A map uses a scale of 1 inch to 12 miles. If two towns are 3.5 inches apart on the map, how many miles apart are they?', '42', 'Multiply 3.5 by 12 to get 42 miles.'),
+      mc('A map uses a scale of 1 inch to 12 miles. If two towns are 3.5 inches apart on the map, how many miles apart are they?', { A: '36', B: '42', C: '48', D: '54' }, 'B', 'Multiply 3.5 by 12 to get 42 miles.'),
       mc('A jacket originally costs $80 and is discounted by 25%. What is the sale price?', { A: '$55', B: '$60', C: '$65', D: '$70' }, 'B', 'A 25% discount leaves 75% of the original price: 0.75 × 80 = 60.'),
       mc('If 5 notebooks cost $12.50, what is the cost of 8 notebooks at the same rate?', { A: '$16.00', B: '$18.00', C: '$20.00', D: '$22.50' }, 'C', 'The unit price is $2.50, so 8 notebooks cost $20.'),
     ],
@@ -236,7 +236,7 @@ export const ACT_GUIDE_MODULES = [
     strategy: 'If the problem gives two linear relationships, look for substitution or elimination instead of doing extra arithmetic.',
     check: 'Plug your answer back into the original equation or both equations in a system.',
     problems: [
-      fr('Solve for x: 4x - 7 = 21', '7', 'Add 7 to both sides to get 4x = 28, so x = 7.'),
+      mc('Solve for x: 4x - 7 = 21', { A: '5', B: '6', C: '7', D: '8' }, 'C', 'Add 7 to both sides to get 4x = 28, so x = 7.'),
       mc('What is the solution to the system y = x + 2 and y = 8 - x?', { A: '(3, 5)', B: '(2, 4)', C: '(4, 6)', D: '(5, 7)' }, 'A', 'Set x + 2 equal to 8 - x. Then 2x = 6, so x = 3 and y = 5.'),
       mc('A taxi charges a $4 start fee plus $2 per mile. Which equation models the cost c for m miles?', { A: 'c = 2m', B: 'c = 4m + 2', C: 'c = 2m + 4', D: 'c = 4m - 2' }, 'C', 'The fixed fee is 4 and the rate is 2 per mile.'),
     ],
@@ -253,7 +253,7 @@ export const ACT_GUIDE_MODULES = [
     problems: [
       mc('If f(x) = 3x - 4, what is f(6)?', { A: '10', B: '12', C: '14', D: '18' }, 'C', 'Substitute x = 6: 3(6) - 4 = 18 - 4 = 14.'),
       mc('The slope of a line is 5 and it passes through (2, 1). Which equation is correct?', { A: 'y = 5x - 9', B: 'y = 5x + 9', C: 'y = x + 5', D: 'y = -5x + 11' }, 'A', 'Use point-slope or slope-intercept form: 1 = 5(2) + b gives b = -9.'),
-      fr('If g(x) = x^2 + 1, what is g(3)?', '10', 'Substitute 3 into the function: 3^2 + 1 = 10.'),
+      mc('If g(x) = x^2 + 1, what is g(3)?', { A: '8', B: '9', C: '10', D: '12' }, 'C', 'Substitute 3 into the function: 3^2 + 1 = 10.'),
     ],
   }),
   mathModule({
@@ -268,7 +268,7 @@ export const ACT_GUIDE_MODULES = [
     problems: [
       mc('What is x^3 · x^4?', { A: 'x^7', B: 'x^12', C: '2x^7', D: 'x' }, 'A', 'Add exponents when multiplying like bases.'),
       mc('Which expression is equivalent to x^2 - 5x + 6?', { A: '(x - 6)(x + 1)', B: '(x - 3)(x - 2)', C: '(x + 3)(x + 2)', D: '(x - 5)(x + 1)' }, 'B', 'The factors of 6 that add to -5 are -3 and -2.'),
-      fr('Solve x^2 = 49 for the positive value of x.', '7', 'The positive square root of 49 is 7.'),
+      mc('Solve x^2 = 49 for the positive value of x.', { A: '6', B: '7', C: '8', D: '9' }, 'B', 'The positive square root of 49 is 7.'),
     ],
   }),
   mathModule({
@@ -283,7 +283,7 @@ export const ACT_GUIDE_MODULES = [
     problems: [
       mc('A triangle has angles measuring 35° and 65°. What is the third angle?', { A: '70°', B: '80°', C: '90°', D: '100°' }, 'B', 'Triangle angles sum to 180°, so the third angle is 180 - 100 = 80°.'),
       mc('What is the area of a rectangle with length 9 and width 4?', { A: '13', B: '26', C: '36', D: '72' }, 'C', 'Area = length × width = 36.'),
-      fr('A circle has radius 5. What is its circumference in terms of pi?', '10pi', 'Circumference = 2πr = 10π.'),
+      mc('A circle has radius 5. What is its circumference in terms of pi?', { A: '5pi', B: '10pi', C: '15pi', D: '25pi' }, 'B', 'Circumference = 2πr = 10π.'),
     ],
   }),
   mathModule({
@@ -297,7 +297,7 @@ export const ACT_GUIDE_MODULES = [
     check: 'When using a formula, make sure the final number is reasonable for the points shown.',
     problems: [
       mc('What is the slope of the line through (1, 3) and (5, 11)?', { A: '1', B: '2', C: '3', D: '4' }, 'B', 'Slope = (11 - 3) / (5 - 1) = 8/4 = 2.'),
-      fr('What is the midpoint of the segment joining (2, 4) and (8, 10)? Enter the x-coordinate only.', '5', 'The midpoint x-value is (2 + 8) / 2 = 5.'),
+      mc('What is the midpoint of the segment joining (2, 4) and (8, 10)? What is the x-coordinate?', { A: '3', B: '4', C: '5', D: '6' }, 'C', 'The midpoint x-value is (2 + 8) / 2 = 5.'),
       mc('Which equation has y-intercept 4 and slope -3?', { A: 'y = -3x + 4', B: 'y = 3x - 4', C: 'y = -4x + 3', D: 'y = 4x - 3' }, 'A', 'Slope-intercept form is y = mx + b.'),
     ],
   }),
@@ -312,7 +312,7 @@ export const ACT_GUIDE_MODULES = [
     check: 'Ask whether your probability is between 0 and 1 and whether your average fits the data range.',
     problems: [
       mc('A bag holds 3 red, 5 blue, and 2 green marbles. What is the probability of drawing a blue marble?', { A: '1/5', B: '1/2', C: '3/10', D: '5/10' }, 'D', 'There are 10 marbles total and 5 are blue, so the probability is 5/10 = 1/2.'),
-      fr('Find the mean of 4, 6, 8, and 10.', '7', 'The sum is 28 and 28/4 = 7.'),
+      mc('Find the mean of 4, 6, 8, and 10.', { A: '6', B: '7', C: '8', D: '9' }, 'B', 'The sum is 28 and 28/4 = 7.'),
       mc('If a survey of 50 students shows 18 prefer buses, what percent prefer buses?', { A: '18%', B: '32%', C: '36%', D: '64%' }, 'C', '18/50 = 0.36 = 36%.'),
     ],
   }),
