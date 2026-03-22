@@ -8,46 +8,46 @@ const sf = 'Sora, sans-serif'
 
 function MockFrame({ children, label }) {
   return (
-    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-      <div style={{ padding: '6px 14px', background: '#e2e8f0', fontSize: 10, fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ display: 'flex', gap: 4 }}>
-          {['#ef4444', '#f59e0b', '#22c55e'].map(c => <span key={c} style={{ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' }} />)}
+    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+      <div style={{ padding: '8px 16px', background: '#e2e8f0', fontSize: 12, fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ display: 'flex', gap: 5 }}>
+          {['#ef4444', '#f59e0b', '#22c55e'].map(c => <span key={c} style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} />)}
         </span>
         {label}
       </div>
-      <div style={{ padding: 14 }}>{children}</div>
+      <div style={{ padding: 20 }}>{children}</div>
     </div>
   )
 }
 
 function Tip({ n, children }) {
   return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
-      <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
-      <span style={{ fontSize: 13, color: '#475569', lineHeight: 1.65 }}>{children}</span>
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
+      <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', fontSize: 13, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
+      <span style={{ fontSize: 15, color: '#475569', lineHeight: 1.7 }}>{children}</span>
     </div>
   )
 }
 
 function Section({ icon, title, subtitle, children }) {
   return (
-    <div style={{ background: 'white', borderRadius: 20, boxShadow: '0 8px 30px rgba(0,0,0,.08)', padding: '28px 28px 24px', marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-          <Icon name={icon} size={18} />
+    <div style={{ background: 'white', borderRadius: 22, boxShadow: '0 8px 30px rgba(0,0,0,.08)', padding: '32px 32px 28px', marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+          <Icon name={icon} size={21} />
         </div>
         <div>
-          <div style={{ fontFamily: sf, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>{subtitle}</div>}
+          <div style={{ fontFamily: sf, fontSize: 21, fontWeight: 900, color: '#0f172a' }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>}
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>{children}</div>
+      <div style={{ marginTop: 18 }}>{children}</div>
     </div>
   )
 }
 
 function MiniCard({ children, style }) {
-  return <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 11, ...style }}>{children}</div>
+  return <div style={{ background: 'white', borderRadius: 10, border: '1px solid #e2e8f0', padding: '10px 14px', fontSize: 13, ...style }}>{children}</div>
 }
 
 /* ─── Student Sections ───────────────────────────────── */
@@ -67,20 +67,20 @@ function StudentSections({ exam }) {
       {/* Dashboard */}
       <Section icon="home" title="Your Dashboard" subtitle="Your home base for everything">
         <MockFrame label="Dashboard">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             {[
               { label: 'Best Score', value: sampleScore, sub: `/ ${maxScore}` },
               { label: 'Most Recent', value: sampleRecent },
               { label: 'Improvement', value: sampleImprovement, color: '#10b981' },
             ].map(c => (
-              <MiniCard key={c.label} style={{ flex: '1 1 0', minWidth: 80, textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700 }}>{c.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: c.color || '#0f172a', fontFamily: sf }}>{c.value}</div>
-                {c.sub && <div style={{ fontSize: 9, color: '#94a3b8' }}>{c.sub}</div>}
+              <MiniCard key={c.label} style={{ flex: '1 1 0', minWidth: 90, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>{c.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: c.color || '#0f172a', fontFamily: sf }}>{c.value}</div>
+                {c.sub && <div style={{ fontSize: 11, color: '#94a3b8' }}>{c.sub}</div>}
               </MiniCard>
             ))}
           </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', marginBottom: 6 }}>YOUR JOURNEY</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 8 }}>YOUR JOURNEY</div>
           {[
             { step: '1) Take the Pre-Test', status: 'TODO', color: '#94a3b8' },
             { step: '2) Study Plan', status: 'LOCKED', color: '#cbd5e1' },
@@ -88,9 +88,9 @@ function StudentSections({ exam }) {
             { step: '4) Review Mistakes', status: 'LOCKED', color: '#cbd5e1' },
             { step: '5) Study Guide', status: 'TODO', color: '#94a3b8' },
           ].map(s => (
-            <div key={s.step} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 11 }}>
+            <div key={s.step} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 5, fontSize: 13 }}>
               <span style={{ fontWeight: 700, color: '#334155' }}>{s.step}</span>
-              <span style={{ fontWeight: 800, fontSize: 9, color: s.color }}>{s.status}</span>
+              <span style={{ fontWeight: 800, fontSize: 11, color: s.color }}>{s.status}</span>
             </div>
           ))}
         </MockFrame>
@@ -102,19 +102,19 @@ function StudentSections({ exam }) {
       {/* Test Taking */}
       <Section icon="test" title="Taking a Test" subtitle="Timed sections with the real test PDF">
         <MockFrame label={`Test — ${label} Pre-Test · Section 1`}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ width: 120, flexShrink: 0 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>QUESTIONS</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <div style={{ width: 150, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>QUESTIONS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
                 {Array.from({ length: 16 }, (_, i) => {
                   const isActive = i === 2
                   const isAnswered = i < 2
                   const isMarked = i === 5
                   return (
                     <div key={i} style={{
-                      width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
+                      width: 28, height: 28, borderRadius: 7, fontSize: 11, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '1px solid',
+                      border: '1.5px solid',
                       borderColor: isActive ? '#0ea5e9' : isAnswered ? '#10b981' : isMarked ? '#f59e0b' : '#e2e8f0',
                       background: isActive ? 'rgba(14,165,233,.1)' : isAnswered ? 'rgba(16,185,129,.08)' : isMarked ? '#fef9c3' : 'white',
                       color: isActive ? '#0ea5e9' : isAnswered ? '#10b981' : isMarked ? '#92400e' : '#94a3b8',
@@ -124,21 +124,21 @@ function StudentSections({ exam }) {
                   )
                 })}
               </div>
-              <div style={{ marginTop: 8, padding: '5px 8px', background: '#fef9c3', borderRadius: 6, fontSize: 9, fontWeight: 700, color: '#92400e', textAlign: 'center', border: '1px solid #fde68a' }}>
+              <div style={{ marginTop: 10, padding: '7px 10px', background: '#fef9c3', borderRadius: 8, fontSize: 11, fontWeight: 700, color: '#92400e', textAlign: 'center', border: '1px solid #fde68a' }}>
                 Mark to Come Back
               </div>
             </div>
-            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 8, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#94a3b8' }}>
+            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 10, minHeight: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#94a3b8' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>📄</div>
+                <div style={{ fontSize: 24, marginBottom: 4 }}>📄</div>
                 <div>Test PDF</div>
-                <div style={{ fontSize: 9 }}>Scrollable pages</div>
+                <div style={{ fontSize: 11 }}>Scrollable pages</div>
               </div>
             </div>
           </div>
-          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: 6, padding: '6px 10px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b' }}>Section 1 of {exam === 'act' ? '4' : '4'}</span>
-            <span style={{ fontSize: 12, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>32:15</span>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: 8, padding: '8px 12px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Section 1 of {exam === 'act' ? '4' : '4'}</span>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>32:15</span>
           </div>
         </MockFrame>
         <Tip n={1}>The <strong>test PDF</strong> displays on the right — scroll through it just like the real exam.</Tip>
@@ -151,21 +151,21 @@ function StudentSections({ exam }) {
       {/* Results */}
       <Section icon="results" title="Your Results" subtitle="See exactly where you stand">
         <MockFrame label={`Results — ${label} Pre-Test`}>
-          <div style={{ textAlign: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700 }}>TOTAL SCORE</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{sampleScore}</div>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>TOTAL SCORE</div>
+            <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{sampleScore}</div>
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             {sections.map(s => (
-              <MiniCard key={s} style={{ flex: '1 1 0', minWidth: 60, textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, color: '#334155' }}>{s}</div>
+              <MiniCard key={s} style={{ flex: '1 1 0', minWidth: 70, textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, color: '#334155', fontSize: 13 }}>{s}</div>
               </MiniCard>
             ))}
           </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', marginBottom: 4 }}>WEAK TOPICS</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 6 }}>WEAK TOPICS</div>
           {['Algebra & Functions', 'Craft & Structure', 'Data Analysis'].map(t => (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', fontSize: 11 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 13 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
               <span style={{ color: '#334155' }}>{t}</span>
             </div>
           ))}
@@ -178,35 +178,35 @@ function StudentSections({ exam }) {
       {/* Study Guide */}
       <Section icon="guide" title="Study Guide" subtitle="Master every topic chapter by chapter">
         <MockFrame label={`Study Guide — ${label}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
               { ch: 'Ch 1: Linear Equations', pct: 100, done: true },
               { ch: 'Ch 2: Systems of Equations', pct: 60, done: false },
               { ch: 'Ch 3: Quadratic Functions', pct: 0, done: false },
               { ch: 'Ch 4: Data & Statistics', pct: 0, done: false },
             ].map(c => (
-              <div key={c.ch} style={{ background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', padding: '8px 10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#334155' }}>
+              <div key={c.ch} style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: '10px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: '#334155' }}>
                   <span>{c.ch}</span>
                   {c.done
-                    ? <span style={{ color: '#10b981', fontSize: 9, fontWeight: 800 }}>COMPLETE</span>
-                    : <span style={{ color: '#94a3b8', fontSize: 9 }}>{c.pct}%</span>
+                    ? <span style={{ color: '#10b981', fontSize: 11, fontWeight: 800 }}>COMPLETE</span>
+                    : <span style={{ color: '#94a3b8', fontSize: 11 }}>{c.pct}%</span>
                   }
                 </div>
-                <div style={{ height: 4, background: '#f1f5f9', borderRadius: 99, marginTop: 4, overflow: 'hidden' }}>
+                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, marginTop: 6, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${c.pct}%`, background: c.done ? '#10b981' : '#0ea5e9', borderRadius: 99 }} />
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 10, background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', padding: '8px 10px' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>PRACTICE QUESTION</div>
-            <div style={{ fontSize: 11, color: '#334155', marginBottom: 6 }}>If 2x + 5 = 13, what is x?</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 12, background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: '10px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>PRACTICE QUESTION</div>
+            <div style={{ fontSize: 14, color: '#334155', marginBottom: 8 }}>If 2x + 5 = 13, what is x?</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {['A) 2', 'B) 4', 'C) 6', 'D) 8'].map(a => (
                 <span key={a} style={{
-                  padding: '3px 10px', fontSize: 10, borderRadius: 4,
-                  border: '1px solid',
+                  padding: '5px 14px', fontSize: 12, borderRadius: 6,
+                  border: '1.5px solid',
                   borderColor: a === 'B) 4' ? '#10b981' : '#e2e8f0',
                   background: a === 'B) 4' ? 'rgba(16,185,129,.1)' : 'white',
                   color: '#334155',
@@ -224,9 +224,9 @@ function StudentSections({ exam }) {
       {/* Calendar */}
       <Section icon="calendar" title="Calendar & Study Plan" subtitle="A personalized day-by-day schedule">
         <MockFrame label="Calendar">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 14 }}>
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: '#94a3b8', padding: 2 }}>{d}</div>
+              <div key={i} style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#94a3b8', padding: 3 }}>{d}</div>
             ))}
             {Array.from({ length: 28 }, (_, i) => {
               const day = i + 1
@@ -234,21 +234,21 @@ function StudentSections({ exam }) {
               const isTestDay = day === 28
               return (
                 <div key={i} style={{
-                  textAlign: 'center', fontSize: 10, padding: '4px 2px', borderRadius: 4,
+                  textAlign: 'center', fontSize: 13, padding: '6px 2px', borderRadius: 6,
                   background: isTestDay ? 'rgba(239,68,68,.1)' : hasTask ? 'rgba(14,165,233,.08)' : 'transparent',
                   color: isTestDay ? '#ef4444' : hasTask ? '#0369a1' : '#64748b',
                   fontWeight: isTestDay || hasTask ? 700 : 400,
-                  border: isTestDay ? '1px solid rgba(239,68,68,.3)' : 'none',
+                  border: isTestDay ? '1.5px solid rgba(239,68,68,.3)' : 'none',
                 }}>
                   {day}
                 </div>
               )
             })}
           </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', marginBottom: 4 }}>TODAY'S TASKS</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 6 }}>TODAY'S TASKS</div>
           {['Study: Ch 2 Systems of Equations', 'Review: 3 missed questions', 'Check: Latest results'].map(t => (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 3, fontSize: 10 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, border: '1.5px solid #cbd5e1' }} />
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
               <span style={{ color: '#334155' }}>{t}</span>
             </div>
           ))}
@@ -268,13 +268,13 @@ function StudentSections({ exam }) {
             { q: 'Q23 — Data Analysis', status: 'To Review', color: '#f59e0b' },
             { q: 'Q31 — Grammar', status: 'To Review', color: '#f59e0b' },
           ].map(m => (
-            <div key={m.q} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 3, fontSize: 11 }}>
+            <div key={m.q} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
               <span style={{ color: '#334155', fontWeight: 600 }}>{m.q}</span>
-              <span style={{ fontSize: 9, fontWeight: 800, color: m.color }}>{m.status}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: m.color }}>{m.status}</span>
             </div>
           ))}
-          <div style={{ marginTop: 6, textAlign: 'center' }}>
-            <span style={{ display: 'inline-block', padding: '6px 16px', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>Next unsolved →</span>
+          <div style={{ marginTop: 8, textAlign: 'center' }}>
+            <span style={{ display: 'inline-block', padding: '8px 20px', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', borderRadius: 10, fontSize: 13, fontWeight: 800 }}>Next unsolved →</span>
           </div>
         </MockFrame>
         <Tip n={1}>Every question you miss is <strong>automatically added</strong> to your Mistake Notebook.</Tip>
@@ -286,13 +286,13 @@ function StudentSections({ exam }) {
       {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Get around fast with the top bar">
         <MockFrame label="Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 8, padding: '8px 14px' }}>
-            <span style={{ fontSize: 11, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
+            <div style={{ display: 'flex', gap: 8 }}>
               {['Calendar', 'Guide', 'Mistakes'].map(b => (
-                <span key={b} style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 6, color: 'rgba(255,255,255,.85)' }}>{b}</span>
+                <span key={b} style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>{b}</span>
               ))}
-              <span style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 6, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>{label}</span>
+              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 7, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>{label}</span>
             </div>
           </div>
         </MockFrame>
@@ -312,11 +312,11 @@ function TutorSections() {
       {/* Students */}
       <Section icon="students" title="Your Students" subtitle="View everyone affiliated with your school">
         <MockFrame label="Tutor Dashboard — Students">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1.5px solid #e2e8f0' }}>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {['Name', 'Email', 'Tests', 'Best Score', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 800, color: '#64748b', fontSize: 9 }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -327,13 +327,13 @@ function TutorSections() {
                 { name: 'Sam Chen', email: 'sam@school.edu', tests: 1, score: 'SAT 1180' },
               ].map(s => (
                 <tr key={s.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '6px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
-                  <td style={{ padding: '6px', color: '#94a3b8' }}>{s.email}</td>
-                  <td style={{ padding: '6px', color: '#334155' }}>{s.tests}</td>
-                  <td style={{ padding: '6px', fontWeight: 700, color: '#0f172a' }}>{s.score}</td>
-                  <td style={{ padding: '6px' }}>
-                    <span style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 4, fontWeight: 700, marginRight: 3 }}>View</span>
-                    <span style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 4, fontWeight: 700 }}>Report</span>
+                  <td style={{ padding: '8px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
+                  <td style={{ padding: '8px', color: '#94a3b8' }}>{s.email}</td>
+                  <td style={{ padding: '8px', color: '#334155' }}>{s.tests}</td>
+                  <td style={{ padding: '8px', fontWeight: 700, color: '#0f172a' }}>{s.score}</td>
+                  <td style={{ padding: '8px' }}>
+                    <span style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 5, fontWeight: 700, marginRight: 4 }}>View</span>
+                    <span style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 5, fontWeight: 700 }}>Report</span>
                   </td>
                 </tr>
               ))}
@@ -349,11 +349,11 @@ function TutorSections() {
       {/* Test Results */}
       <Section icon="results" title="Test Results" subtitle="Every completed test from your students">
         <MockFrame label="Tutor Dashboard — Test Results">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1.5px solid #e2e8f0' }}>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {['Student', 'Test', 'Date', 'Score', 'Top Weakness'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 800, color: '#64748b', fontSize: 9 }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -364,11 +364,11 @@ function TutorSections() {
                 { name: 'Alex J.', test: 'SAT Practice 1', date: 'Mar 18', score: '1340', weak: 'Geometry' },
               ].map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '6px', fontWeight: 600, color: '#334155' }}>{r.name}</td>
-                  <td style={{ padding: '6px', color: '#334155' }}>{r.test}</td>
-                  <td style={{ padding: '6px', color: '#94a3b8' }}>{r.date}</td>
-                  <td style={{ padding: '6px', fontWeight: 700, color: '#0f172a' }}>{r.score}</td>
-                  <td style={{ padding: '6px', color: '#ef4444', fontSize: 9 }}>{r.weak}</td>
+                  <td style={{ padding: '8px', fontWeight: 600, color: '#334155' }}>{r.name}</td>
+                  <td style={{ padding: '8px', color: '#334155' }}>{r.test}</td>
+                  <td style={{ padding: '8px', color: '#94a3b8' }}>{r.date}</td>
+                  <td style={{ padding: '8px', fontWeight: 700, color: '#0f172a' }}>{r.score}</td>
+                  <td style={{ padding: '8px', color: '#ef4444', fontSize: 11 }}>{r.weak}</td>
                 </tr>
               ))}
             </tbody>
@@ -382,35 +382,35 @@ function TutorSections() {
       {/* Analytics */}
       <Section icon="chart" title="Analytics" subtitle="Track performance across your students">
         <MockFrame label="Tutor Dashboard — Analytics">
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             {[
               { label: 'Students', value: '12' },
               { label: 'Active (7d)', value: '8' },
               { label: 'Avg Score', value: '1285' },
               { label: 'Median', value: '1310' },
             ].map(k => (
-              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 55, textAlign: 'center' }}>
-                <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
-                <div style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{k.value}</div>
+              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 65, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{k.value}</div>
               </MiniCard>
             ))}
           </div>
-          <div style={{ background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', padding: 10, marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>SCORE DISTRIBUTION</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 50 }}>
+          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>SCORE DISTRIBUTION</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 60 }}>
               {[15, 25, 40, 60, 80, 55, 30, 10].map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '3px 3px 0 0', minWidth: 0 }} />
+                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '4px 4px 0 0', minWidth: 0 }} />
               ))}
             </div>
           </div>
-          <div style={{ background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', padding: 10 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>MOST MISSED TOPICS</div>
+          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>MOST MISSED TOPICS</div>
             {['Algebra & Functions', 'Data Interpretation', 'Grammar & Usage'].map((t, i) => (
-              <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                <div style={{ flex: 1, height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+              <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${80 - i * 20}%`, background: i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#0ea5e9', borderRadius: 99 }} />
                 </div>
-                <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600, flexShrink: 0, width: 90, textAlign: 'right' }}>{t}</span>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, flexShrink: 0, width: 110, textAlign: 'right' }}>{t}</span>
               </div>
             ))}
           </div>
@@ -424,10 +424,10 @@ function TutorSections() {
       {/* Previewing */}
       <Section icon="eye" title="Previewing Student Work" subtitle="See any student's dashboard as they see it">
         <MockFrame label="Tutor View — Alex Johnson's Dashboard">
-          <div style={{ background: '#fef3c7', borderRadius: 6, padding: '8px 12px', fontSize: 10, color: '#92400e', fontWeight: 600, marginBottom: 8, border: '1px solid #fde68a' }}>
+          <div style={{ background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 10, border: '1px solid #fde68a' }}>
             Tutor View — You're previewing Alex Johnson's dashboard (read-only)
           </div>
-          <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center', padding: 20 }}>
+          <div style={{ fontSize: 13, color: '#64748b', textAlign: 'center', padding: 24 }}>
             [Student's full dashboard appears here with their real data]
           </div>
         </MockFrame>
@@ -439,11 +439,11 @@ function TutorSections() {
       {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Find your way around">
         <MockFrame label="Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 8, padding: '8px 14px' }}>
-            <span style={{ fontSize: 11, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <span style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 6, color: 'rgba(255,255,255,.85)' }}>Students</span>
-              <span style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 6, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>My Dashboard</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>Students</span>
+              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 7, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>My Dashboard</span>
             </div>
           </div>
         </MockFrame>
@@ -463,11 +463,11 @@ function AdminSections() {
       {/* Student Management */}
       <Section icon="admin" title="Student Management" subtitle="Full control over all user accounts">
         <MockFrame label="Admin — Students">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1.5px solid #e2e8f0' }}>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {['Name', 'Role', 'Affiliation', 'Tests', 'Best', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 800, color: '#64748b', fontSize: 9 }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -478,17 +478,17 @@ function AdminSections() {
                 { name: 'Sam Chen', role: 'Student', aff: 'Oak Academy', tests: 1, score: '1180', roleColor: '#10b981' },
               ].map(s => (
                 <tr key={s.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '5px 6px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
-                  <td style={{ padding: '5px 6px' }}>
-                    <span style={{ fontSize: 8, fontWeight: 800, padding: '2px 6px', borderRadius: 4, color: s.roleColor, background: `${s.roleColor}15` }}>{s.role}</span>
+                  <td style={{ padding: '7px 8px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
+                  <td style={{ padding: '7px 8px' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 5, color: s.roleColor, background: `${s.roleColor}15` }}>{s.role}</span>
                   </td>
-                  <td style={{ padding: '5px 6px', color: '#64748b', fontSize: 10 }}>{s.aff}</td>
-                  <td style={{ padding: '5px 6px', color: '#334155' }}>{s.tests}</td>
-                  <td style={{ padding: '5px 6px', fontWeight: 700 }}>{s.score}</td>
-                  <td style={{ padding: '5px 6px' }}>
-                    <span style={{ display: 'flex', gap: 3 }}>
+                  <td style={{ padding: '7px 8px', color: '#64748b', fontSize: 12 }}>{s.aff}</td>
+                  <td style={{ padding: '7px 8px', color: '#334155' }}>{s.tests}</td>
+                  <td style={{ padding: '7px 8px', fontWeight: 700 }}>{s.score}</td>
+                  <td style={{ padding: '7px 8px' }}>
+                    <span style={{ display: 'flex', gap: 4 }}>
                       {['Reset', 'View', 'Report', 'Delete'].map(a => (
-                        <span key={a} style={{ fontSize: 8, padding: '2px 5px', background: a === 'Delete' ? 'rgba(239,68,68,.08)' : 'rgba(14,165,233,.08)', color: a === 'Delete' ? '#ef4444' : '#0369a1', borderRadius: 4, fontWeight: 700 }}>{a}</span>
+                        <span key={a} style={{ fontSize: 10, padding: '3px 7px', background: a === 'Delete' ? 'rgba(239,68,68,.08)' : 'rgba(14,165,233,.08)', color: a === 'Delete' ? '#ef4444' : '#0369a1', borderRadius: 5, fontWeight: 700 }}>{a}</span>
                       ))}
                     </span>
                   </td>
@@ -507,7 +507,7 @@ function AdminSections() {
       {/* Analytics */}
       <Section icon="chart" title="Program Analytics" subtitle="Organization-wide performance metrics">
         <MockFrame label="Admin — Analytics">
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             {[
               { label: 'Registered', value: '48' },
               { label: 'Students', value: '42' },
@@ -515,17 +515,17 @@ function AdminSections() {
               { label: 'Tests', value: '127' },
               { label: 'Avg Gain', value: '+45', color: '#10b981' },
             ].map(k => (
-              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 50, textAlign: 'center' }}>
-                <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
-                <div style={{ fontSize: 13, fontWeight: 900, color: k.color || '#0f172a', fontFamily: sf }}>{k.value}</div>
+              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 60, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: k.color || '#0f172a', fontFamily: sf }}>{k.value}</div>
               </MiniCard>
             ))}
           </div>
-          <div style={{ background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', padding: 10 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>ACTIVITY OVER TIME</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 40 }}>
+          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ACTIVITY OVER TIME</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 55 }}>
               {[20, 35, 50, 45, 60, 70, 55, 80, 65, 75, 90, 85].map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '2px 2px 0 0', minWidth: 0 }} />
+                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '3px 3px 0 0', minWidth: 0 }} />
               ))}
             </div>
           </div>
@@ -539,19 +539,19 @@ function AdminSections() {
       {/* Affiliations */}
       <Section icon="folder" title="Affiliations" subtitle="Compare performance across schools">
         <MockFrame label="Admin — Affiliations">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[
               { name: 'Lincoln High School', students: 18, tests: 52, avg: 1285 },
               { name: 'Oak Academy', students: 12, tests: 34, avg: 1320 },
               { name: 'Riverside Prep', students: 8, tests: 21, avg: 1250 },
             ].map(a => (
-              <MiniCard key={a.name} style={{ flex: '1 1 120px' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 11, marginBottom: 4 }}>{a.name}</div>
-                <div style={{ display: 'flex', gap: 8, fontSize: 9, color: '#64748b' }}>
+              <MiniCard key={a.name} style={{ flex: '1 1 140px' }}>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, marginBottom: 6 }}>{a.name}</div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#64748b' }}>
                   <span>{a.students} students</span>
                   <span>{a.tests} tests</span>
                 </div>
-                <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>Avg: <strong style={{ color: '#0f172a' }}>{a.avg}</strong></div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Avg: <strong style={{ color: '#0f172a' }}>{a.avg}</strong></div>
               </MiniCard>
             ))}
           </div>
@@ -564,23 +564,23 @@ function AdminSections() {
       {/* Proof of Impact */}
       <Section icon="trend" title="Proof of Impact" subtitle="Statistical evidence that the program works">
         <MockFrame label="Admin — Proof of Impact">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
             <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 700 }}>PRE-TEST AVG</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>1215</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>PRE-TEST AVG</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>1215</div>
             </MiniCard>
             <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 700 }}>POST-TEST AVG</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#10b981', fontFamily: sf }}>1310</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>POST-TEST AVG</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', fontFamily: sf }}>1310</div>
             </MiniCard>
             <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 8, color: '#94a3b8', fontWeight: 700 }}>MEAN GAIN</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#10b981', fontFamily: sf }}>+95</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>MEAN GAIN</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', fontFamily: sf }}>+95</div>
             </MiniCard>
           </div>
-          <div style={{ background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', padding: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#166534', marginBottom: 4 }}>STATISTICALLY SIGNIFICANT</div>
-            <div style={{ fontSize: 9, color: '#15803d', lineHeight: 1.6 }}>
+          <div style={{ background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', padding: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#166534', marginBottom: 6 }}>STATISTICALLY SIGNIFICANT</div>
+            <div style={{ fontSize: 12, color: '#15803d', lineHeight: 1.7 }}>
               p-value: 0.001 · Cohen's d: 0.82 (large effect)<br />
               95% CI: [+72, +118] points
             </div>
@@ -595,11 +595,11 @@ function AdminSections() {
       <Section icon="test" title="Test Management" subtitle="Manage PDFs and answer keys">
         <MockFrame label="Admin — Tests">
           {['SAT Pre-Test', 'SAT Practice 1', 'SAT Practice 2', 'ACT Pre-Test'].map(t => (
-            <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'white', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 3, fontSize: 11 }}>
+            <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
               <span style={{ fontWeight: 700, color: '#334155' }}>{t}</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <span style={{ fontSize: 8, padding: '2px 6px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 4, fontWeight: 700 }}>PDF ✓</span>
-                <span style={{ fontSize: 8, padding: '2px 6px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 4, fontWeight: 700 }}>Key ✓</span>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <span style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 5, fontWeight: 700 }}>PDF ✓</span>
+                <span style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 5, fontWeight: 700 }}>Key ✓</span>
               </div>
             </div>
           ))}
@@ -612,13 +612,13 @@ function AdminSections() {
       {/* Navigation */}
       <Section icon="target" title="Quick Navigation" subtitle="Admin toolbar overview">
         <MockFrame label="Admin Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 8, padding: '8px 14px', flexWrap: 'wrap', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {['Regrade', 'Reset My Data', 'Back to Dashboard'].map(b => (
-                <span key={b} style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 6, color: 'rgba(255,255,255,.85)' }}>{b}</span>
+                <span key={b} style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>{b}</span>
               ))}
-              <span style={{ padding: '4px 10px', fontSize: 9, fontWeight: 700, background: 'rgba(239,68,68,.15)', borderRadius: 6, color: '#fca5a5' }}>Sign Out</span>
+              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(239,68,68,.15)', borderRadius: 7, color: '#fca5a5' }}>Sign Out</span>
             </div>
           </div>
         </MockFrame>
@@ -664,7 +664,7 @@ export default function Welcome() {
       background: 'linear-gradient(170deg, #0f172a 0%, #1e3a5f 40%, #0ea5e9 100%)',
       padding: '40px 20px 60px',
     }}>
-      <div style={{ maxWidth: 620, margin: '0 auto' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: 40, color: 'white' }}>
           <div style={{
