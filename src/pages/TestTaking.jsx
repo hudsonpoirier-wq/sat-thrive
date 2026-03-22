@@ -471,15 +471,14 @@ export default function TestTaking() {
     }
   }, [])
 
-  // Arrow key navigation between questions
+  // Arrow key navigation between questions (left/right and up/down)
   useEffect(() => {
     function handleKeyDown(e) {
-      // Don't intercept if user is typing in an input/textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
         setCurrentQ(q => Math.max(1, q - 1))
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault()
         setCurrentQ(q => {
           const mod = modules[currentModule]

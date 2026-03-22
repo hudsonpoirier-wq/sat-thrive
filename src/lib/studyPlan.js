@@ -578,29 +578,33 @@ export function dayLabels() {
   return DAYS.slice()
 }
 
-// Official upcoming test dates for quick selection
+// Official national test dates for quick selection
 export const UPCOMING_TEST_DATES = {
   sat: [
-    { date: '2025-08-23', label: 'Aug 23, 2025' },
-    { date: '2025-10-04', label: 'Oct 4, 2025' },
-    { date: '2025-11-01', label: 'Nov 1, 2025' },
-    { date: '2025-12-06', label: 'Dec 6, 2025' },
     { date: '2026-03-14', label: 'Mar 14, 2026' },
-    { date: '2026-05-03', label: 'May 3, 2026' },
-    { date: '2026-06-07', label: 'Jun 7, 2026' },
-    { date: '2026-08-29', label: 'Aug 29, 2026' },
+    { date: '2026-05-02', label: 'May 2, 2026' },
+    { date: '2026-06-06', label: 'Jun 6, 2026' },
+    { date: '2026-08-22', label: 'Aug 22, 2026' },
+    { date: '2026-09-12', label: 'Sep 12, 2026' },
     { date: '2026-10-03', label: 'Oct 3, 2026' },
     { date: '2026-11-07', label: 'Nov 7, 2026' },
     { date: '2026-12-05', label: 'Dec 5, 2026' },
+    { date: '2027-03-13', label: 'Mar 13, 2027' },
+    { date: '2027-05-01', label: 'May 1, 2027' },
+    { date: '2027-06-05', label: 'Jun 5, 2027' },
   ],
   act: [
-    { date: '2025-07-12', label: 'Jul 12, 2025' },
-    { date: '2025-09-13', label: 'Sep 13, 2025' },
-    { date: '2025-10-25', label: 'Oct 25, 2025' },
     { date: '2025-12-13', label: 'Dec 13, 2025' },
-    { date: '2026-02-07', label: 'Feb 7, 2026' },
-    { date: '2026-04-04', label: 'Apr 4, 2026' },
+    { date: '2026-02-14', label: 'Feb 14, 2026' },
+    { date: '2026-04-11', label: 'Apr 11, 2026' },
     { date: '2026-06-13', label: 'Jun 13, 2026' },
-    { date: '2026-07-18', label: 'Jul 18, 2026' },
+    { date: '2026-07-11', label: 'Jul 11, 2026' },
+    { date: '2026-09-19', label: 'Sep 19, 2026' },
+    { date: '2026-10-17', label: 'Oct 17, 2026' },
+    { date: '2026-12-12', label: 'Dec 12, 2026' },
+    { date: '2027-02-27', label: 'Feb 27, 2027' },
+    { date: '2027-04-10', label: 'Apr 10, 2027' },
+    { date: '2027-06-12', label: 'Jun 12, 2027' },
+    { date: '2027-07-10', label: 'Jul 10, 2027' },
   ],
 }

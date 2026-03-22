@@ -14,24 +14,40 @@ export default function PDFSectionStack({ pdfUrl, startPage = 0, endPage = 0, zo
     const node = pageRefs.current?.[targetPage]
     const root = rootRef.current
     if (!node || !root) return
-    const scrollRatio = Math.max(0, Math.min(0.95, Number(initialScrollRatio || 0)))
+    const ratio = Math.max(0, Math.min(0.95, Number(initialScrollRatio || 0)))
+
+    // Find the nearest scrollable ancestor (root itself, or a parent like .test-pdf-panel)
+    const findScrollParent = (el) => {
+      let p = el
+      while (p && p !== document.body) {
+        if (p.scrollHeight > p.clientHeight + 2) {
+          const style = getComputedStyle(p)
+          if (style.overflowY === 'auto' || style.overflowY === 'scroll') return p
+        }
+        p = p.parentElement
+      }
+      return null
+    }
+
     const scrollToTarget = () => {
-      // Check if root itself scrolls or if we need to scroll a parent/window
-      const rootScrolls = root.scrollHeight > root.clientHeight + 2
-      if (rootScrolls) {
+      const scrollParent = findScrollParent(root)
+      if (scrollParent) {
+        // Calculate node position relative to the scroll parent
+        const nodeRect = node.getBoundingClientRect()
+        const parentRect = scrollParent.getBoundingClientRect()
+        const offsetInParent = nodeRect.top - parentRect.top + scrollParent.scrollTop
+        const offsetWithinNode = (node.offsetHeight || 0) * ratio
         try {
-          const top = node.offsetTop + ((node.offsetHeight || 0) * scrollRatio)
-          root.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' })
+          scrollParent.scrollTo({ top: Math.max(0, offsetInParent + offsetWithinNode - 24), behavior: 'smooth' })
         } catch {
-          root.scrollTop = Math.max(0, node.offsetTop + ((node.offsetHeight || 0) * scrollRatio) - 24)
+          scrollParent.scrollTop = Math.max(0, offsetInParent + offsetWithinNode - 24)
         }
       } else {
-        // Container doesn't scroll (overflow: visible) — scroll the page instead
+        // No scrollable parent found — scroll window
         try {
           const rect = node.getBoundingClientRect()
-          const offsetWithinNode = (node.offsetHeight || 0) * scrollRatio
-          const scrollY = window.scrollY + rect.top + offsetWithinNode - 320
-          window.scrollTo({ top: Math.max(0, scrollY), behavior: 'smooth' })
+          const offsetWithinNode = (node.offsetHeight || 0) * ratio
+          window.scrollTo({ top: Math.max(0, window.scrollY + rect.top + offsetWithinNode - 120), behavior: 'smooth' })
         } catch {
           node.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
