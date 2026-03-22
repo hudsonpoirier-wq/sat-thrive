@@ -109,7 +109,7 @@ export default function SetupPlan() {
             {(() => {
               const dates = UPCOMING_TEST_DATES[exam] || []
               const today = new Date().toISOString().slice(0, 10)
-              const future = dates.filter(d => d.date >= today).slice(0, 4)
+              const future = dates.filter(d => d.date >= today)
               if (!future.length) return null
               return (
                 <div style={{ marginTop: 10 }}>
