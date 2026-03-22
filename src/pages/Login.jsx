@@ -134,7 +134,7 @@ export default function Login() {
                 The Agora Project
               </div>
               <div className="login-subtitle">
-                Built for speed, focus, and results.
+                Built for speed, focus, and results
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function Login() {
             <img src="/logo.png" alt="" className="login-logo" />
             <div className="login-brand-text">
               <div className="login-title">The Agora Project</div>
-              <div className="login-subtitle">Built for speed, focus, and results.</div>
+              <div className="login-subtitle">Built for speed, focus, and results</div>
             </div>
           </div>
 
