@@ -985,7 +985,7 @@ export default function TestTaking() {
               const isCurr = n === currentQ
               return (
                 <button key={n} className={`q-nav-btn${isCurr ? ' current' : ''}${isAnswered ? ' answered' : ''}${isMrk ? ' marked' : ''}`}
-                  onClick={() => setCurrentQ(n)} title={`Q${n}${isMrk ? ' · Marked' : ''}${isAnswered ? ' · Answered' : ''}`}>
+                  onClick={() => setCurrentQ(n)} title={`Q${n}${isMrk ? ' · Come back to' : ''}${isAnswered ? ' · Answered' : ''}`}>
                   {n}
                 </button>
               )
@@ -997,7 +997,7 @@ export default function TestTaking() {
             <div className="q-label">Question {currentQ}</div>
             <div className="q-counter">{mod.label} · {mod.module}</div>
             <button className={`mark-review-btn${isMarked ? ' marked' : ''}`} onClick={() => toggleMark(currentQ)}>
-              {isMarked ? 'Marked for Review' : 'Mark for Review'}
+              {isMarked ? 'Marked to Come Back' : 'Mark to Come Back'}
             </button>
           </div>
 
