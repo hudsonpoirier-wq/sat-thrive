@@ -179,11 +179,14 @@ export function calcWeakTopics(answers) {
 }
 
 function normalizeFreeResponseInput(value) {
-  let normalized = String(value ?? '').trim().replace(/[−–—]/g, '-')
+  let normalized = String(value ?? '').trim()
+    .replace(/[−–—]/g, '-')     // normalize dash variants to ASCII minus
+    .replace(/\s+/g, ' ')        // collapse multiple spaces to one
+  // Strip thousands-separator commas (1,000 or 1, 000)
   let prev = null
   while (normalized !== prev) {
     prev = normalized
-    normalized = normalized.replace(/(\d),(?=\d)/g, '$1')
+    normalized = normalized.replace(/(\d),\s*(?=\d)/g, '$1')
   }
   return normalized
 }
@@ -228,7 +231,9 @@ function parseFreeResponse(value) {
     }
   }
 
-  const cleaned = normalized.replace(/\s/g, '')
+  // Remove all whitespace, then strip any remaining digit commas
+  let cleaned = normalized.replace(/\s/g, '')
+  { let p = null; while (cleaned !== p) { p = cleaned; cleaned = cleaned.replace(/(\d),(?=\d)/g, '$1') } }
   const frac = cleaned.match(/^([+-]?\d+(?:\.\d+)?)\/([+-]?\d+(?:\.\d+)?)$/)
   if (frac) {
     const num = Number(frac[1])
@@ -396,7 +401,8 @@ export function freeResponseMatches(given, correct) {
       if (Math.abs(g.value - c.value) < 1e-9) return true
       continue
     }
-    if (g.raw === c.raw) return true
+    // Case-insensitive text comparison (covers tuples, text answers)
+    if (g.raw.toLowerCase() === c.raw.toLowerCase()) return true
   }
   return false
 }
