@@ -4,9 +4,11 @@ import {
   QUESTION_CHAPTER_MAP as SAT_QUESTION_CHAPTER_MAP,
   MODULES as SAT_MODULES,
   MODULE_ORDER as SAT_MODULE_ORDER,
+  PDF_PAGE_MAP,
   rawToScaled as rawToSatScaled,
   answerMatches,
 } from './testData.js'
+import { EXTRA_PDF_PAGE_MAPS } from './extraPdfPageMaps.js'
 import { GUIDE_CONTENT } from './guideContent.js'
 import {
   ACT_ANSWER_KEYS,
@@ -20,6 +22,23 @@ import {
 } from './actData.js'
 import { ACT_GUIDE_CONTENT } from './actGuideContent.js'
 import { ACT_TESTS, getExamFromTestId, SAT_TESTS } from './tests.js'
+
+// Derive SAT section page ranges from the per-question page maps
+function buildSatSectionRanges() {
+  const allMaps = { pre_test: PDF_PAGE_MAP, ...EXTRA_PDF_PAGE_MAPS }
+  const ranges = {}
+  for (const [testId, modules] of Object.entries(allMaps)) {
+    ranges[testId] = {}
+    for (const [moduleId, qMap] of Object.entries(modules)) {
+      const pages = Object.values(qMap).map(Number).filter(Number.isFinite)
+      if (pages.length) {
+        ranges[testId][moduleId] = [Math.min(...pages), Math.max(...pages)]
+      }
+    }
+  }
+  return ranges
+}
+const SAT_SECTION_PAGE_RANGES = buildSatSectionRanges()
 
 const SAT_PERCENTILES = [
   { score: 400, percentile: 1 },
@@ -87,8 +106,8 @@ export function getExamConfig(exam = 'sat') {
     questionChapterMap: SAT_QUESTION_CHAPTER_MAP,
     guideContent: GUIDE_CONTENT,
     answerKey: SAT_ANSWER_KEY,
-    viewerMode: 'single',
-    sectionPageRanges: null,
+    viewerMode: 'stack',
+    sectionPageRanges: SAT_SECTION_PAGE_RANGES,
     guideCompletionTarget: Object.keys(SAT_CHAPTERS).length,
   }
 }

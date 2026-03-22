@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, defaultStudyPrefs } from '../lib/studyPlan.js'
+import { loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, dayLabels, defaultStudyPrefs, UPCOMING_TEST_DATES } from '../lib/studyPlan.js'
 import { getExamConfigForTest } from '../data/examData.js'
 import Icon from '../components/AppIcons.jsx'
 
@@ -106,6 +106,43 @@ export default function SetupPlan() {
                 color: '#0f172a',
               }}
             />
+            {(() => {
+              const dates = UPCOMING_TEST_DATES[exam] || []
+              const today = new Date().toISOString().slice(0, 10)
+              const future = dates.filter(d => d.date >= today).slice(0, 4)
+              if (!future.length) return null
+              return (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6, fontWeight: 700 }}>
+                    Upcoming official {examConfig.label} dates:
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {future.map(d => (
+                      <button
+                        key={d.date}
+                        type="button"
+                        onClick={() => {
+                          setTestDate(d.date)
+                          saveSatTestDate(userId, d.date, exam)
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 12,
+                          fontWeight: 800,
+                          border: testDate === d.date ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
+                          borderRadius: 8,
+                          background: testDate === d.date ? 'rgba(14,165,233,.10)' : 'white',
+                          color: testDate === d.date ? '#0369a1' : '#64748b',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Available Days */}

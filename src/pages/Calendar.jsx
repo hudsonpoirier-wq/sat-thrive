@@ -5,7 +5,7 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
-import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels, UPCOMING_TEST_DATES } from '../lib/studyPlan.js'
 import { getChaptersForExam, getExamConfig, calcWeakTopicsForTest } from '../data/examData.js'
 import { getExamFromTestId, getTestsForExam } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -339,6 +339,31 @@ export default function CalendarPage() {
                   style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
                 />
               </label>
+              {!isAdminPreview && (() => {
+                const dates = UPCOMING_TEST_DATES[exam] || []
+                const today = new Date().toISOString().slice(0, 10)
+                const future = dates.filter(d => d.date >= today).slice(0, 4)
+                if (!future.length) return null
+                return future.map(d => (
+                  <button
+                    key={d.date}
+                    type="button"
+                    onClick={() => updateJourneyDate(d.date)}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      border: satDate === d.date ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
+                      borderRadius: 8,
+                      background: satDate === d.date ? 'rgba(14,165,233,.10)' : 'white',
+                      color: satDate === d.date ? '#0369a1' : '#64748b',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                ))
+              })()}
             </div>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>

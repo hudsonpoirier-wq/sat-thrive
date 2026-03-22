@@ -730,16 +730,20 @@ export default function TestTaking() {
     )
   }
   const totalQ = mod.questions
-  const pageMap = viewerMode === 'single'
-    ? ((testConfig?.id === 'pre_test')
-      ? (PDF_PAGE_MAP[currentModule] || {})
-      : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {}))
-    : {}
+  const pageMap = (testConfig?.id === 'pre_test')
+    ? (PDF_PAGE_MAP[currentModule] || {})
+    : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {})
   const basePdfPage = (() => {
     if (Number.isFinite(Number(pageMap?.[currentQ]))) return pageMap[currentQ]
     // Fallback: use the nearest previous mapped question page.
     for (let q = currentQ - 1; q >= 1; q--) {
       if (Number.isFinite(Number(pageMap?.[q]))) return pageMap[q]
+    }
+    // For ACT (no per-question map): estimate from section range
+    const sr = Array.isArray(sectionRanges?.[currentModule]) ? sectionRanges[currentModule] : null
+    if (sr) {
+      const progress = (currentQ - 1) / Math.max(1, totalQ)
+      return sr[0] + Math.floor(progress * (sr[1] - sr[0] + 1))
     }
     return 0
   })()
@@ -747,6 +751,33 @@ export default function TestTaking() {
   const overridePage = pdfOverrides?.[currentModule]?.[currentQ]
   const pdfPage = Math.max(0, Number.isFinite(Number(overridePage)) ? Number(overridePage) : (basePdfPage + pdfOffset))
   const sectionRange = Array.isArray(sectionRanges?.[currentModule]) ? sectionRanges[currentModule] : null
+
+  // Estimate scroll ratio within the target page for multi-question pages
+  const scrollRatio = (() => {
+    if (viewerMode !== 'stack') return 0
+    // For SAT: use page map to find which questions share this page
+    const pm = (testConfig?.id === 'pre_test')
+      ? (PDF_PAGE_MAP[currentModule] || {})
+      : (EXTRA_PDF_PAGE_MAPS?.[testConfig?.id]?.[currentModule] || {})
+    if (Object.keys(pm).length) {
+      const qsOnPage = Object.entries(pm).filter(([, p]) => p === pdfPage).map(([q]) => Number(q)).sort((a, b) => a - b)
+      if (qsOnPage.length > 1) {
+        const pos = qsOnPage.indexOf(currentQ)
+        return pos > 0 ? (pos / qsOnPage.length) * 0.8 : 0
+      }
+      return 0
+    }
+    // For ACT: estimate by question progress within section
+    const totalQuestions = mod.questions
+    if (sectionRange) {
+      const pageCount = sectionRange[1] - sectionRange[0] + 1
+      const progress = (currentQ - 1) / totalQuestions
+      const offset = progress * pageCount
+      return Math.max(0, Math.min(0.92, offset - Math.floor(offset)))
+    }
+    return 0
+  })()
+
   const modAnswers = answers[currentModule] || {}
   const currentAnswer = modAnswers[currentQ]
   const markedList = markedForReview[currentModule] || []
@@ -838,7 +869,8 @@ export default function TestTaking() {
 	              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
                   {viewerMode === 'stack' && sectionRange ? (
                     <>
-                      Section pages <span style={{ color: '#0f172a' }}>{sectionRange[0] + 1}–{sectionRange[1] + 1}</span>
+                      Pages <span style={{ color: '#0f172a' }}>{sectionRange[0] + 1}–{sectionRange[1] + 1}</span>
+                      <span style={{ color: '#94a3b8', marginLeft: 8 }}>· Q{currentQ} on page {pdfPage + 1}</span>
                     </>
                   ) : profile?.role === 'admin' ? (
                     <>
@@ -934,6 +966,8 @@ export default function TestTaking() {
                   pdfUrl={testConfig?.pdfUrl || '/practice-test-11.pdf'}
                   startPage={sectionRange[0]}
                   endPage={sectionRange[1]}
+                  initialPageIndex={pdfPage}
+                  initialScrollRatio={scrollRatio}
                   containerStyle={{ width: '100%', height: 'auto', overflowY: 'visible' }}
                 />
               ) : (
