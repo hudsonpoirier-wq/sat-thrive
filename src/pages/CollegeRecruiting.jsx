@@ -26,6 +26,20 @@ import {
 import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/AppIcons.jsx'
 
+/* ── Application requirement labels ── */
+const APP_PLATFORM_LABELS = {
+  'common-app': 'Common App', 'coalition': 'Coalition App', 'uc-app': 'UC Application',
+  'applytexas': 'ApplyTexas', 'direct': 'Direct Application', 'military': 'Direct (Military)',
+   'questbridge': 'QuestBridge',
+}
+const TEST_POLICY_LABELS = {
+  required: 'Required', optional: 'Test-Optional', blind: 'Test-Blind', free: 'Test-Free',
+}
+const INTERVIEW_LABELS = {
+  required: 'Required', recommended: 'Recommended', optional: 'Optional (Alumni)',
+  evaluative: 'Evaluative', none: 'Not Offered',
+}
+
 /* ── Rank tiers as numeric priority for sorting ── */
 const RANK_TIER_ORDER = { top10: 1, top25: 2, top50: 3, top100: 4, top200: 5, other: 6 }
 
@@ -1425,6 +1439,80 @@ function CollegeDetailModal({ college, exam, activeScore, onClose }) {
               ))}
             </div>
           </DetailSection>
+
+          {/* Application Requirements */}
+          {college.app && (
+            <DetailSection title="Application Requirements" icon="test">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
+                {college.app.platform && <InfoRow label="Application Platform" value={APP_PLATFORM_LABELS[college.app.platform] || college.app.platform} />}
+                {college.app.testPolicy && <InfoRow label="Test Policy" value={TEST_POLICY_LABELS[college.app.testPolicy] || college.app.testPolicy} />}
+                {college.app.recLetters != null && <InfoRow label="Recommendation Letters" value={college.app.recLetters === 0 ? 'Not Required' : `${college.app.recLetters} required`} />}
+                {college.app.interview && <InfoRow label="Interview" value={INTERVIEW_LABELS[college.app.interview] || college.app.interview} />}
+                {college.app.essays != null && <InfoRow label="Supplemental Essays" value={college.app.essays === 0 ? 'None' : `${college.app.essays} essay${college.app.essays > 1 ? 's' : ''}`} />}
+              </div>
+
+              {/* Deadlines */}
+              {(college.app.deadlineED || college.app.deadlineEA || college.app.deadlineRD) && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Application Deadlines</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {college.app.deadlineED && (
+                      <span style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(139,92,246,.08)', border: '1px solid rgba(139,92,246,.15)', color: '#7c3aed', fontSize: 13, fontWeight: 700 }}>
+                        ED: {college.app.deadlineED}
+                      </span>
+                    )}
+                    {college.app.deadlineED2 && (
+                      <span style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(139,92,246,.05)', border: '1px solid rgba(139,92,246,.12)', color: '#7c3aed', fontSize: 13, fontWeight: 700 }}>
+                        ED II: {college.app.deadlineED2}
+                      </span>
+                    )}
+                    {college.app.deadlineEA && (
+                      <span style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(14,165,233,.08)', border: '1px solid rgba(14,165,233,.15)', color: '#0369a1', fontSize: 13, fontWeight: 700 }}>
+                        EA: {college.app.deadlineEA}
+                      </span>
+                    )}
+                    {college.app.deadlineRD && (
+                      <span style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(71,85,105,.08)', border: '1px solid rgba(71,85,105,.15)', color: '#334155', fontSize: 13, fontWeight: 700 }}>
+                        RD: {college.app.deadlineRD}
+                      </span>
+                    )}
+                    {college.app.rolling && (
+                      <span style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.15)', color: '#059669', fontSize: 13, fontWeight: 700 }}>
+                        Rolling Admission
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Special Requirements */}
+              {college.app.specialReqs && college.app.specialReqs.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Special Requirements</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {college.app.specialReqs.map((req, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: 11, marginTop: 3, flexShrink: 0 }}>&#9679;</span>
+                        {req}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* What They Look For */}
+              {college.app.lookingFor && (
+                <div style={{
+                  padding: 16, borderRadius: 12,
+                  background: 'linear-gradient(135deg, rgba(14,165,233,.04), rgba(139,92,246,.04))',
+                  border: '1px solid rgba(14,165,233,.10)',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>What They Look For</div>
+                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>{college.app.lookingFor}</div>
+                </div>
+              )}
+            </DetailSection>
+          )}
 
           {/* Visit website */}
           <div style={{ marginTop: 24, textAlign: 'center' }}>
