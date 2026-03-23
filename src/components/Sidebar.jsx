@@ -51,6 +51,7 @@ export default function Sidebar({ currentExam = 'sat' }) {
   }
 
   return (
+    <>
     <aside className="sidebar">
       <div className="sidebar-top">
         <Link to="/dashboard" className="sidebar-brand">
@@ -68,7 +69,6 @@ export default function Sidebar({ currentExam = 'sat' }) {
           }}>
             {['sat', 'act'].map(ex => {
               const active = currentExam === ex
-              const targetPath = location.pathname
               const examPages = ['/dashboard', '/tasks', '/guide', '/strategies', '/practice', '/extra-tests', '/mistakes', '/report', '/calendar', '/journey', '/college-recruiting']
               const basePath = examPages.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
                 ? location.pathname
@@ -143,5 +143,26 @@ export default function Sidebar({ currentExam = 'sat' }) {
         </button>
       </div>
     </aside>
+
+      {/* Mobile bottom nav — shown when sidebar is hidden */}
+      <nav className="mobile-bottom-nav">
+        {[
+          { icon: 'home', label: 'Home', to: '/dashboard' },
+          { icon: 'guide', label: 'Study', to: '/guide' },
+          { icon: 'task', label: 'Tasks', to: '/tasks' },
+          { icon: 'report', label: 'Report', to: '/report' },
+          { icon: 'settings', label: 'More', to: '/settings' },
+        ].map(item => {
+          const examParam = currentExam ? `?exam=${currentExam}` : ''
+          const href = ['/dashboard', '/guide', '/tasks', '/report'].includes(item.to) ? `${item.to}${examParam}` : item.to
+          return (
+            <Link key={item.to} to={href} className={isActive(item.to) ? 'active' : ''}>
+              <Icon name={item.icon} size={22} />
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
+    </>
   )
 }

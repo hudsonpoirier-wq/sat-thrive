@@ -38,14 +38,14 @@ export default function PriorScore() {
   const examConfig = useMemo(() => getExamConfig(exam), [exam])
   const userId = user?.id
 
-  if (profile?.role === 'tutor') return <Navigate to="/tutor" replace />
-  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
-
   const [mode, setMode] = useState(null) // null = choosing, 'enter' = entering score, 'skip' = taking pretest
   const [inputMode, setInputMode] = useState('total') // 'total' or 'sections'
   const [totalScore, setTotalScore] = useState('')
   const [sectionScores, setSectionScores] = useState({})
   const [saving, setSaving] = useState(false)
+
+  if (profile?.role === 'tutor') return <Navigate to="/tutor" replace />
+  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
 
   const sections = exam === 'act' ? ACT_SECTIONS : SAT_SECTIONS
   const totalMin = exam === 'act' ? 1 : 400

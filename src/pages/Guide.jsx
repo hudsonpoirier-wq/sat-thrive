@@ -463,6 +463,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts, exam, c
 
 export default function Guide() {
   const { user, profile } = useAuth()
+  const navigate = useNavigate()
   const location = useLocation()
   const requestedExam = useMemo(() => String(new URLSearchParams(location.search || '').get('exam') || '').toLowerCase(), [location.search])
   const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)

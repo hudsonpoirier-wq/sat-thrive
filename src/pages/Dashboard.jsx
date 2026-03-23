@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -253,7 +253,7 @@ export default function Dashboard() {
   const displayProfile = isAdminPreview ? targetProfile : profile
   const readOnlyView = isAdminPreview
   const isTutor = profile?.role === 'tutor'
-  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+  const viewHref = useCallback((path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview), [exam, viewUserId, isAdminPreview])
 
   function hasViewedResultsForAttempt(attemptId) {
     if (!viewUserId || !attemptId) return false
@@ -799,7 +799,7 @@ export default function Dashboard() {
               { title: 'Progress Report', desc: 'Detailed analytics on score trends, improvement over time, and study completion rates.', btn: 'View report', href: viewHref('/report'), color: '#8b5cf6', icon: 'chart' },
               { title: 'Journey Planner', desc: 'Adaptive daily study plan that updates based on your weak topics, availability, and target test date.', btn: 'View journey', href: viewHref('/journey'), color: '#06b6d4', icon: 'calendar' },
               { title: 'College Recruiting', desc: 'Discover colleges that match your scores, filter by cost, location, and size, and see your admission chances.', btn: 'Explore schools', href: viewHref('/college-recruiting'), color: '#0f172a', icon: 'students' },
-              { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: '/compare-tests', color: '#dc2626', icon: 'results' },
+              { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: viewHref('/compare-tests'), color: '#dc2626', icon: 'results' },
             ].map((r) => (
               <Link key={r.title} to={r.href} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{

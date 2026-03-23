@@ -18,11 +18,11 @@ export default function PickTestDate() {
   const examConfig = useMemo(() => getExamConfig(exam), [exam])
   const userId = user?.id
 
-  if (profile?.role === 'tutor') return <Navigate to="/tutor" replace />
-  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
-
   const [testDate, setTestDate] = useState('')
   const [showCalendar, setShowCalendar] = useState(false)
+
+  if (profile?.role === 'tutor') return <Navigate to="/tutor" replace />
+  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
 
   const today = new Date().toISOString().slice(0, 10)
   const futureDates = (UPCOMING_TEST_DATES[exam] || []).filter(d => d.date >= today)
