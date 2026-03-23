@@ -104,38 +104,60 @@ function StepDashboard() {
         </p>
       </motion.div>
 
-      <MockWindow label="Dashboard Overview">
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <StatBox label="Score" value="1280" sub="/ 1600" />
-          <StatBox label="Tests" value="3" sub="completed" />
-          <StatBox label="Streak" value="5" sub="days" color="#f59e0b" />
+      <MockWindow label="Dashboard">
+        {/* Hero mockup */}
+        <motion.div variants={fadeUp} style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0ea5e9 100%)',
+          borderRadius: 12, padding: '18px 20px', marginBottom: 14,
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo.png" alt="" style={{ width: 28, height: 28 }} />
+          </div>
+          <div>
+            <div style={{ fontFamily: sf, fontSize: 16, fontWeight: 900, color: 'white' }}>The Agora Project</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.5)' }}>Built for speed, focus, and results</div>
+          </div>
         </motion.div>
 
+        {/* Score overview mockup */}
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <StatBox label="Best Score" value="1310" sub="All-time high" />
+          <StatBox label="Highest Test" value="1280" sub="Practice 2" />
+          <StatBox label="Most Recent" value="1310" sub="Mar 23" />
+        </motion.div>
+
+        {/* Resource cards mockup */}
         <motion.div variants={fadeUp}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Recent Activity</div>
-          {[
-            { label: 'SAT Practice 2', date: 'Today', score: '1310', trend: '+30' },
-            { label: 'SAT Practice 1', date: 'Mar 18', score: '1280', trend: '+50' },
-            { label: 'SAT Pre-Test', date: 'Mar 12', score: '1230', trend: '--' },
-          ].map((item, i) => (
-            <div key={i} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '10px 14px', background: i === 0 ? 'rgba(14,165,233,.04)' : 'white',
-              borderRadius: 10, border: '1px solid rgba(14,165,233,.08)',
-              marginBottom: 5,
-            }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{item.label}</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.date}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Resources</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            {[
+              { label: 'Study Guide', color: '#1e3a8a', icon: 'guide' },
+              { label: 'Strategies', color: '#166534', icon: 'target' },
+              { label: 'Practice', color: '#84cc16', icon: 'star' },
+              { label: 'Extra Tests', color: '#0ea5e9', icon: 'test' },
+              { label: 'Mistakes', color: '#f59e0b', icon: 'mistakes' },
+              { label: 'Report', color: '#8b5cf6', icon: 'chart' },
+              { label: 'Journey', color: '#06b6d4', icon: 'calendar' },
+              { label: 'Colleges', color: '#0f172a', icon: 'students' },
+              { label: 'Compare', color: '#dc2626', icon: 'results' },
+            ].map(r => (
+              <div key={r.label} style={{
+                padding: '10px 8px', borderRadius: 8,
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: `${r.color}18`, margin: '0 auto 4px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon name={r.icon} size={12} style={{ color: r.color }} />
+                </div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#0f172a' }}>{r.label}</div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{item.score}</div>
-                {item.trend !== '--' && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{item.trend}</div>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </motion.div>
       </MockWindow>
 
@@ -600,6 +622,8 @@ function StepComplete({ onGetStarted, role }) {
           { icon: 'home', label: 'Dashboard', desc: 'View your stats' },
           { icon: 'guide', label: 'Study Guide', desc: 'Start learning' },
           { icon: 'test', label: 'Take a Test', desc: 'Dive right in' },
+          { icon: 'students', label: 'Colleges', desc: 'Find your fit' },
+          { icon: 'target', label: 'Strategies', desc: 'Score higher' },
         ].map((item) => (
           <div key={item.label} style={{
             background: 'white', borderRadius: 16,
@@ -645,6 +669,128 @@ function StepComplete({ onGetStarted, role }) {
   )
 }
 
+function StepCollegeRecruiting() {
+  const schools = [
+    { name: 'Stanford University', loc: 'Stanford, CA', accept: '4%', tier: 'Reach', tierColor: '#ef4444', sat: '1510–1570' },
+    { name: 'University of Michigan', loc: 'Ann Arbor, MI', accept: '18%', tier: 'Target', tierColor: '#f59e0b', sat: '1360–1510' },
+    { name: 'University of Arizona', loc: 'Tucson, AZ', accept: '87%', tier: 'Safety', tierColor: '#10b981', sat: '1060–1290' },
+  ]
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>College Recruiting</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Explore 775+ colleges and see your estimated admission chances based on your scores. Filter by region, cost, size, major, and more.
+        </p>
+      </motion.div>
+
+      <MockWindow label="College Recruiting — Your Matches">
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+          {schools.map((s, i) => (
+            <motion.div key={s.name} variants={fadeUp} custom={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '14px 16px', borderRadius: 12,
+              border: '1.5px solid rgba(14,165,233,.1)',
+              marginBottom: 8,
+              background: 'white',
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{s.name}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{s.loc} &middot; SAT {s.sat}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{
+                  display: 'inline-block', padding: '3px 10px', borderRadius: 7,
+                  background: `${s.tierColor}15`, color: s.tierColor,
+                  fontSize: 11, fontWeight: 800,
+                }}>{s.tier}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{s.accept} accept</div>
+              </div>
+            </motion.div>
+          ))}
+          <motion.div variants={fadeUp} style={{
+            display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10,
+          }}>
+            {['Region', 'Cost', 'Size', 'Major', 'Match Tier'].map(f => (
+              <span key={f} style={{
+                padding: '4px 10px', borderRadius: 7,
+                background: '#f1f5f9', fontSize: 11, fontWeight: 700, color: '#64748b',
+                border: '1px solid #e2e8f0',
+              }}>{f}</span>
+            ))}
+          </motion.div>
+        </motion.div>
+      </MockWindow>
+
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="students" size={15} style={{ color: 'white' }} />
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Click any school to see detailed info — tuition, test score ranges, acceptance rates, popular majors, and your estimated admission chance.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function StepStrategies() {
+  const strategies = [
+    { title: 'Time Management', desc: 'Learn to pace yourself across all sections', icon: 'clock', color: '#f59e0b' },
+    { title: 'Process of Elimination', desc: 'Narrow down choices to boost accuracy', icon: 'target', color: '#0ea5e9' },
+    { title: 'Reading Strategies', desc: 'Active reading techniques for passages', icon: 'guide', color: '#8b5cf6' },
+    { title: 'Math Shortcuts', desc: 'Quick formulas and mental math tricks', icon: 'math', color: '#10b981' },
+  ]
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>Test Strategies</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Master proven strategies to maximize your score. Time management, elimination techniques, and section-specific tips.
+        </p>
+      </motion.div>
+
+      <MockWindow label="Test Strategies">
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {strategies.map((s, i) => (
+            <motion.div key={s.title} variants={fadeUp} custom={i} style={{
+              padding: '16px 14px', borderRadius: 12,
+              border: '1.5px solid rgba(14,165,233,.1)',
+              background: 'white',
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10,
+                background: `${s.color}15`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 10,
+              }}>
+                <Icon name={s.icon} size={16} style={{ color: s.color }} />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 3 }}>{s.title}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>{s.desc}</div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </MockWindow>
+
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="target" size={15} style={{ color: 'white' }} />
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Each strategy includes practical tips you can apply immediately. Knowing how to approach the test is just as important as knowing the content.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ─── Step definitions ───────────────────────────────── */
 
 const STEPS = [
@@ -653,7 +799,9 @@ const STEPS = [
   { number: 3, title: 'Smart Journey', icon: 'target' },
   { number: 4, title: 'More Practice', icon: 'test' },
   { number: 5, title: 'Track Progress', icon: 'chart' },
-  { number: 6, title: 'All Set!', icon: 'home' },
+  { number: 6, title: 'College Recruiting', icon: 'students' },
+  { number: 7, title: 'Test Strategies', icon: 'target' },
+  { number: 8, title: 'All Set!', icon: 'home' },
 ]
 
 /* ─── Main Component ─────────────────────────────────── */
@@ -713,7 +861,9 @@ export default function Welcome() {
       case 2: return <StepJourney />
       case 3: return <StepPractice />
       case 4: return <StepProgress />
-      case 5: return <StepComplete onGetStarted={handleGetStarted} role={role} />
+      case 5: return <StepCollegeRecruiting />
+      case 6: return <StepStrategies />
+      case 7: return <StepComplete onGetStarted={handleGetStarted} role={role} />
       default: return null
     }
   }
