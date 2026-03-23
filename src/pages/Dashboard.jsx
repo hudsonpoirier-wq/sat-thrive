@@ -906,7 +906,6 @@ export default function Dashboard() {
               { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: viewHref('/compare-tests'), color: '#dc2626', icon: 'results' },
               { title: 'Calendar', desc: 'See your full study schedule, set your test date, mark available days, and plan your prep timeline.', btn: 'Open calendar', href: viewHref('/calendar'), color: '#f97316', icon: 'calendar' },
               { title: 'About', desc: 'Learn about The Agora Project, how it works, and the tools available to help you succeed.', btn: 'Learn more', href: viewHref('/about'), color: '#475569', icon: 'info' },
-              { title: 'Settings', desc: 'Customize your experience — switch between SAT and ACT, update your profile, and manage preferences.', btn: 'Open settings', href: viewHref('/settings'), color: '#64748b', icon: 'settings' },
             ].map((r) => (
               <Link key={r.title} to={r.href} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{
