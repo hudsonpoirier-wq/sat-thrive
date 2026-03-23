@@ -1,611 +1,660 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
+import { motion, AnimatePresence } from 'framer-motion'
 import Icon from '../components/AppIcons.jsx'
 
 const sf = 'Sora, sans-serif'
 
+/* ─── Animation variants ─────────────────────────────── */
+
+const slideVariants = {
+  enter: (dir) => ({ x: dir > 0 ? 300 : -300, opacity: 0, scale: 0.95 }),
+  center: { x: 0, opacity: 1, scale: 1 },
+  exit: (dir) => ({ x: dir > 0 ? -300 : 300, opacity: 0, scale: 0.95 }),
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] } }),
+}
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.15 } },
+}
+
 /* ─── Shared helpers ─────────────────────────────────── */
 
-function MockFrame({ children, label }) {
+function StepBadge({ number, active }) {
   return (
-    <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
-      <div style={{ padding: '8px 16px', background: '#e2e8f0', fontSize: 12, fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{
+      width: 36, height: 36, borderRadius: 12,
+      background: active ? 'linear-gradient(135deg, #0ea5e9, #3b82f6)' : '#e2e8f0',
+      color: active ? 'white' : '#94a3b8',
+      fontSize: 15, fontWeight: 800, fontFamily: sf,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all .3s ease',
+      boxShadow: active ? '0 4px 14px rgba(14,165,233,.35)' : 'none',
+    }}>
+      {number}
+    </div>
+  )
+}
+
+function MockWindow({ label, children }) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      style={{
+        background: 'white',
+        border: '1.5px solid rgba(14,165,233,.15)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(14,165,233,.08)',
+      }}
+    >
+      <div style={{
+        padding: '8px 16px',
+        background: 'linear-gradient(90deg, #f0f7ff, #f8fafc)',
+        borderBottom: '1px solid rgba(14,165,233,.1)',
+        fontSize: 12, fontWeight: 700, color: '#64748b',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
         <span style={{ display: 'flex', gap: 5 }}>
-          {['#ef4444', '#f59e0b', '#22c55e'].map(c => <span key={c} style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} />)}
+          {['#ef4444', '#f59e0b', '#22c55e'].map(c => (
+            <span key={c} style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} />
+          ))}
         </span>
         {label}
       </div>
       <div style={{ padding: 20 }}>{children}</div>
-    </div>
+    </motion.div>
   )
 }
 
-function Tip({ n, children }) {
+function StatBox({ label, value, sub, color }) {
   return (
-    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
-      <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', fontSize: 13, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
-      <span style={{ fontSize: 15, color: '#475569', lineHeight: 1.7 }}>{children}</span>
-    </div>
+    <motion.div
+      variants={fadeUp}
+      style={{
+        flex: '1 1 0', minWidth: 100, textAlign: 'center',
+        background: 'white', borderRadius: 14,
+        border: '1.5px solid rgba(14,165,233,.12)',
+        padding: '14px 10px',
+        boxShadow: '0 2px 8px rgba(14,165,233,.06)',
+      }}
+    >
+      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 900, color: color || '#0f172a', fontFamily: sf, marginTop: 2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{sub}</div>}
+    </motion.div>
   )
 }
 
-function Section({ icon, title, subtitle, children }) {
+/* ─── Step content components ────────────────────────── */
+
+function StepDashboard() {
   return (
-    <div style={{ background: 'white', borderRadius: 22, boxShadow: '0 8px 30px rgba(0,0,0,.08)', padding: '32px 32px 28px', marginBottom: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-          <Icon name={icon} size={21} />
-        </div>
-        <div>
-          <div style={{ fontFamily: sf, fontSize: 21, fontWeight: 900, color: '#0f172a' }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>}
-        </div>
-      </div>
-      <div style={{ marginTop: 18 }}>{children}</div>
-    </div>
-  )
-}
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>Your Dashboard</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Your home base shows key stats at a glance. Track your best score, number of completed tests, and current study streak.
+        </p>
+      </motion.div>
 
-function MiniCard({ children, style }) {
-  return <div style={{ background: 'white', borderRadius: 10, border: '1px solid #e2e8f0', padding: '10px 14px', fontSize: 13, ...style }}>{children}</div>
-}
+      <MockWindow label="Dashboard Overview">
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <StatBox label="Score" value="1280" sub="/ 1600" />
+          <StatBox label="Tests" value="3" sub="completed" />
+          <StatBox label="Streak" value="5" sub="days" color="#f59e0b" />
+        </motion.div>
 
-/* ─── Student Sections ───────────────────────────────── */
-
-function studentSlides(exam) {
-  const label = exam === 'act' ? 'ACT' : 'SAT'
-  const maxScore = exam === 'act' ? '36' : '1600'
-  const sampleScore = exam === 'act' ? '28' : '1280'
-  const sampleRecent = exam === 'act' ? '30' : '1310'
-  const sampleImprovement = exam === 'act' ? '+2' : '+30'
-  const sections = exam === 'act'
-    ? ['English: 29', 'Math: 27', 'Reading: 30', 'Science: 28']
-    : ['Reading: 640', 'Math: 670']
-
-  return [
-      <Section icon="home" title="Your Dashboard" subtitle="Your home base for everything">
-        <MockFrame label="Dashboard">
-          <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Best Score', value: sampleScore, sub: `/ ${maxScore}` },
-              { label: 'Most Recent', value: sampleRecent },
-              { label: 'Improvement', value: sampleImprovement, color: '#10b981' },
-            ].map(c => (
-              <MiniCard key={c.label} style={{ flex: '1 1 0', minWidth: 90, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>{c.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: c.color || '#0f172a', fontFamily: sf }}>{c.value}</div>
-                {c.sub && <div style={{ fontSize: 11, color: '#94a3b8' }}>{c.sub}</div>}
-              </MiniCard>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 8 }}>YOUR JOURNEY</div>
+        <motion.div variants={fadeUp}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>Recent Activity</div>
           {[
-            { step: '1) Take the Pre-Test', status: 'TODO', color: '#94a3b8' },
-            { step: '2) Study Plan', status: 'LOCKED', color: '#cbd5e1' },
-            { step: '3) Review Results', status: 'LOCKED', color: '#cbd5e1' },
-            { step: '4) Review Mistakes', status: 'LOCKED', color: '#cbd5e1' },
-            { step: '5) Study Guide', status: 'TODO', color: '#94a3b8' },
-          ].map(s => (
-            <div key={s.step} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 5, fontSize: 13 }}>
-              <span style={{ fontWeight: 700, color: '#334155' }}>{s.step}</span>
-              <span style={{ fontWeight: 800, fontSize: 11, color: s.color }}>{s.status}</span>
+            { label: 'SAT Practice 2', date: 'Today', score: '1310', trend: '+30' },
+            { label: 'SAT Practice 1', date: 'Mar 18', score: '1280', trend: '+50' },
+            { label: 'SAT Pre-Test', date: 'Mar 12', score: '1230', trend: '--' },
+          ].map((item, i) => (
+            <div key={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px 14px', background: i === 0 ? 'rgba(14,165,233,.04)' : 'white',
+              borderRadius: 10, border: '1px solid rgba(14,165,233,.08)',
+              marginBottom: 5,
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.date}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{item.score}</div>
+                {item.trend !== '--' && (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{item.trend}</div>
+                )}
+              </div>
             </div>
           ))}
-        </MockFrame>
-        <Tip n={1}>Your <strong>score cards</strong> at the top track your best, most recent, and improvement scores across all tests.</Tip>
-        <Tip n={2}>Follow the <strong>5-step journey</strong>: start with the Pre-Test, then unlock your Study Plan, Results, Mistake Review, and Study Guide.</Tip>
-        <Tip n={3}>Steps unlock as you go — <strong>complete the Pre-Test first</strong> to unlock everything else.</Tip>
-      </Section>,
+        </motion.div>
+      </MockWindow>
 
-      <Section icon="test" title="Taking a Test" subtitle="Timed sections with the real test PDF">
-        <MockFrame label={`Test — ${label} Pre-Test · Section 1`}>
-          <div style={{ display: 'flex', gap: 14 }}>
-            <div style={{ width: 150, flexShrink: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>QUESTIONS</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
-                {Array.from({ length: 16 }, (_, i) => {
-                  const isActive = i === 2
-                  const isAnswered = i < 2
-                  const isMarked = i === 5
-                  return (
-                    <div key={i} style={{
-                      width: 28, height: 28, borderRadius: 7, fontSize: 11, fontWeight: 700,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: '1.5px solid',
-                      borderColor: isActive ? '#0ea5e9' : isAnswered ? '#10b981' : isMarked ? '#f59e0b' : '#e2e8f0',
-                      background: isActive ? 'rgba(14,165,233,.1)' : isAnswered ? 'rgba(16,185,129,.08)' : isMarked ? '#fef9c3' : 'white',
-                      color: isActive ? '#0ea5e9' : isAnswered ? '#10b981' : isMarked ? '#92400e' : '#94a3b8',
-                    }}>
-                      {i + 1}
-                    </div>
-                  )
-                })}
-              </div>
-              <div style={{ marginTop: 10, padding: '7px 10px', background: '#fef9c3', borderRadius: 8, fontSize: 11, fontWeight: 700, color: '#92400e', textAlign: 'center', border: '1px solid #fde68a' }}>
-                Mark to Come Back
-              </div>
-            </div>
-            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 10, minHeight: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#94a3b8' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, marginBottom: 4 }}>📄</div>
-                <div>Test PDF</div>
-                <div style={{ fontSize: 11 }}>Scrollable pages</div>
-              </div>
-            </div>
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="home" size={15} style={{ color: 'white' }} />
           </div>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', borderRadius: 8, padding: '8px 12px', border: '1px solid #e2e8f0' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>Section 1 of {exam === 'act' ? '4' : '4'}</span>
-            <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>32:15</span>
-          </div>
-        </MockFrame>
-        <Tip n={1}>The <strong>test PDF</strong> displays on the right — scroll through it just like the real exam.</Tip>
-        <Tip n={2}>Click any <strong>question number</strong> on the left to jump to that question in the PDF.</Tip>
-        <Tip n={3}>Use <strong>"Mark to Come Back"</strong> (yellow) to flag questions you want to revisit before submitting.</Tip>
-        <Tip n={4}>The <strong>timer</strong> counts down for each section. Green = answered, blue = current, gray = unanswered.</Tip>
-        <Tip n={5}>Use <strong>arrow keys</strong> (← → ↑ ↓) to navigate between questions quickly.</Tip>
-      </Section>,
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Your dashboard updates in real time as you take tests and study. Every score improvement is tracked automatically.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
 
-      <Section icon="results" title="Your Results" subtitle="See exactly where you stand">
-        <MockFrame label={`Results — ${label} Pre-Test`}>
-          <div style={{ textAlign: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>TOTAL SCORE</div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{sampleScore}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {sections.map(s => (
-              <MiniCard key={s} style={{ flex: '1 1 0', minWidth: 70, textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, color: '#334155', fontSize: 13 }}>{s}</div>
-              </MiniCard>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 6 }}>WEAK TOPICS</div>
-          {['Algebra & Functions', 'Craft & Structure', 'Data Analysis'].map(t => (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: 13 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
-              <span style={{ color: '#334155' }}>{t}</span>
-            </div>
+function StepStudyGuide() {
+  const chapters = [
+    { ch: 'Chapter 1: Algebra Basics', pct: 100, done: true },
+    { ch: 'Chapter 2: Geometry', pct: 65, done: false },
+    { ch: 'Chapter 3: Data Analysis', pct: 20, done: false },
+    { ch: 'Chapter 4: Advanced Math', pct: 0, done: false },
+  ]
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>Study Guide</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Work through chapters organized by topic. Each chapter includes lessons and practice questions tailored to what you need to learn.
+        </p>
+      </motion.div>
+
+      <MockWindow label="Study Guide — SAT Math">
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {chapters.map((c, i) => (
+            <motion.div key={c.ch} variants={fadeUp} custom={i} style={{
+              background: 'white', borderRadius: 12,
+              border: c.done ? '1.5px solid rgba(16,185,129,.25)' : '1.5px solid rgba(14,165,233,.1)',
+              padding: '14px 16px',
+              transition: 'all .2s ease',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 9,
+                    background: c.done ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 13, fontWeight: 800,
+                  }}>
+                    {c.done ? '\u2713' : i + 1}
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{c.ch}</span>
+                </div>
+                {c.done
+                  ? <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981', background: 'rgba(16,185,129,.08)', padding: '3px 10px', borderRadius: 6 }}>COMPLETE</span>
+                  : <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>{c.pct}%</span>
+                }
+              </div>
+              <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${c.pct}%`,
+                  background: c.done ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #0ea5e9, #3b82f6)',
+                  borderRadius: 99, transition: 'width .6s ease',
+                }} />
+              </div>
+            </motion.div>
           ))}
-        </MockFrame>
-        <Tip n={1}>See your <strong>total score</strong> and <strong>per-section breakdown</strong> after every test.</Tip>
-        <Tip n={2}><strong>Weak topics</strong> are identified automatically — these feed directly into your study plan.</Tip>
-        <Tip n={3}>Your study calendar and guide <strong>prioritize these weak areas</strong> to help you improve fastest.</Tip>
-      </Section>,
+        </motion.div>
+      </MockWindow>
 
-      <Section icon="guide" title="Study Guide" subtitle="Master every topic chapter by chapter">
-        <MockFrame label={`Study Guide — ${label}`}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { ch: 'Ch 1: Linear Equations', pct: 100, done: true },
-              { ch: 'Ch 2: Systems of Equations', pct: 60, done: false },
-              { ch: 'Ch 3: Quadratic Functions', pct: 0, done: false },
-              { ch: 'Ch 4: Data & Statistics', pct: 0, done: false },
-            ].map(c => (
-              <div key={c.ch} style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: '10px 14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                  <span>{c.ch}</span>
-                  {c.done
-                    ? <span style={{ color: '#10b981', fontSize: 11, fontWeight: 800 }}>COMPLETE</span>
-                    : <span style={{ color: '#94a3b8', fontSize: 11 }}>{c.pct}%</span>
-                  }
-                </div>
-                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, marginTop: 6, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${c.pct}%`, background: c.done ? '#10b981' : '#0ea5e9', borderRadius: 99 }} />
-                </div>
-              </div>
-            ))}
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="guide" size={15} style={{ color: 'white' }} />
           </div>
-          <div style={{ marginTop: 12, background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: '10px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>PRACTICE QUESTION</div>
-            <div style={{ fontSize: 14, color: '#334155', marginBottom: 8 }}>If 2x + 5 = 13, what is x?</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {['A) 2', 'B) 4', 'C) 6', 'D) 8'].map(a => (
-                <span key={a} style={{
-                  padding: '5px 14px', fontSize: 12, borderRadius: 6,
-                  border: '1.5px solid',
-                  borderColor: a === 'B) 4' ? '#10b981' : '#e2e8f0',
-                  background: a === 'B) 4' ? 'rgba(16,185,129,.1)' : 'white',
-                  color: '#334155',
-                  fontWeight: a === 'B) 4' ? 700 : 400,
-                }}>{a}</span>
-              ))}
-            </div>
-          </div>
-        </MockFrame>
-        <Tip n={1}>Work through <strong>chapters</strong> organized by topic at your own pace.</Tip>
-        <Tip n={2}>Each chapter has <strong>multiple-choice practice questions</strong> to test your understanding.</Tip>
-        <Tip n={3}>Complete all chapters ({exam === 'act' ? '44' : '25'}) to mark the Study Guide step as done on your dashboard.</Tip>
-      </Section>,
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Chapters are prioritized based on your weak areas. Complete them at your own pace to build mastery before test day.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
 
-      <Section icon="calendar" title="Calendar & Study Plan" subtitle="A personalized day-by-day schedule">
-        <MockFrame label="Calendar">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 14 }}>
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#94a3b8', padding: 3 }}>{d}</div>
-            ))}
-            {Array.from({ length: 28 }, (_, i) => {
-              const day = i + 1
-              const hasTask = [3, 5, 8, 10, 12, 15, 17, 19, 22, 24, 26].includes(day)
-              const isTestDay = day === 28
-              return (
-                <div key={i} style={{
-                  textAlign: 'center', fontSize: 13, padding: '6px 2px', borderRadius: 6,
-                  background: isTestDay ? 'rgba(239,68,68,.1)' : hasTask ? 'rgba(14,165,233,.08)' : 'transparent',
-                  color: isTestDay ? '#ef4444' : hasTask ? '#0369a1' : '#64748b',
-                  fontWeight: isTestDay || hasTask ? 700 : 400,
-                  border: isTestDay ? '1.5px solid rgba(239,68,68,.3)' : 'none',
+function StepJourney() {
+  const steps = [
+    { label: 'Take Pre-Test', status: 'done', icon: '\u2713' },
+    { label: 'Review Results', status: 'done', icon: '\u2713' },
+    { label: 'Study Weak Areas', status: 'active', icon: '3' },
+    { label: 'Practice Test', status: 'upcoming', icon: '4' },
+    { label: 'Final Review', status: 'upcoming', icon: '5' },
+  ]
+
+  const statusColors = {
+    done: { bg: 'linear-gradient(135deg, #10b981, #059669)', border: 'rgba(16,185,129,.25)', text: '#10b981', barColor: '#10b981' },
+    active: { bg: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', border: 'rgba(14,165,233,.3)', text: '#0ea5e9', barColor: '#0ea5e9' },
+    upcoming: { bg: '#e2e8f0', border: 'rgba(203,213,225,.5)', text: '#94a3b8', barColor: '#e2e8f0' },
+  }
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>Smart Journey</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Follow a guided path from your first pre-test through mastery. Each step unlocks the next as you progress.
+        </p>
+      </motion.div>
+
+      <MockWindow label="Your Learning Journey">
+        <div style={{ padding: '10px 0' }}>
+          {steps.map((step, i) => {
+            const colors = statusColors[step.status]
+            const isLast = i === steps.length - 1
+            return (
+              <motion.div key={step.label} variants={fadeUp} custom={i} style={{ display: 'flex', gap: 16, position: 'relative' }}>
+                {/* Timeline line */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 40, flexShrink: 0 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12,
+                    background: colors.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: step.status === 'upcoming' ? '#94a3b8' : 'white',
+                    fontSize: 15, fontWeight: 800,
+                    boxShadow: step.status === 'active' ? '0 4px 14px rgba(14,165,233,.3)' : 'none',
+                    border: step.status === 'active' ? '2px solid rgba(14,165,233,.2)' : 'none',
+                  }}>
+                    {step.icon}
+                  </div>
+                  {!isLast && (
+                    <div style={{
+                      width: 3, flex: 1, minHeight: 20,
+                      background: colors.barColor,
+                      borderRadius: 99,
+                      margin: '4px 0',
+                    }} />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div style={{
+                  flex: 1,
+                  paddingBottom: isLast ? 0 : 20,
+                  paddingTop: 8,
                 }}>
-                  {day}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: 15, fontWeight: 700,
+                      color: step.status === 'upcoming' ? '#94a3b8' : '#0f172a',
+                    }}>
+                      {step.label}
+                    </span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800,
+                      padding: '3px 10px', borderRadius: 6,
+                      color: colors.text,
+                      background: step.status === 'done' ? 'rgba(16,185,129,.08)' : step.status === 'active' ? 'rgba(14,165,233,.08)' : 'rgba(148,163,184,.08)',
+                      textTransform: 'uppercase',
+                    }}>
+                      {step.status === 'done' ? 'Complete' : step.status === 'active' ? 'In Progress' : 'Locked'}
+                    </span>
+                  </div>
                 </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      </MockWindow>
+
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="target" size={15} style={{ color: 'white' }} />
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            The journey adapts to your performance. Complete each step to unlock the next, and watch your progress grow.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function StepPractice() {
+  const [selected, setSelected] = useState(null)
+  const choices = [
+    { letter: 'A', text: 'x = 3' },
+    { letter: 'B', text: 'x = 4' },
+    { letter: 'C', text: 'x = 5' },
+    { letter: 'D', text: 'x = 6' },
+  ]
+  const correctAnswer = 'B'
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>More Practice</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          Practice with real-style questions. Pick an answer and get instant feedback with detailed explanations.
+        </p>
+      </motion.div>
+
+      <MockWindow label="Practice Question — Algebra">
+        <motion.div variants={fadeUp}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+          }}>
+            <div style={{
+              padding: '4px 12px', borderRadius: 8,
+              background: 'linear-gradient(135deg, rgba(14,165,233,.1), rgba(59,130,246,.1))',
+              fontSize: 11, fontWeight: 800, color: '#0ea5e9',
+              border: '1px solid rgba(14,165,233,.15)',
+            }}>
+              Question 7 of 25
+            </div>
+            <div style={{
+              padding: '4px 12px', borderRadius: 8,
+              background: 'rgba(148,163,184,.08)',
+              fontSize: 11, fontWeight: 700, color: '#94a3b8',
+            }}>
+              Algebra
+            </div>
+          </div>
+
+          <div style={{
+            fontSize: 16, color: '#0f172a', lineHeight: 1.8,
+            padding: '16px 20px', background: '#f8fafc',
+            borderRadius: 12, border: '1px solid #e2e8f0',
+            marginBottom: 16,
+          }}>
+            If 2x + 5 = 13, what is the value of x?
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {choices.map((choice) => {
+              const isSelected = selected === choice.letter
+              const isCorrect = selected && choice.letter === correctAnswer
+              const isWrong = isSelected && choice.letter !== correctAnswer
+
+              let borderColor = 'rgba(14,165,233,.12)'
+              let bg = 'white'
+              if (isCorrect) { borderColor = '#10b981'; bg = 'rgba(16,185,129,.06)' }
+              else if (isWrong) { borderColor = '#ef4444'; bg = 'rgba(239,68,68,.04)' }
+              else if (isSelected) { borderColor = '#0ea5e9'; bg = 'rgba(14,165,233,.04)' }
+
+              return (
+                <motion.div
+                  key={choice.letter}
+                  variants={fadeUp}
+                  onClick={() => setSelected(choice.letter)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '14px 18px', borderRadius: 12,
+                    border: `1.5px solid ${borderColor}`,
+                    background: bg,
+                    cursor: 'pointer',
+                    transition: 'all .2s ease',
+                  }}
+                  whileHover={{ scale: 1.01, boxShadow: '0 2px 12px rgba(14,165,233,.1)' }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 10,
+                    background: isCorrect ? 'linear-gradient(135deg, #10b981, #059669)' : isWrong ? '#ef4444' : 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 14, fontWeight: 800,
+                    opacity: (isSelected || isCorrect) ? 1 : 0.25,
+                    transition: 'opacity .2s ease',
+                  }}>
+                    {isCorrect ? '\u2713' : isWrong ? '\u2717' : choice.letter}
+                  </div>
+                  <span style={{
+                    fontSize: 15, fontWeight: isSelected ? 700 : 500,
+                    color: isCorrect ? '#059669' : isWrong ? '#ef4444' : '#334155',
+                  }}>
+                    {choice.text}
+                  </span>
+                </motion.div>
               )
             })}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', marginBottom: 6 }}>TODAY'S TASKS</div>
-          {['Study: Ch 2 Systems of Equations', 'Review: 3 missed questions', 'Check: Latest results'].map(t => (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
-              <div style={{ width: 16, height: 16, borderRadius: 5, border: '1.5px solid #cbd5e1' }} />
-              <span style={{ color: '#334155' }}>{t}</span>
-            </div>
-          ))}
-        </MockFrame>
-        <Tip n={1}>Set your <strong>official test date</strong> and which days you're available to study.</Tip>
-        <Tip n={2}>Your schedule <strong>adapts automatically</strong> based on weak topics and how much time you have left.</Tip>
-        <Tip n={3}>Each task links directly to the right page — just <strong>click to start</strong>.</Tip>
-        <Tip n={4}>Red dates mark your <strong>test day</strong>. Blue dates have study tasks assigned.</Tip>
-      </Section>,
 
-      <Section icon="mistakes" title="Mistake Notebook" subtitle="Review and master every missed question">
-        <MockFrame label="Mistake Notebook">
+          {selected && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{
+                marginTop: 14,
+                padding: '14px 18px',
+                borderRadius: 12,
+                background: selected === correctAnswer ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.04)',
+                border: `1px solid ${selected === correctAnswer ? 'rgba(16,185,129,.2)' : 'rgba(239,68,68,.15)'}`,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 800, color: selected === correctAnswer ? '#059669' : '#ef4444', marginBottom: 4 }}>
+                {selected === correctAnswer ? 'Correct!' : 'Not quite!'}
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                2x + 5 = 13 {'\u2192'} 2x = 8 {'\u2192'} x = 4. The answer is B.
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+      </MockWindow>
+
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="test" size={15} style={{ color: 'white' }} />
+          </div>
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Try clicking an answer above! Practice questions work just like this throughout the platform — instant feedback helps you learn faster.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function StepProgress() {
+  const barData = [
+    { label: 'Week 1', height: 30, score: '1230' },
+    { label: 'Week 2', height: 45, score: '1260' },
+    { label: 'Week 3', height: 60, score: '1280' },
+    { label: 'Week 4', height: 75, score: '1310' },
+    { label: 'Week 5', height: 90, score: '1340' },
+  ]
+
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div variants={fadeUp} style={{ marginBottom: 20 }}>
+        <h3 style={{ fontFamily: sf, fontSize: 24, fontWeight: 900, color: '#0f172a', margin: '0 0 6px' }}>Track Your Progress</h3>
+        <p style={{ fontSize: 15, color: '#64748b', margin: 0, lineHeight: 1.7 }}>
+          See how far you have come with detailed analytics and visual progress charts. Every test tells a story.
+        </p>
+      </motion.div>
+
+      <MockWindow label="Progress Overview">
+        <motion.div variants={fadeUp}>
+          {/* Score trend chart */}
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            Score Trend
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 120, marginBottom: 8, padding: '0 4px' }}>
+            {barData.map((bar, i) => (
+              <motion.div
+                key={i}
+                initial={{ height: 0 }}
+                animate={{ height: `${bar.height}%` }}
+                transition={{ duration: 0.6, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                style={{
+                  flex: 1,
+                  background: `linear-gradient(180deg, #0ea5e9 0%, #3b82f6 100%)`,
+                  borderRadius: '8px 8px 4px 4px',
+                  minWidth: 0,
+                  position: 'relative',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: -20,
+                  fontSize: 11, fontWeight: 800, color: '#0ea5e9',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {bar.score}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 10, padding: '0 4px' }}>
+            {barData.map((bar, i) => (
+              <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                {bar.label}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div variants={fadeUp} style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            Skill Breakdown
+          </div>
           {[
-            { q: 'Q12 — Algebra', status: 'To Review', color: '#f59e0b' },
-            { q: 'Q7 — Reading Comp', status: 'Solved ✓', color: '#10b981' },
-            { q: 'Q23 — Data Analysis', status: 'To Review', color: '#f59e0b' },
-            { q: 'Q31 — Grammar', status: 'To Review', color: '#f59e0b' },
-          ].map(m => (
-            <div key={m.q} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
-              <span style={{ color: '#334155', fontWeight: 600 }}>{m.q}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: m.color }}>{m.status}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 8, textAlign: 'center' }}>
-            <span style={{ display: 'inline-block', padding: '8px 20px', background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', color: 'white', borderRadius: 10, fontSize: 13, fontWeight: 800 }}>Next unsolved →</span>
-          </div>
-        </MockFrame>
-        <Tip n={1}>Every question you miss is <strong>automatically added</strong> to your Mistake Notebook.</Tip>
-        <Tip n={2}>Review each mistake and answer it correctly to mark it as <strong>solved</strong>.</Tip>
-        <Tip n={3}><strong>"Next unsolved"</strong> jumps straight to the next question you haven't reviewed yet.</Tip>
-        <Tip n={4}>Uses <strong>spaced repetition</strong> — questions resurface over time to lock in your learning.</Tip>
-      </Section>,
-
-      <Section icon="target" title="Quick Navigation" subtitle="Get around fast with the top bar">
-        <MockFrame label="Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {['Calendar', 'Guide', 'Mistakes'].map(b => (
-                <span key={b} style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>{b}</span>
-              ))}
-              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 7, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>{label}</span>
-            </div>
-          </div>
-        </MockFrame>
-        <Tip n={1}>The <strong>top bar</strong> gives you one-click access to Calendar, Study Guide, and Mistakes from any page.</Tip>
-        <Tip n={2}>Use the <strong>exam switcher</strong> ({label} badge) to toggle between your SAT and ACT dashboards anytime.</Tip>
-        <Tip n={3}>Click the <strong>AGORA logo</strong> to return to your dashboard from anywhere.</Tip>
-      </Section>,
-  ]
-}
-
-/* ─── Tutor Sections ─────────────────────────────────── */
-
-function tutorSlides() {
-  return [
-      <Section icon="students" title="Your Students" subtitle="View everyone affiliated with your school">
-        <MockFrame label="Tutor Dashboard — Students">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Name', 'Email', 'Tests', 'Best Score', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { name: 'Alex Johnson', email: 'alex@school.edu', tests: 3, score: 'SAT 1340' },
-                { name: 'Maria Garcia', email: 'maria@school.edu', tests: 2, score: 'ACT 29' },
-                { name: 'Sam Chen', email: 'sam@school.edu', tests: 1, score: 'SAT 1180' },
-              ].map(s => (
-                <tr key={s.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '8px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
-                  <td style={{ padding: '8px', color: '#94a3b8' }}>{s.email}</td>
-                  <td style={{ padding: '8px', color: '#334155' }}>{s.tests}</td>
-                  <td style={{ padding: '8px', fontWeight: 700, color: '#0f172a' }}>{s.score}</td>
-                  <td style={{ padding: '8px' }}>
-                    <span style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 5, fontWeight: 700, marginRight: 4 }}>View</span>
-                    <span style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(14,165,233,.08)', color: '#0369a1', borderRadius: 5, fontWeight: 700 }}>Report</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </MockFrame>
-        <Tip n={1}>See all students <strong>affiliated with your school</strong> in one searchable table.</Tip>
-        <Tip n={2}>Track each student's <strong>test count</strong> and <strong>best score</strong> at a glance.</Tip>
-        <Tip n={3}>Click <strong>"View"</strong> to preview any student's full dashboard exactly as they see it.</Tip>
-        <Tip n={4}>Click <strong>"Report"</strong> to see their detailed progress report with score breakdowns.</Tip>
-      </Section>,
-
-      <Section icon="results" title="Test Results" subtitle="Every completed test from your students">
-        <MockFrame label="Tutor Dashboard — Test Results">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Student', 'Test', 'Date', 'Score', 'Top Weakness'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { name: 'Alex J.', test: 'SAT Pre-Test', date: 'Mar 15', score: '1280', weak: 'Algebra' },
-                { name: 'Maria G.', test: 'ACT Pre-Test', date: 'Mar 14', score: '27', weak: 'Science' },
-                { name: 'Alex J.', test: 'SAT Practice 1', date: 'Mar 18', score: '1340', weak: 'Geometry' },
-              ].map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '8px', fontWeight: 600, color: '#334155' }}>{r.name}</td>
-                  <td style={{ padding: '8px', color: '#334155' }}>{r.test}</td>
-                  <td style={{ padding: '8px', color: '#94a3b8' }}>{r.date}</td>
-                  <td style={{ padding: '8px', fontWeight: 700, color: '#0f172a' }}>{r.score}</td>
-                  <td style={{ padding: '8px', color: '#ef4444', fontSize: 11 }}>{r.weak}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </MockFrame>
-        <Tip n={1}>See <strong>every completed test</strong> from your students in one place, sorted by date.</Tip>
-        <Tip n={2}>Track scores, dates, and <strong>top weaknesses</strong> to identify who needs the most help.</Tip>
-        <Tip n={3}>Results update <strong>in real time</strong> — new scores appear as soon as students finish a test.</Tip>
-      </Section>,
-
-      <Section icon="chart" title="Analytics" subtitle="Track performance across your students">
-        <MockFrame label="Tutor Dashboard — Analytics">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Students', value: '12' },
-              { label: 'Active (7d)', value: '8' },
-              { label: 'Avg Score', value: '1285' },
-              { label: 'Median', value: '1310' },
-            ].map(k => (
-              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 65, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>{k.value}</div>
-              </MiniCard>
-            ))}
-          </div>
-          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14, marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>SCORE DISTRIBUTION</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 60 }}>
-              {[15, 25, 40, 60, 80, 55, 30, 10].map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '4px 4px 0 0', minWidth: 0 }} />
-              ))}
-            </div>
-          </div>
-          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>MOST MISSED TOPICS</div>
-            {['Algebra & Functions', 'Data Interpretation', 'Grammar & Usage'].map((t, i) => (
-              <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${80 - i * 20}%`, background: i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#0ea5e9', borderRadius: 99 }} />
-                </div>
-                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, flexShrink: 0, width: 110, textAlign: 'right' }}>{t}</span>
+            { skill: 'Algebra & Functions', pct: 85, color: '#10b981' },
+            { skill: 'Geometry & Trig', pct: 70, color: '#0ea5e9' },
+            { skill: 'Data Analysis', pct: 55, color: '#f59e0b' },
+            { skill: 'Advanced Math', pct: 40, color: '#ef4444' },
+          ].map((item, i) => (
+            <div key={item.skill} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{item.skill}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: item.color }}>{item.pct}%</span>
               </div>
-            ))}
-          </div>
-        </MockFrame>
-        <Tip n={1}>Track <strong>key metrics</strong>: student count, active users, average and median scores.</Tip>
-        <Tip n={2}>The <strong>score distribution</strong> chart shows how your students' scores spread out.</Tip>
-        <Tip n={3}>Identify the <strong>most commonly missed topics</strong> across all students to guide group instruction.</Tip>
-        <Tip n={4}>Toggle between <strong>SAT and ACT</strong> analytics separately.</Tip>
-      </Section>,
-
-      <Section icon="eye" title="Previewing Student Work" subtitle="See any student's dashboard as they see it">
-        <MockFrame label="Tutor View — Alex Johnson's Dashboard">
-          <div style={{ background: '#fef3c7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 10, border: '1px solid #fde68a' }}>
-            Tutor View — You're previewing Alex Johnson's dashboard (read-only)
-          </div>
-          <div style={{ fontSize: 13, color: '#64748b', textAlign: 'center', padding: 24 }}>
-            [Student's full dashboard appears here with their real data]
-          </div>
-        </MockFrame>
-        <Tip n={1}>Click <strong>"View"</strong> on any student to see their exact dashboard with real data.</Tip>
-        <Tip n={2}>Preview mode is <strong>read-only</strong> — you can look but can't modify their data or start tests.</Tip>
-        <Tip n={3}>A yellow banner at the top always reminds you that you're in preview mode.</Tip>
-      </Section>,
-
-      <Section icon="target" title="Quick Navigation" subtitle="Find your way around">
-        <MockFrame label="Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>Students</span>
-              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.25)', borderRadius: 7, color: 'white', border: '1px solid rgba(14,165,233,.4)' }}>My Dashboard</span>
-            </div>
-          </div>
-        </MockFrame>
-        <Tip n={1}>Click <strong>"Students"</strong> in the top bar to access your Tutor Dashboard with student lists, results, and analytics.</Tip>
-        <Tip n={2}>Click <strong>"My Dashboard"</strong> to return to the standard student view (you also have your own SAT/ACT practice dashboard).</Tip>
-        <Tip n={3}>Click the <strong>AGORA logo</strong> to return to your dashboard from anywhere.</Tip>
-      </Section>,
-  ]
-}
-
-/* ─── Admin Sections ─────────────────────────────────── */
-
-function adminSlides() {
-  return [
-      <Section icon="admin" title="Student Management" subtitle="Full control over all user accounts">
-        <MockFrame label="Admin — Students">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Name', 'Role', 'Affiliation', 'Tests', 'Best', 'Actions'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: '#64748b', fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { name: 'Alex Johnson', role: 'Student', aff: 'Lincoln HS', tests: 3, score: '1340', roleColor: '#10b981' },
-                { name: 'Ms. Davis', role: 'Tutor', aff: 'Lincoln HS', tests: 0, score: '—', roleColor: '#0ea5e9' },
-                { name: 'Sam Chen', role: 'Student', aff: 'Oak Academy', tests: 1, score: '1180', roleColor: '#10b981' },
-              ].map(s => (
-                <tr key={s.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '7px 8px', fontWeight: 700, color: '#334155' }}>{s.name}</td>
-                  <td style={{ padding: '7px 8px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 5, color: s.roleColor, background: `${s.roleColor}15` }}>{s.role}</span>
-                  </td>
-                  <td style={{ padding: '7px 8px', color: '#64748b', fontSize: 12 }}>{s.aff}</td>
-                  <td style={{ padding: '7px 8px', color: '#334155' }}>{s.tests}</td>
-                  <td style={{ padding: '7px 8px', fontWeight: 700 }}>{s.score}</td>
-                  <td style={{ padding: '7px 8px' }}>
-                    <span style={{ display: 'flex', gap: 4 }}>
-                      {['Reset', 'View', 'Report', 'Delete'].map(a => (
-                        <span key={a} style={{ fontSize: 10, padding: '3px 7px', background: a === 'Delete' ? 'rgba(239,68,68,.08)' : 'rgba(14,165,233,.08)', color: a === 'Delete' ? '#ef4444' : '#0369a1', borderRadius: 5, fontWeight: 700 }}>{a}</span>
-                      ))}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </MockFrame>
-        <Tip n={1}>See <strong>every user</strong> in the system — students, tutors, and admins — with their role badge.</Tip>
-        <Tip n={2}><strong>Filter by affiliation</strong> using the dropdown to focus on a specific school.</Tip>
-        <Tip n={3}><strong>Reset</strong> clears a student's tests, scores, and study progress so they can start fresh.</Tip>
-        <Tip n={4}><strong>View</strong> opens their dashboard in read-only preview. <strong>Report</strong> shows detailed analytics.</Tip>
-        <Tip n={5}><strong>Delete</strong> permanently removes a user account — use with caution.</Tip>
-      </Section>,
-
-      <Section icon="chart" title="Program Analytics" subtitle="Organization-wide performance metrics">
-        <MockFrame label="Admin — Analytics">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Registered', value: '48' },
-              { label: 'Students', value: '42' },
-              { label: 'Tutors', value: '5' },
-              { label: 'Tests', value: '127' },
-              { label: 'Avg Gain', value: '+45', color: '#10b981' },
-            ].map(k => (
-              <MiniCard key={k.label} style={{ flex: '1 1 0', minWidth: 60, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{k.label}</div>
-                <div style={{ fontSize: 17, fontWeight: 900, color: k.color || '#0f172a', fontFamily: sf }}>{k.value}</div>
-              </MiniCard>
-            ))}
-          </div>
-          <div style={{ background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', padding: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>ACTIVITY OVER TIME</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 55 }}>
-              {[20, 35, 50, 45, 60, 70, 55, 80, 65, 75, 90, 85].map((h, i) => (
-                <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #0ea5e9, #6366f1)', borderRadius: '3px 3px 0 0', minWidth: 0 }} />
-              ))}
-            </div>
-          </div>
-        </MockFrame>
-        <Tip n={1}>Summary cards show <strong>total registrations, test completions, and average improvement</strong> at a glance.</Tip>
-        <Tip n={2}>Charts cover <strong>activity trends, score distributions, averages by test, and most missed topics</strong>.</Tip>
-        <Tip n={3}>Filter analytics by <strong>affiliation</strong> to compare performance between different schools.</Tip>
-        <Tip n={4}>Toggle between <strong>SAT and ACT</strong> for separate analytics views.</Tip>
-      </Section>,
-
-      <Section icon="folder" title="Affiliations" subtitle="Compare performance across schools">
-        <MockFrame label="Admin — Affiliations">
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {[
-              { name: 'Lincoln High School', students: 18, tests: 52, avg: 1285 },
-              { name: 'Oak Academy', students: 12, tests: 34, avg: 1320 },
-              { name: 'Riverside Prep', students: 8, tests: 21, avg: 1250 },
-            ].map(a => (
-              <MiniCard key={a.name} style={{ flex: '1 1 140px' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, marginBottom: 6 }}>{a.name}</div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#64748b' }}>
-                  <span>{a.students} students</span>
-                  <span>{a.tests} tests</span>
-                </div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Avg: <strong style={{ color: '#0f172a' }}>{a.avg}</strong></div>
-              </MiniCard>
-            ))}
-          </div>
-        </MockFrame>
-        <Tip n={1}>See <strong>side-by-side stats</strong> for every school or organization in your system.</Tip>
-        <Tip n={2}>Click any affiliation card to <strong>filter</strong> the Students and Analytics tabs to just that group.</Tip>
-        <Tip n={3}>Compare <strong>student counts, test counts, and average scores</strong> across all affiliations.</Tip>
-      </Section>,
-
-      <Section icon="trend" title="Proof of Impact" subtitle="Statistical evidence that the program works">
-        <MockFrame label="Admin — Proof of Impact">
-          <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-            <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>PRE-TEST AVG</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', fontFamily: sf }}>1215</div>
-            </MiniCard>
-            <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>POST-TEST AVG</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', fontFamily: sf }}>1310</div>
-            </MiniCard>
-            <MiniCard style={{ flex: '1 1 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>MEAN GAIN</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', fontFamily: sf }}>+95</div>
-            </MiniCard>
-          </div>
-          <div style={{ background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', padding: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#166534', marginBottom: 6 }}>STATISTICALLY SIGNIFICANT</div>
-            <div style={{ fontSize: 12, color: '#15803d', lineHeight: 1.7 }}>
-              p-value: 0.001 · Cohen's d: 0.82 (large effect)<br />
-              95% CI: [+72, +118] points
-            </div>
-          </div>
-        </MockFrame>
-        <Tip n={1}>Compare <strong>pre-test vs post-test averages</strong> across all students with paired data.</Tip>
-        <Tip n={2}>See full <strong>statistical analysis</strong>: paired t-test, p-value, Cohen's d effect size, and confidence intervals.</Tip>
-        <Tip n={3}>Use this data to <strong>demonstrate program effectiveness</strong> to stakeholders and funders.</Tip>
-      </Section>,
-
-      <Section icon="test" title="Test Management" subtitle="Manage PDFs and answer keys">
-        <MockFrame label="Admin — Tests">
-          {['SAT Pre-Test', 'SAT Practice 1', 'SAT Practice 2', 'ACT Pre-Test'].map(t => (
-            <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 4, fontSize: 13 }}>
-              <span style={{ fontWeight: 700, color: '#334155' }}>{t}</span>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <span style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 5, fontWeight: 700 }}>PDF ✓</span>
-                <span style={{ fontSize: 10, padding: '3px 8px', background: 'rgba(16,185,129,.08)', color: '#10b981', borderRadius: 5, fontWeight: 700 }}>Key ✓</span>
+              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${item.pct}%` }}
+                  transition={{ duration: 0.8, delay: 0.3 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ height: '100%', background: item.color, borderRadius: 99 }}
+                />
               </div>
             </div>
           ))}
-        </MockFrame>
-        <Tip n={1}>View the <strong>status of every test</strong> — which ones have PDFs and answer keys ready.</Tip>
-        <Tip n={2}><strong>Upload PDFs</strong> and the system can auto-extract answer keys from scoring guides.</Tip>
-        <Tip n={3}>Use <strong>"Regrade Attempts"</strong> in the toolbar to rescore all tests after updating an answer key.</Tip>
-      </Section>,
+        </motion.div>
+      </MockWindow>
 
-      <Section icon="target" title="Quick Navigation" subtitle="Admin toolbar overview">
-        <MockFrame label="Admin Navigation Bar">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a2744', borderRadius: 10, padding: '10px 18px', flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: 'white' }}>AGORA</span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {['Regrade', 'Reset My Data', 'Back to Dashboard'].map(b => (
-                <span key={b} style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.15)', borderRadius: 7, color: 'rgba(255,255,255,.85)' }}>{b}</span>
-              ))}
-              <span style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: 'rgba(239,68,68,.15)', borderRadius: 7, color: '#fca5a5' }}>Sign Out</span>
-            </div>
+      <motion.div variants={fadeUp} style={{ marginTop: 16, padding: '14px 18px', background: 'rgba(14,165,233,.06)', borderRadius: 12, border: '1px solid rgba(14,165,233,.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="chart" size={15} style={{ color: 'white' }} />
           </div>
-        </MockFrame>
-        <Tip n={1}><strong>"Regrade Attempts"</strong> rescores all completed tests with the latest answer key logic.</Tip>
-        <Tip n={2}><strong>"Reset My Data"</strong> clears your own test data (useful when testing the platform yourself).</Tip>
-        <Tip n={3}><strong>"Back to Dashboard"</strong> returns you to the standard student dashboard view.</Tip>
-      </Section>,
-  ]
+          <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.7 }}>
+            Your progress page updates after every test. Use it to identify strengths and focus on areas that need the most work.
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
 }
+
+function StepComplete({ onGetStarted, role }) {
+  return (
+    <motion.div
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+      style={{ textAlign: 'center', paddingTop: 20 }}
+    >
+      <motion.div
+        variants={fadeUp}
+        style={{
+          width: 80, height: 80, borderRadius: 24,
+          background: 'linear-gradient(135deg, #10b981, #059669)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 24px',
+          boxShadow: '0 12px 32px rgba(16,185,129,.3)',
+        }}
+      >
+        <span style={{ fontSize: 36, color: 'white', fontWeight: 900 }}>{'\u2713'}</span>
+      </motion.div>
+
+      <motion.h3 variants={fadeUp} style={{
+        fontFamily: sf, fontSize: 32, fontWeight: 900, color: '#0f172a',
+        margin: '0 0 12px',
+      }}>
+        You're All Set!
+      </motion.h3>
+
+      <motion.p variants={fadeUp} style={{
+        fontSize: 16, color: '#64748b', margin: '0 auto 32px',
+        maxWidth: 440, lineHeight: 1.7,
+      }}>
+        {role === 'tutor'
+          ? "You're ready to start tracking your students' progress and helping them succeed."
+          : "You're ready to start your test prep journey. Take your first pre-test, study smart, and watch your score climb."}
+      </motion.p>
+
+      <motion.div variants={fadeUp} style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {[
+          { icon: 'home', label: 'Dashboard', desc: 'View your stats' },
+          { icon: 'guide', label: 'Study Guide', desc: 'Start learning' },
+          { icon: 'test', label: 'Take a Test', desc: 'Dive right in' },
+        ].map((item) => (
+          <div key={item.label} style={{
+            background: 'white', borderRadius: 16,
+            border: '1.5px solid rgba(14,165,233,.12)',
+            padding: '20px 24px', width: 140,
+            boxShadow: '0 4px 16px rgba(14,165,233,.06)',
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 10px',
+              color: 'white',
+            }}>
+              <Icon name={item.icon} size={19} />
+            </div>
+            <div style={{ fontFamily: sf, fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>{item.desc}</div>
+          </div>
+        ))}
+      </motion.div>
+
+      <motion.button
+        variants={fadeUp}
+        onClick={onGetStarted}
+        whileHover={{ scale: 1.03, boxShadow: '0 12px 32px rgba(249,115,22,.35)' }}
+        whileTap={{ scale: 0.97 }}
+        style={{
+          marginTop: 36,
+          padding: '16px 48px',
+          fontSize: 18, fontWeight: 900, fontFamily: sf,
+          color: 'white',
+          background: 'linear-gradient(135deg, #f97316, #ea580c)',
+          border: 'none', borderRadius: 16,
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px rgba(249,115,22,.3)',
+          transition: 'box-shadow .3s ease',
+        }}
+      >
+        Go to Dashboard
+      </motion.button>
+    </motion.div>
+  )
+}
+
+/* ─── Step definitions ───────────────────────────────── */
+
+const STEPS = [
+  { number: 1, title: 'Your Dashboard', icon: 'home' },
+  { number: 2, title: 'Study Guide', icon: 'guide' },
+  { number: 3, title: 'Smart Journey', icon: 'target' },
+  { number: 4, title: 'More Practice', icon: 'test' },
+  { number: 5, title: 'Track Progress', icon: 'chart' },
+  { number: 6, title: 'All Set!', icon: 'home' },
+]
 
 /* ─── Main Component ─────────────────────────────────── */
 
@@ -616,33 +665,37 @@ export default function Welcome() {
   const params = new URLSearchParams(location.search)
   const exam = params.get('exam') || 'sat'
   const role = profile?.role || 'student'
-  const [slide, setSlide] = useState(0)
 
-  const isAdmin = role === 'admin'
-  const isTutor = role === 'tutor'
-  const label = exam === 'act' ? 'ACT' : 'SAT'
+  // Admins already know the platform — skip the welcome tour
+  if (role === 'admin') return <Navigate to="/admin" replace />
 
-  const slides = isAdmin ? adminSlides() : isTutor ? tutorSlides() : studentSlides(exam)
-  const total = slides.length
-  const isFirst = slide === 0
-  const isLast = slide === total - 1
+  const [step, setStep] = useState(0)
+  const [direction, setDirection] = useState(1)
 
-  const heroSubtitle = isAdmin
-    ? "Here's a quick tour of your Admin Dashboard and all the tools at your disposal."
-    : isTutor
-      ? "Here's a quick tour of your Tutor Dashboard and how to track your students' progress."
-      : `You chose ${label} — great choice! Here's a quick tour of everything you can do.`
-
-  const roleBadge = isAdmin ? 'Admin' : isTutor ? 'Tutor' : 'Student'
+  const totalSteps = STEPS.length
+  const isFirst = step === 0
+  const isLast = step === totalSteps - 1
 
   function handleGetStarted() {
-    if (isAdmin) navigate('/admin', { replace: true })
-    else if (isTutor) navigate('/dashboard', { replace: true })
-    else navigate(`/dashboard?exam=${exam}`, { replace: true })
+    if (role === 'admin') navigate('/admin', { replace: true })
+    else if (role === 'tutor') navigate('/tutor', { replace: true })
+    else navigate(`/pick-test-date?exam=${exam}`, { replace: true })
   }
 
-  const goNext = useCallback(() => setSlide(s => Math.min(s + 1, total - 1)), [total])
-  const goPrev = useCallback(() => setSlide(s => Math.max(s - 1, 0)), [])
+  const goNext = useCallback(() => {
+    setDirection(1)
+    setStep(s => Math.min(s + 1, totalSteps - 1))
+  }, [totalSteps])
+
+  const goPrev = useCallback(() => {
+    setDirection(-1)
+    setStep(s => Math.max(s - 1, 0))
+  }, [])
+
+  const goTo = useCallback((i) => {
+    setDirection(i > step ? 1 : -1)
+    setStep(i)
+  }, [step])
 
   useEffect(() => {
     function onKey(e) {
@@ -653,109 +706,234 @@ export default function Welcome() {
     return () => window.removeEventListener('keydown', onKey)
   }, [goNext, goPrev])
 
+  function renderStepContent() {
+    switch (step) {
+      case 0: return <StepDashboard />
+      case 1: return <StepStudyGuide />
+      case 2: return <StepJourney />
+      case 3: return <StepPractice />
+      case 4: return <StepProgress />
+      case 5: return <StepComplete onGetStarted={handleGetStarted} role={role} />
+      default: return null
+    }
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(170deg, #0f172a 0%, #1e3a5f 40%, #0ea5e9 100%)',
-      padding: '40px 20px 60px',
+      background: 'linear-gradient(180deg, #edf4ff 0%, #f0f4f8 100%)',
     }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: 32, color: 'white' }}>
-          <div style={{
-            display: 'inline-block', padding: '4px 14px',
-            background: 'rgba(255,255,255,.12)', borderRadius: 20,
-            fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.8)',
-            marginBottom: 16, border: '1px solid rgba(255,255,255,.15)',
-          }}>
-            {roleBadge} Account
-          </div>
-          <div style={{ fontFamily: sf, fontSize: 28, fontWeight: 900, marginBottom: 8, lineHeight: 1.3 }}>
-            Welcome to The Agora Project
-          </div>
-          <div style={{ fontSize: 15, color: 'rgba(255,255,255,.7)', lineHeight: 1.7, maxWidth: 480, margin: '0 auto' }}>
-            {heroSubtitle}
-          </div>
-        </div>
+      {/* ── Hero Section ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          textAlign: 'center',
+          paddingTop: 48,
+          paddingBottom: 24,
+        }}
+      >
+        <motion.img
+          src="/logo.png"
+          alt="Agora Logo"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          style={{
+            width: 64, height: 64,
+            borderRadius: 18,
+            marginBottom: 20,
+            boxShadow: '0 8px 24px rgba(14,165,233,.15)',
+          }}
+        />
 
-        {/* Slide counter */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, padding: '0 4px' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,.5)' }}>
-            {slide + 1} / {total}
-          </div>
+        <h1 style={{
+          fontFamily: sf,
+          fontSize: 36,
+          fontWeight: 900,
+          color: '#0f172a',
+          margin: '0 0 10px',
+          lineHeight: 1.2,
+        }}>
+          Welcome to The Agora Project
+        </h1>
+
+        <p style={{
+          fontSize: 16,
+          color: '#64748b',
+          margin: '0 auto',
+          maxWidth: 460,
+          lineHeight: 1.7,
+        }}>
+          Let's take a quick tour of your new study platform
+        </p>
+      </motion.div>
+
+      {/* ── Step indicator bar ── */}
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 6, marginBottom: 32, flexWrap: 'wrap',
+          }}
+        >
+          {STEPS.map((s, i) => {
+            const isActive = i === step
+            const isDone = i < step
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <motion.button
+                  onClick={() => goTo(i)}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    width: isActive ? 'auto' : 36, height: 36,
+                    borderRadius: 12,
+                    padding: isActive ? '0 16px' : 0,
+                    background: isActive
+                      ? 'linear-gradient(135deg, #0ea5e9, #3b82f6)'
+                      : isDone
+                        ? 'rgba(16,185,129,.12)'
+                        : 'white',
+                    color: isActive ? 'white' : isDone ? '#10b981' : '#94a3b8',
+                    fontSize: 13, fontWeight: 800, fontFamily: sf,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: isActive ? '0 4px 16px rgba(14,165,233,.3)' : '0 2px 8px rgba(0,0,0,.04)',
+                    transition: 'all .3s ease',
+                    border: isActive ? 'none' : isDone ? '1.5px solid rgba(16,185,129,.2)' : '1.5px solid #e2e8f0',
+                  }}
+                  aria-label={`Step ${i + 1}: ${s.title}`}
+                >
+                  {isDone ? '\u2713' : s.number}
+                  {isActive && <span style={{ fontSize: 12, fontWeight: 700 }}>{s.title}</span>}
+                </motion.button>
+                {i < STEPS.length - 1 && (
+                  <div style={{
+                    width: 24, height: 2,
+                    background: i < step ? '#10b981' : '#e2e8f0',
+                    borderRadius: 99,
+                    transition: 'background .3s ease',
+                  }} />
+                )}
+              </div>
+            )
+          })}
+        </motion.div>
+      </div>
+
+      {/* ── Slide content ── */}
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 20px', minHeight: 400 }}>
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={step}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* ── Navigation controls ── */}
+      {!isLast && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          style={{
+            maxWidth: 640, margin: '32px auto 0',
+            padding: '0 20px 60px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}
+        >
+          <motion.button
+            onClick={goPrev}
+            disabled={isFirst}
+            whileHover={!isFirst ? { scale: 1.03 } : {}}
+            whileTap={!isFirst ? { scale: 0.97 } : {}}
+            style={{
+              padding: '12px 28px', fontSize: 14, fontWeight: 800,
+              fontFamily: sf,
+              color: isFirst ? '#cbd5e1' : '#64748b',
+              background: 'white',
+              border: `1.5px solid ${isFirst ? '#e2e8f0' : 'rgba(14,165,233,.15)'}`,
+              borderRadius: 12,
+              cursor: isFirst ? 'not-allowed' : 'pointer',
+              transition: 'all .2s ease',
+              boxShadow: isFirst ? 'none' : '0 2px 8px rgba(0,0,0,.04)',
+            }}
+          >
+            {'\u2190'} Previous
+          </motion.button>
+
+          {/* Progress dots */}
           <div style={{ display: 'flex', gap: 6 }}>
-            {slides.map((_, i) => (
+            {STEPS.map((_, i) => (
               <button
                 key={i}
-                onClick={() => setSlide(i)}
+                onClick={() => goTo(i)}
                 style={{
-                  width: i === slide ? 20 : 8,
-                  height: 8,
-                  borderRadius: 99,
-                  border: 'none',
+                  width: i === step ? 24 : 8, height: 8,
+                  borderRadius: 99, border: 'none', padding: 0,
+                  background: i === step
+                    ? 'linear-gradient(90deg, #0ea5e9, #3b82f6)'
+                    : i < step
+                      ? '#10b981'
+                      : '#cbd5e1',
                   cursor: 'pointer',
-                  background: i === slide ? 'white' : 'rgba(255,255,255,.25)',
                   transition: 'all .3s ease',
-                  padding: 0,
                 }}
-                aria-label={`Slide ${i + 1}`}
+                aria-label={`Go to step ${i + 1}`}
               />
             ))}
           </div>
-        </div>
 
-        {/* Current slide */}
-        <div key={slide} className="fade-up">
-          {slides[slide]}
-        </div>
-
-        {/* Navigation controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, gap: 12 }}>
-          <button
-            onClick={goPrev}
-            disabled={isFirst}
-            className="btn btn-outline"
+          <motion.button
+            onClick={goNext}
+            whileHover={{ scale: 1.03, boxShadow: '0 8px 24px rgba(249,115,22,.3)' }}
+            whileTap={{ scale: 0.97 }}
             style={{
-              padding: '12px 24px', fontSize: 14, fontWeight: 800,
-              color: isFirst ? 'rgba(255,255,255,.25)' : 'white',
-              borderColor: isFirst ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.3)',
-              background: 'rgba(255,255,255,.06)',
-              cursor: isFirst ? 'not-allowed' : 'pointer',
+              padding: '12px 32px', fontSize: 14, fontWeight: 800,
+              fontFamily: sf,
+              color: 'white',
+              background: 'linear-gradient(135deg, #f97316, #ea580c)',
+              border: 'none',
+              borderRadius: 12,
+              cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(249,115,22,.25)',
+              transition: 'all .2s ease',
             }}
           >
-            ← Back
-          </button>
+            Next {'\u2192'}
+          </motion.button>
+        </motion.div>
+      )}
 
-          {isLast ? (
-            <button
-              onClick={handleGetStarted}
-              className="btn btn-primary"
-              style={{
-                padding: '14px 40px', fontSize: 16, fontWeight: 900,
-                borderRadius: 14, boxShadow: '0 8px 24px rgba(14,165,233,.4)',
-              }}
-            >
-              {isAdmin ? 'Go to Admin Dashboard →' : isTutor ? 'Go to Dashboard →' : 'Get Started →'}
-            </button>
-          ) : (
-            <button
-              onClick={goNext}
-              className="btn btn-primary"
-              style={{
-                padding: '12px 32px', fontSize: 14, fontWeight: 800,
-                borderRadius: 12,
-              }}
-            >
-              Next →
-            </button>
-          )}
-        </div>
+      {/* Final step nav — just a spacer */}
+      {isLast && <div style={{ paddingBottom: 60 }} />}
 
-        {/* Keyboard hint */}
-        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,.3)' }}>
-          Use arrow keys or click to navigate
-        </div>
-      </div>
+      {/* Keyboard hint */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        style={{
+          textAlign: 'center',
+          paddingBottom: 24,
+          fontSize: 12, color: '#94a3b8',
+        }}
+      >
+        Use arrow keys to navigate
+      </motion.div>
     </div>
   )
 }

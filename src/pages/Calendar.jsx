@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
-import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
-import ExamSwitcher from '../components/ExamSwitcher.jsx'
-import TopResourceNav from '../components/TopResourceNav.jsx'
+import Sidebar from '../components/Sidebar.jsx'
+import { motion, AnimatePresence } from 'framer-motion'
 import { buildAdaptiveSchedule, loadSatTestDate, saveSatTestDate, loadStudyPrefs, saveStudyPrefs, normalizeWeakTopics, dayLabels, UPCOMING_TEST_DATES } from '../lib/studyPlan.js'
 import { getChaptersForExam, getExamConfig, calcWeakTopicsForTest } from '../data/examData.js'
 import { getExamFromTestId, getTestsForExam } from '../data/tests.js'
@@ -14,31 +13,7 @@ import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
 
-function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, isAdminPreview, currentExam, satHref, actHref, showResources = true }) {
-  const navigate = useNavigate()
-  return (
-    <nav className="nav">
-      <BrandLink to={homeHref} />
-      <div className="nav-actions">
-        <TopResourceNav hidden={!showResources} current="calendar" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-          title="Go back"
-        >
-          ← Back
-        </button>
-        {isAdminPreview && (
-          <Link to="/admin" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.85)', borderColor: 'rgba(255,255,255,.22)', background: 'rgba(255,255,255,.08)' }}>
-            Admin
-          </Link>
-        )}
-      </div>
-    </nav>
-  )
-}
+/* ─── Helpers ─────────────────────────────────────────── */
 
 function startOfWeek(date) {
   const d = new Date(date)
@@ -59,6 +34,282 @@ function dateKey(d) {
   return new Date(d).toISOString().slice(0, 10)
 }
 
+function getMonthDays(year, month) {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+function getFirstDayOfWeek(year, month) {
+  const day = new Date(year, month, 1).getDay()
+  return day === 0 ? 6 : day - 1 // Mon=0 ... Sun=6
+}
+
+/* ─── Framer Motion Variants ─────────────────────────── */
+
+const monthSlide = {
+  enter: (dir) => ({ x: dir > 0 ? 220 : -220, opacity: 0 }),
+  center: { x: 0, opacity: 1, transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit: (dir) => ({ x: dir > 0 ? -220 : 220, opacity: 0, transition: { duration: 0.24, ease: [0.25, 0.46, 0.45, 0.94] } }),
+}
+
+const panelReveal = {
+  hidden: { opacity: 0, y: 18, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, y: 10, scale: 0.97, transition: { duration: 0.2 } },
+}
+
+const taskCard = {
+  hidden: { opacity: 0, y: 14 },
+  visible: (i) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.06, duration: 0.35, ease: [0.22, 1, 0.36, 1] },
+  }),
+}
+
+const dotPop = {
+  hidden: { scale: 0 },
+  visible: (i) => ({
+    scale: 1,
+    transition: { delay: i * 0.04, type: 'spring', stiffness: 500, damping: 25 },
+  }),
+}
+
+/* ─── Task-type color mapping for dots ────────────────── */
+
+function getTaskDotColor(task) {
+  const t = (task.title || '').toLowerCase()
+  const s = (task.subtitle || '').toLowerCase()
+  const combined = t + ' ' + s
+  if (combined.includes('test') || combined.includes('practice test') || combined.includes('final')) return '#f97316' // orange for test
+  if (combined.includes('review') || combined.includes('mistake') || combined.includes('revisit')) return '#10b981' // green for review
+  return '#0ea5e9' // blue for study (default)
+}
+
+/* ─── Styles ──────────────────────────────────────────── */
+
+const S = {
+  /* Page header */
+  header: {
+    marginBottom: 28,
+  },
+  headerTop: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    gap: 16, flexWrap: 'wrap',
+  },
+  title: {
+    fontFamily: 'Sora, sans-serif', fontSize: 26, fontWeight: 800,
+    color: '#1a2744', letterSpacing: '-0.02em', margin: 0,
+  },
+  subtitle: {
+    marginTop: 6, color: '#64748b', fontSize: 14, lineHeight: 1.6, maxWidth: 520,
+  },
+  navBtns: {
+    display: 'flex', gap: 8, flexWrap: 'wrap',
+  },
+  navBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '8px 14px', borderRadius: 10,
+    border: '1px solid #e2e8f0', background: '#fff',
+    color: '#475569', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', textDecoration: 'none',
+    transition: 'all .18s ease',
+  },
+
+  /* Settings card */
+  settingsCard: {
+    background: '#fff', borderRadius: 16,
+    border: '1px solid #e5e7eb', padding: '20px 24px',
+    marginBottom: 24,
+  },
+  settingsTitle: {
+    fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700,
+    color: '#1a2744', marginBottom: 4,
+  },
+  settingsDesc: {
+    color: '#64748b', fontSize: 13, lineHeight: 1.6, marginBottom: 16,
+  },
+  settingsRow: {
+    display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
+  },
+  dateInput: {
+    padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10,
+    fontSize: 13, background: 'white', fontFamily: 'inherit',
+    outline: 'none', transition: 'border-color .18s',
+  },
+  dateChip: (active) => ({
+    padding: '6px 12px', fontSize: 12, fontWeight: 600,
+    border: active ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
+    borderRadius: 999, background: active ? 'rgba(14,165,233,.08)' : '#fff',
+    color: active ? '#0369a1' : '#64748b',
+    cursor: 'pointer', transition: 'all .18s',
+  }),
+  dayChip: (enabled) => ({
+    padding: '7px 14px', fontSize: 12, fontWeight: 600,
+    border: enabled ? '1.5px solid rgba(14,165,233,.4)' : '1.5px solid #e2e8f0',
+    borderRadius: 999, background: enabled ? 'rgba(14,165,233,.08)' : '#fff',
+    color: enabled ? '#0ea5e9' : '#94a3b8',
+    cursor: 'pointer', transition: 'all .18s',
+  }),
+
+  /* Calendar container */
+  calContainer: {
+    background: '#fff', borderRadius: 20,
+    border: '1px solid #e5e7eb',
+    padding: '24px 28px 28px',
+    boxShadow: '0 1px 3px rgba(0,0,0,.04)',
+  },
+
+  /* Month nav */
+  monthNav: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 20,
+  },
+  monthLabel: {
+    fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700,
+    color: '#1a2744',
+  },
+  arrowBtn: {
+    width: 36, height: 36, borderRadius: '50%',
+    border: '1px solid #e5e7eb', background: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', color: '#475569',
+    transition: 'all .18s',
+    fontSize: 18, fontWeight: 600,
+  },
+
+  /* Weekday headers */
+  weekRow: {
+    display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+    borderBottom: '1px solid #f1f5f9', paddingBottom: 10, marginBottom: 6,
+  },
+  weekLabel: {
+    textAlign: 'center', fontSize: 12, fontWeight: 600,
+    color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.4px',
+  },
+
+  /* Day grid */
+  dayGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: 2,
+  },
+
+  /* Day cell */
+  dayCell: (isSelected, isToday, isInPlan, isTestDate, isCurrentMonth) => ({
+    position: 'relative',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    minHeight: 64, padding: '8px 4px',
+    borderRadius: 12,
+    cursor: isInPlan ? 'pointer' : 'default',
+    background: isSelected ? 'rgba(14,165,233,.07)' : 'transparent',
+    transition: 'all .18s ease',
+    border: isSelected ? '2px solid #0ea5e9' : '1px solid #e5e7eb',
+    outline: 'none',
+    fontFamily: 'inherit',
+  }),
+  dayNum: (isSelected, isToday, isInPlan, isTestDate, isCurrentMonth) => ({
+    width: 38, height: 38,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: '50%',
+    fontFamily: 'Sora, sans-serif',
+    fontSize: 14, fontWeight: isToday || isSelected ? 700 : 500,
+    color: isTestDate
+      ? '#fff'
+      : isSelected
+        ? '#0ea5e9'
+        : isToday
+          ? '#0ea5e9'
+          : !isCurrentMonth
+            ? '#cbd5e1'
+            : isInPlan
+              ? '#334155'
+              : '#d1d5db',
+    background: isTestDate
+      ? '#f97316'
+      : 'transparent',
+    border: isToday && !isTestDate
+      ? '2px solid #0ea5e9'
+      : 'none',
+    transition: 'all .18s ease',
+  }),
+  dotsRow: {
+    display: 'flex', gap: 3, marginTop: 4, justifyContent: 'center',
+    minHeight: 6,
+  },
+  dot: (color) => ({
+    width: 5, height: 5, borderRadius: '50%',
+    background: color,
+  }),
+
+  /* Selected day panel */
+  panel: {
+    background: '#fff', borderRadius: 20,
+    border: '1px solid #e5e7eb', padding: '28px 28px 24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,.04)',
+    marginTop: 20,
+  },
+  panelHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    gap: 12, marginBottom: 20, flexWrap: 'wrap',
+  },
+  panelDate: {
+    fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 700,
+    color: '#1a2744',
+  },
+  panelDay: {
+    fontSize: 13, color: '#94a3b8', fontWeight: 500, marginBottom: 2,
+  },
+  panelTime: {
+    fontSize: 13, color: '#64748b', marginTop: 6,
+    display: 'flex', alignItems: 'center', gap: 5,
+  },
+  focusBadge: (focus) => ({
+    padding: '5px 14px', borderRadius: 999,
+    fontSize: 12, fontWeight: 600,
+    background: focus === 'Reading'
+      ? 'rgba(59,130,246,.08)'
+      : focus === 'Math'
+        ? 'rgba(16,185,129,.08)'
+        : 'rgba(148,163,184,.08)',
+    color: focus === 'Reading'
+      ? '#2563eb'
+      : focus === 'Math'
+        ? '#059669'
+        : '#64748b',
+  }),
+  taskCard: {
+    display: 'block',
+    textDecoration: 'none',
+    color: '#0f172a',
+    border: '1px solid #f1f5f9',
+    borderRadius: 14,
+    padding: '16px 18px',
+    background: '#fafbfc',
+    transition: 'all .18s ease',
+  },
+  taskTitle: {
+    fontWeight: 700, color: '#1a2744', marginBottom: 4, fontSize: 14,
+  },
+  taskSub: {
+    fontSize: 13, color: '#64748b', lineHeight: 1.6,
+  },
+  emptyTask: {
+    border: '1.5px dashed #e2e8f0', borderRadius: 14,
+    padding: '18px 20px', color: '#94a3b8', fontSize: 13, lineHeight: 1.6,
+    textAlign: 'center',
+  },
+
+  /* Legend */
+  legend: {
+    display: 'flex', gap: 18, marginTop: 16, paddingTop: 14,
+    borderTop: '1px solid #f1f5f9', flexWrap: 'wrap',
+  },
+  legendItem: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    fontSize: 12, color: '#64748b',
+  },
+}
+
+/* ─── Component ───────────────────────────────────────── */
+
 export default function CalendarPage() {
   const { user, profile } = useAuth()
   const location = useLocation()
@@ -73,10 +324,6 @@ export default function CalendarPage() {
     [user?.id, profile, location.search]
   )
   const requestedDayKey = useMemo(() => new URLSearchParams(location.search || '').get('day') || '', [location.search])
-  const satHref = useMemo(() => withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
-  const actHref = useMemo(() => withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview), [viewUserId, isAdminPreview])
-  const showResourceNav = hasUnlockedResources(viewUserId, exam)
-
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
   const [studied, setStudied] = useState({})
@@ -87,6 +334,12 @@ export default function CalendarPage() {
   const [satDate, setSatDate] = useState(() => loadSatTestDate(viewUserId, exam))
   const [studyPrefs, setStudyPrefs] = useState(() => loadStudyPrefs(viewUserId, exam))
   const availabilityLabels = dayLabels()
+
+  /* Month navigation state */
+  const todayDate = useMemo(() => new Date(), [])
+  const [viewMonth, setViewMonth] = useState(todayDate.getMonth())
+  const [viewYear, setViewYear] = useState(todayDate.getFullYear())
+  const [monthDirection, setMonthDirection] = useState(0)
 
   useEffect(() => {
     const nextDate = loadSatTestDate(viewUserId, exam)
@@ -115,19 +368,15 @@ export default function CalendarPage() {
       setLoading(false)
     })
 
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [viewUserId, isAdminPreview])
 
   const displayProfile = isAdminPreview ? targetProfile : profile
   const completed = attempts.filter(a => (a.completed_at || a.scores?.total))
   const completedForExam = completed.filter((attempt) => getExamFromTestId(attempt?.test_id) === exam)
-  const studiedForExam = Object.fromEntries(Object.entries(studied || {}).filter(([chapterId]) => Boolean(chapters?.[chapterId])))
+  const studiedForExam = useMemo(() => Object.fromEntries(Object.entries(studied || {}).filter(([chapterId]) => Boolean(chapters?.[chapterId]))), [studied, chapters])
   const latestCompleted = completedForExam[0] || null
   const hasTakenPretest = completedForExam.some(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
-  const latestMistakes = latestCompleted ? (mistakes || []).filter(m => String(m.attempt_id || '') === String(latestCompleted.id)) : []
-  // Use ALL mistakes for the exam so review count matches the Mistake Notebook
   const allExamMistakes = (mistakes || []).filter((m) => getExamFromTestId(m?.test_id) === exam)
   const allExamValidated = allExamMistakes.filter((m) => {
     const key = `${m.test_id}:${m.section}:${m.q_num}`
@@ -136,17 +385,13 @@ export default function CalendarPage() {
   const reviewTodoCount = Math.max(0, allExamMistakes.length - allExamValidated)
 
   const deriveWeakTopicsForAttempt = (attempt) => {
-    // Always recompute from raw answers + answer key for accuracy.
-    // This guarantees every missed chapter appears regardless of what was stored.
     const keyBySection = getAnswerKeyBySection(attempt?.test_id)
     if (keyBySection && attempt?.answers && Object.keys(attempt.answers).length) {
       const computed = calcWeakTopicsForTest(attempt.test_id, attempt.answers, keyBySection)
       if (computed.length) return computed
     }
-    // Fallback to stored weak_topics if recomputation isn't possible
     const normalized = normalizeWeakTopics(attempt?.weak_topics || [])
     if (normalized.length) return normalized
-    // Last resort: derive from mistakes table
     const list = (mistakes || []).filter((m) => String(m.attempt_id || '') === String(attempt?.id || '') && m.chapter_id)
     const counts = {}
     for (const m of list) {
@@ -173,27 +418,69 @@ export default function CalendarPage() {
     })
   }, [latestCompleted, hasTakenPretest, studiedForExam, reviewTodoCount, studyPrefs, satDate, mistakes, exam])
 
-  const homeHref = withViewUser(withExam('/dashboard', exam), viewUserId, isAdminPreview)
-  const guideHref = withViewUser(withExam('/guide', exam), viewUserId, isAdminPreview)
-  const resultsHref = latestCompleted ? withViewUser(withExam(`/results/${latestCompleted.id}`, exam), viewUserId, isAdminPreview) : homeHref
-  const latestResultsLabel = latestCompleted
-    ? `${examTests.find((t) => t.id === (latestCompleted.test_id === 'practice_test_11' ? 'pre_test' : latestCompleted.test_id))?.label || 'Latest Test'} Results`
-    : 'Latest Results'
-
-  const calendarCells = useMemo(() => {
-    if (!schedule?.days?.length) return []
-    const first = startOfWeek(schedule.days[0].date)
-    const last = endOfWeek(schedule.days[schedule.days.length - 1].date)
-    const map = new Map((schedule.days || []).map((day) => [day.key, day]))
-    const cells = []
-    const cursor = new Date(first)
-    while (cursor.getTime() <= last.getTime()) {
-      const key = dateKey(cursor)
-      cells.push({ key, date: new Date(cursor), day: map.get(key) || null })
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    return cells
+  /* Build a map of dateKey -> day for fast lookup */
+  const scheduleDayMap = useMemo(() => {
+    if (!schedule?.days?.length) return new Map()
+    return new Map(schedule.days.map((day) => [day.key, day]))
   }, [schedule])
+
+  /* Build month grid cells */
+  const monthCells = useMemo(() => {
+    const daysInMonth = getMonthDays(viewYear, viewMonth)
+    const firstDow = getFirstDayOfWeek(viewYear, viewMonth)
+    const cells = []
+
+    // Previous month fill
+    const prevMonth = viewMonth === 0 ? 11 : viewMonth - 1
+    const prevYear = viewMonth === 0 ? viewYear - 1 : viewYear
+    const prevDays = getMonthDays(prevYear, prevMonth)
+    for (let i = firstDow - 1; i >= 0; i--) {
+      const dayNum = prevDays - i
+      const d = new Date(prevYear, prevMonth, dayNum)
+      const key = dateKey(d)
+      cells.push({ key, date: d, dayNum, isCurrentMonth: false, scheduleDay: scheduleDayMap.get(key) || null })
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(viewYear, viewMonth, d)
+      const key = dateKey(date)
+      cells.push({ key, date, dayNum: d, isCurrentMonth: true, scheduleDay: scheduleDayMap.get(key) || null })
+    }
+
+    // Next month fill to complete the grid (always 6 rows = 42 cells)
+    const remaining = 42 - cells.length
+    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1
+    const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear
+    for (let d = 1; d <= remaining; d++) {
+      const date = new Date(nextYear, nextMonth, d)
+      const key = dateKey(date)
+      cells.push({ key, date, dayNum: d, isCurrentMonth: false, scheduleDay: scheduleDayMap.get(key) || null })
+    }
+
+    return cells
+  }, [viewYear, viewMonth, scheduleDayMap])
+
+  /* Navigate to today's month when schedule first loads (once) */
+  const monthInitRef = useRef(false)
+  useEffect(() => {
+    if (!schedule?.days?.length) return
+    if (monthInitRef.current) return
+    monthInitRef.current = true
+    // If there's a requested day, navigate to that month
+    if (requestedDayKey) {
+      const parts = requestedDayKey.split('-')
+      if (parts.length === 3) {
+        setViewYear(parseInt(parts[0]))
+        setViewMonth(parseInt(parts[1]) - 1)
+      }
+      return
+    }
+    // Otherwise show today's month
+    const today = new Date()
+    setViewYear(today.getFullYear())
+    setViewMonth(today.getMonth())
+  }, [schedule, requestedDayKey])
 
   useEffect(() => {
     if (!schedule?.days?.length) return
@@ -221,13 +508,28 @@ export default function CalendarPage() {
       const idx = days.findIndex((d) => d.key === selectedDayKey)
       if (idx < 0) return
       const next = e.key === 'ArrowLeft' ? idx - 1 : idx + 1
-      if (next >= 0 && next < days.length) setSelectedDayKey(days[next].key)
+      if (next >= 0 && next < days.length) {
+        const nextDay = days[next]
+        setSelectedDayKey(nextDay.key)
+        // Navigate view to show the selected day's month
+        const d = new Date(nextDay.date)
+        setViewYear(d.getFullYear())
+        setViewMonth(d.getMonth())
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [schedule, selectedDayKey])
 
+  const homeHref = withViewUser(withExam('/dashboard', exam), viewUserId, isAdminPreview)
+  const guideHref = withViewUser(withExam('/guide', exam), viewUserId, isAdminPreview)
+  const resultsHref = latestCompleted ? withViewUser(withExam(`/results/${latestCompleted.id}`, exam), viewUserId, isAdminPreview) : homeHref
+  const latestResultsLabel = latestCompleted
+    ? `${examTests.find((t) => t.id === (latestCompleted.test_id === 'practice_test_11' ? 'pre_test' : latestCompleted.test_id))?.label || 'Latest Test'} Results`
+    : 'Latest Results'
+
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+
   function updateJourneyDate(nextDate) {
     if (isAdminPreview) return
     setSatDate(nextDate)
@@ -244,101 +546,129 @@ export default function CalendarPage() {
     try { saveStudyPrefs(viewUserId, next, exam) } catch {}
   }
 
+  const goToPrevMonth = useCallback(() => {
+    setMonthDirection(-1)
+    if (viewMonth === 0) {
+      setViewMonth(11)
+      setViewYear(y => y - 1)
+    } else {
+      setViewMonth(m => m - 1)
+    }
+  }, [viewMonth])
+
+  const goToNextMonth = useCallback(() => {
+    setMonthDirection(1)
+    if (viewMonth === 11) {
+      setViewMonth(0)
+      setViewYear(y => y + 1)
+    } else {
+      setViewMonth(m => m + 1)
+    }
+  }, [viewMonth])
+
+  const goToToday = useCallback(() => {
+    const t = new Date()
+    setMonthDirection(t.getFullYear() * 12 + t.getMonth() > viewYear * 12 + viewMonth ? 1 : -1)
+    setViewYear(t.getFullYear())
+    setViewMonth(t.getMonth())
+    setSelectedDayKey(dateKey(t))
+  }, [viewYear, viewMonth])
+
+  const todayKey = dateKey(todayDate)
+  const testDateKey = satDate || ''
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+  /* ─── Loading state ─── */
   if (loading) {
     return (
-      <>
-        <Navbar
-          homeHref={homeHref}
-          guideHref={guideHref}
-          mistakesHref={viewHref('/mistakes')}
-          calendarHref={viewHref('/calendar')}
-          isAdminPreview={isAdminPreview}
-          currentExam={exam}
-          satHref={satHref}
-          actHref={actHref}
-          showResources={showResourceNav}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
-          Loading calendar…
+      <div className="app-layout has-sidebar">
+        <Sidebar currentExam={exam} />
+        <div className="page fade-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{ color: '#94a3b8', fontSize: 15, fontWeight: 500 }}
+          >
+            Loading calendar...
+          </motion.div>
         </div>
-      </>
+      </div>
     )
   }
 
+  /* ─── Main render ─── */
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar
-        homeHref={homeHref}
-        guideHref={guideHref}
-        mistakesHref={viewHref('/mistakes')}
-        calendarHref={viewHref('/calendar')}
-        isAdminPreview={isAdminPreview}
-        currentExam={exam}
-        satHref={satHref}
-        actHref={actHref}
-        showResources={showResourceNav}
-      />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
+
+        {/* Admin preview banner */}
         {isAdminPreview && (
-          <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
-            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>Admin View</div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              marginBottom: 20, padding: '14px 20px', borderRadius: 14,
+              background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))',
+              color: 'white',
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Admin View</div>
             <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-              You’re previewing {displayProfile?.full_name || 'this student'}’s adaptive schedule. This view is read-only.
+              You are previewing {displayProfile?.full_name || 'this student'}'s adaptive schedule. This view is read-only.
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 18 }}>
-          <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Icon name="calendar" size={20} />
-              Smart Journey Calendar
-            </h1>
-            <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Click a day to see the exact study guide chapters and follow-up tasks assigned between now and your {examConfig.label} test window.
+        {/* Page header */}
+        <div style={S.header}>
+          <div style={S.headerTop}>
+            <div>
+              <h1 style={S.title}>Study Calendar</h1>
+              <p style={S.subtitle}>
+                Your personalized {examConfig.label} study plan, day by day. Click any date to see scheduled tasks.
+              </p>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn btn-outline" onClick={() => navigate(-1)}>
-              <Icon name="back" size={16} />
-              Back
-            </button>
-            <Link className="btn btn-outline" to={homeHref}>
-              <Icon name="home" size={16} />
-              Dashboard
-            </Link>
-            <Link className="btn btn-outline" to={guideHref}>Open Study Guide →</Link>
-            <Link className="btn btn-outline" to={resultsHref}>{latestResultsLabel} →</Link>
+            <div style={S.navBtns}>
+              <button style={S.navBtn} onClick={() => navigate(-1)}>
+                <Icon name="back" size={15} /> Back
+              </button>
+              <Link style={S.navBtn} to={homeHref}>
+                <Icon name="home" size={15} /> Dashboard
+              </Link>
+              <Link style={S.navBtn} to={guideHref}>Study Guide</Link>
+            </div>
           </div>
         </div>
 
+        {/* Journey settings */}
         {hasTakenPretest && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="calendar" size={16} />
-                  Journey Settings
-                </div>
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Edit your test date and available days here. Your Smart Journey tasks update from your latest test results and automatically roll missed work forward.
-                </div>
-              </div>
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            style={S.settingsCard}
+          >
+            <div style={S.settingsTitle}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <Icon name="settings" size={15} />
+                Journey Settings
+              </span>
+            </div>
+            <div style={S.settingsDesc}>
+              Set your test date and available study days. Tasks update automatically based on your latest results.
             </div>
 
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                Official or estimated test date:
-                <input
-                  type="date"
-                  value={satDate || ''}
-                  onChange={(e) => {
-                    updateJourneyDate(e.target.value)
-                  }}
-                  disabled={isAdminPreview}
-                  style={{ padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: 'white' }}
-                />
-              </label>
+            {/* Test date row */}
+            <div style={{ ...S.settingsRow, marginBottom: 12 }}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, minWidth: 80 }}>Test date</span>
+              <input
+                type="date"
+                value={satDate || ''}
+                onChange={(e) => updateJourneyDate(e.target.value)}
+                disabled={isAdminPreview}
+                style={S.dateInput}
+              />
               {!isAdminPreview && (() => {
                 const dates = UPCOMING_TEST_DATES[exam] || []
                 const today = new Date().toISOString().slice(0, 10)
@@ -349,16 +679,7 @@ export default function CalendarPage() {
                     key={d.date}
                     type="button"
                     onClick={() => updateJourneyDate(d.date)}
-                    style={{
-                      padding: '5px 10px',
-                      fontSize: 11,
-                      fontWeight: 800,
-                      border: satDate === d.date ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
-                      borderRadius: 8,
-                      background: satDate === d.date ? 'rgba(14,165,233,.10)' : 'white',
-                      color: satDate === d.date ? '#0369a1' : '#64748b',
-                      cursor: 'pointer',
-                    }}
+                    style={S.dateChip(satDate === d.date)}
                   >
                     {d.label}
                   </button>
@@ -366,148 +687,306 @@ export default function CalendarPage() {
               })()}
             </div>
 
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>Available days:</div>
+            {/* Available days row */}
+            <div style={S.settingsRow}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, minWidth: 80 }}>Study days</span>
               {availabilityLabels.map((label, index) => {
                 const enabled = Boolean(studyPrefs?.days?.[index])
                 return (
                   <button
                     key={label}
                     type="button"
-                    className="btn btn-outline"
                     disabled={isAdminPreview}
                     onClick={() => toggleJourneyDay(index)}
-                    style={{
-                      padding: '7px 12px',
-                      fontSize: 12,
-                      background: enabled ? 'rgba(14,165,233,.10)' : 'white',
-                      borderColor: enabled ? 'rgba(14,165,233,.35)' : '#e2e8f0',
-                      color: enabled ? '#0f172a' : '#64748b',
-                    }}
+                    style={S.dayChip(enabled)}
                   >
                     {label}
                   </button>
                 )
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
-                Your Smart Journey updates automatically each time you change your test date or available days.
-                {schedule?.needsMoreTime ? (
-                  <>
-                    {' '}To stay on track, plan for about <b>{schedule.requiredMinutesPerDay} minutes on each study day</b>. If that feels too heavy, add more available days or move your test date back.
-                  </>
-                ) : (
-                  <> Missed work automatically moves into the next available study day.</>
-                )}
+
+            {schedule?.needsMoreTime && (
+              <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 14, lineHeight: 1.6, fontWeight: 500 }}>
+                Plan for about <strong>{schedule.requiredMinutesPerDay} minutes per study day</strong> to stay on track. Add more days or push your test date back if needed.
               </div>
-            </div>
-          </div>
+            )}
+          </motion.div>
         )}
 
+        {/* Calendar content */}
         {!schedule ? (
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No calendar yet</div>
-              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Take the {examConfig.tests.find((test) => test.id === examConfig.preTestId)?.label || 'Pre Test'} first, then the Smart Journey calendar will fill in with day-by-day study guide tasks.
-              </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              ...S.calContainer, textAlign: 'center',
+              padding: '48px 28px', color: '#64748b',
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: 14, opacity: 0.3 }}>
+              <Icon name="calendar" size={36} />
+            </div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 17, fontWeight: 700, color: '#1a2744', marginBottom: 8 }}>
+              No calendar yet
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
+              Take the {examConfig.tests.find((test) => test.id === examConfig.preTestId)?.label || 'Pre Test'} first.
+              Your personalized study calendar will appear here with day-by-day tasks.
+            </div>
+          </motion.div>
         ) : (
-          <div className="calendar-layout">
-            <div className="card dashboard-section-card" style={{ padding: 16 }}>
-              <div className="calendar-weekdays">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
-                  <div key={label}>{label}</div>
+          <>
+            {/* Month calendar */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+              style={S.calContainer}
+            >
+              {/* Month navigation */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); goToPrevMonth() }}
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      border: '1px solid #e5e7eb', background: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', color: '#475569',
+                    }}
+                    aria-label="Previous month"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); goToNextMonth() }}
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      border: '1px solid #e5e7eb', background: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', color: '#475569',
+                    }}
+                    aria-label="Next month"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </div>
+
+                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, color: '#1a2744', pointerEvents: 'none' }}>
+                  {monthNames[viewMonth]} {viewYear}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goToToday() }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 10,
+                    border: '1px solid #0ea5e9', background: '#fff',
+                    color: '#0ea5e9', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Today
+                </button>
+              </div>
+
+              {/* Weekday headers */}
+              <div style={S.weekRow}>
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+                  <div key={d} style={S.weekLabel}>{d}</div>
                 ))}
               </div>
-              <div className="calendar-grid">
-                {calendarCells.map(({ key, date, day }) => {
-                  const isSelected = selectedDay?.key === key
-                  const isInPlan = Boolean(day)
-                  const isToday = Boolean(day?.isToday)
+
+              {/* Day grid */}
+              <div style={S.dayGrid}>
+                {monthCells.map((cell) => {
+                  const isInPlan = Boolean(cell.scheduleDay)
+                  const isSelected = selectedDayKey === cell.key
+                  const isToday = cell.key === todayKey
+                  const isTestDate = cell.key === testDateKey
+                  const isCurrentMonth = cell.isCurrentMonth
+
+                  // Determine task dots
+                  const dots = []
+                  if (cell.scheduleDay?.tasks?.length) {
+                    const seen = new Set()
+                    for (const task of cell.scheduleDay.tasks) {
+                      const c = getTaskDotColor(task)
+                      if (!seen.has(c)) {
+                        seen.add(c)
+                        dots.push(c)
+                      }
+                      if (dots.length >= 3) break
+                    }
+                  }
+
                   return (
                     <button
-                      key={key}
+                      key={cell.key}
                       type="button"
-                      onClick={() => isInPlan && setSelectedDayKey(key)}
-                      disabled={!isInPlan}
-                      className={`calendar-cell${isSelected ? ' selected' : ''}${isToday ? ' today' : ''}${!isInPlan ? ' muted' : ''}`}
+                      onClick={() => {
+                        if (isInPlan) setSelectedDayKey(cell.key)
+                      }}
+                      style={S.dayCell(isSelected, isToday, isInPlan, isTestDate, isCurrentMonth)}
+                      onMouseEnter={(e) => {
+                        if (!isInPlan) return
+                        if (!isSelected) {
+                          e.currentTarget.style.background = '#f8fafc'
+                        }
+                        const numEl = e.currentTarget.querySelector('.day-num')
+                        if (numEl && !isSelected && !isTestDate) {
+                          numEl.style.background = '#f1f5f9'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isInPlan) return
+                        if (!isSelected) {
+                          e.currentTarget.style.background = 'transparent'
+                        }
+                        const numEl = e.currentTarget.querySelector('.day-num')
+                        if (numEl && !isSelected && !isTestDate) {
+                          numEl.style.background = 'transparent'
+                        }
+                      }}
                     >
-                      <div className="calendar-cell-date">{date.getDate()}</div>
-                      {isInPlan ? (
-                        <>
-                          <div className="calendar-cell-focus">{day.focus}</div>
-                          <div className="calendar-cell-count">
-                            {day.tasks.length ? `${day.tasks.length} task${day.tasks.length === 1 ? '' : 's'}` : 'Review / rest'}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="calendar-cell-count">—</div>
-                      )}
+                      <div
+                        className="day-num"
+                        style={S.dayNum(isSelected, isToday, isInPlan, isTestDate, isCurrentMonth)}
+                      >
+                        {cell.dayNum}
+                      </div>
+
+                      {/* Task dots */}
+                      <div style={S.dotsRow}>
+                        {dots.map((color, i) => (
+                          <motion.div
+                            key={color}
+                            custom={i}
+                            variants={dotPop}
+                            initial="hidden"
+                            animate="visible"
+                            style={S.dot(color)}
+                          />
+                        ))}
+                      </div>
                     </button>
                   )
                 })}
               </div>
-            </div>
 
-            <div className="card dashboard-section-card" style={{ padding: 16 }}>
-              {selectedDay ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
+              {/* Legend */}
+              <div style={S.legend}>
+                <div style={S.legendItem}>
+                  <div style={{ ...S.dot('#0ea5e9'), width: 8, height: 8 }} /> Study
+                </div>
+                <div style={S.legendItem}>
+                  <div style={{ ...S.dot('#f97316'), width: 8, height: 8 }} /> Test
+                </div>
+                <div style={S.legendItem}>
+                  <div style={{ ...S.dot('#10b981'), width: 8, height: 8 }} /> Review
+                </div>
+                <div style={S.legendItem}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    border: '2px solid #0ea5e9', background: 'transparent',
+                  }} />
+                  Today
+                </div>
+                {testDateKey && (
+                  <div style={S.legendItem}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#f97316',
+                    }} />
+                    Test date
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Selected day panel */}
+            <AnimatePresence mode="wait">
+              {selectedDay && (
+                <motion.div
+                  key={selectedDayKey}
+                  variants={panelReveal}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  style={S.panel}
+                >
+                  <div style={S.panelHeader}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }}>
-                        {selectedDay.isToday ? 'Today' : selectedDay.date.toLocaleDateString(undefined, { weekday: 'long' })}
+                      <div style={S.panelDay}>
+                        {selectedDay.isToday
+                          ? 'Today'
+                          : selectedDay.date.toLocaleDateString(undefined, { weekday: 'long' })}
                       </div>
-                      <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 20, fontWeight: 900, color: '#1a2744' }}>
-                        {selectedDay.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                      <div style={S.panelDate}>
+                        {selectedDay.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
-                        {selectedDay.estimatedMinutes ? `About ${selectedDay.estimatedMinutes} minutes planned` : 'Light review day'}
+                      <div style={S.panelTime}>
+                        <Icon name="clock" size={14} />
+                        {selectedDay.estimatedMinutes
+                          ? `${selectedDay.estimatedMinutes} min planned`
+                          : 'Light review day'}
                       </div>
                     </div>
-                    <div style={{
-                      padding: '6px 12px',
-                      borderRadius: 999,
-                      background: selectedDay.focus === 'Reading' ? 'rgba(59,130,246,.12)' : selectedDay.focus === 'Math' ? 'rgba(16,185,129,.12)' : 'rgba(148,163,184,.16)',
-                      color: selectedDay.focus === 'Reading' ? '#2563eb' : selectedDay.focus === 'Math' ? '#059669' : '#64748b',
-                      fontSize: 12,
-                      fontWeight: 900,
-                    }}>
+                    <div style={S.focusBadge(selectedDay.focus)}>
                       {selectedDay.focus}
                     </div>
                   </div>
 
+                  {/* Task cards */}
                   <div style={{ display: 'grid', gap: 10 }}>
-                    {selectedDay.tasks.length ? selectedDay.tasks.map((task) => (
-                      <Link
+                    {selectedDay.tasks.length ? selectedDay.tasks.map((task, i) => (
+                      <motion.div
                         key={task.id}
-                        to={viewHref(task.href)}
-                        className="journey-day-card"
-                        style={{
-                          '--day-index': 0,
-                          textDecoration: 'none',
-                          color: '#0f172a',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 14,
-                          padding: 14,
-                          background: '#f8fafc',
-                        }}
+                        custom={i}
+                        variants={taskCard}
+                        initial="hidden"
+                        animate="visible"
                       >
-                        <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 4 }}>{task.title}</div>
-                        <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>{task.subtitle}</div>
-                      </Link>
+                        <Link
+                          to={viewHref(task.href)}
+                          style={S.taskCard}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#0ea5e9'
+                            e.currentTarget.style.boxShadow = '0 4px 14px rgba(14,165,233,.1)'
+                            e.currentTarget.style.transform = 'translateY(-1px)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#f1f5f9'
+                            e.currentTarget.style.boxShadow = 'none'
+                            e.currentTarget.style.transform = 'translateY(0)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                            <div style={{
+                              width: 6, height: 6, borderRadius: '50%', marginTop: 7, flexShrink: 0,
+                              background: getTaskDotColor(task),
+                            }} />
+                            <div>
+                              <div style={S.taskTitle}>{task.title}</div>
+                              <div style={S.taskSub}>{task.subtitle}</div>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
                     )) : (
-                      <div style={{ border: '1px dashed #cbd5e1', borderRadius: 14, padding: 14, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                        No required tasks on this day. Use it for catch-up, a light review set, or a confidence reset.
+                      <div style={S.emptyTask}>
+                        No scheduled tasks. Use this day for catch-up, light review, or rest.
                       </div>
                     )}
                   </div>
-                </>
-              ) : (
-                <div style={{ color: '#64748b', fontSize: 13 }}>Select a day to see its tasks.</div>
+                </motion.div>
               )}
-            </div>
-          </div>
+            </AnimatePresence>
+          </>
         )}
       </div>
     </div>

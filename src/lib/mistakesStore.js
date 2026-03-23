@@ -159,13 +159,21 @@ export async function loadReviewItems(userId) {
   return { source: 'local', items: listLocalReviewItems(userId) }
 }
 
-export function computeDueCount(reviewItems, now = new Date()) {
+export function computeDueCount(reviewItems, now = new Date(), { exam = '' } = {}) {
   const t = now.getTime()
   let n = 0
-  Object.values(reviewItems || {}).forEach((it) => {
+  for (const [key, it] of Object.entries(reviewItems || {})) {
+    // Skip already-validated items
+    if (it?.last_correct === true) continue
+    // Filter by exam if specified (key format: "test_id:section:q_num")
+    if (exam) {
+      const isAct = key.startsWith('act')
+      if (exam === 'act' && !isAct) continue
+      if (exam === 'sat' && isAct) continue
+    }
     const due = new Date(it?.due_at || 0).getTime()
     if (Number.isFinite(due) && due <= t) n += 1
-  })
+  }
   return n
 }
 

@@ -1,124 +1,206 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { TESTS } from '../data/tests.js'
+import { motion } from 'framer-motion'
+import BrandLink from '../components/BrandLink.jsx'
+import Icon from '../components/AppIcons.jsx'
+import ExamSwitcher from '../components/ExamSwitcher.jsx'
+import Sidebar from '../components/Sidebar.jsx'
+import { loadDashboardViewData } from '../lib/dashboardData.js'
+import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
+import { getAnswerKeyBySection } from '../data/answerKeys.js'
+import {
+  getChaptersForExam,
+  getExamConfig,
+  getScoreColumnsForExam,
+  scoreAttemptFromKey,
+  calcWeakTopicsForTest,
+} from '../data/examData.js'
+import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
+import { chooseDashboardExam } from '../lib/examChoice.js'
+import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { getStudiedTopics } from '../lib/studyProgress.js'
 import { loadMistakes, loadReviewItems, computeDueCount } from '../lib/mistakesStore.js'
 import { toLocalDateKey, computeStreak } from '../lib/progressMetrics.js'
 import { encodeReportToQuery } from '../lib/reportShare.js'
-import BrandLink from '../components/BrandLink.jsx'
-import Icon from '../components/AppIcons.jsx'
-import ExamSwitcher from '../components/ExamSwitcher.jsx'
-import { getExamConfig, scoreAttemptFromKey } from '../data/examData.js'
-import { getExamFromTestId } from '../data/tests.js'
-import { getAnswerKeyBySection } from '../data/answerKeys.js'
-import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
-import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
-function Navbar({ dashboardHref, mistakesHref, currentExam, satHref, actHref }) {
-  const navigate = useNavigate()
-  return (
-    <nav className="nav">
-      <BrandLink to={dashboardHref} />
-      <div className="nav-actions">
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-          title="Go back"
-        >
-          <Icon name="back" size={15} />
-          Back
-        </button>
-        <Link to={dashboardHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Dashboard
-        </Link>
-        <Link to={mistakesHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Mistakes
-        </Link>
-      </div>
-    </nav>
-  )
+/* ── helpers ─────────────────────────────────────────── */
+
+const cardStyle = {
+  border: '1px solid rgba(15,23,42,.10)',
+  borderRadius: 16,
+  padding: 20,
+  background: 'white',
+  marginBottom: 18,
 }
 
-function useQuery() {
-  const { search } = useLocation()
-  return useMemo(() => new URLSearchParams(search || ''), [search])
+const headingStyle = {
+  fontFamily: 'Sora,sans-serif',
+  fontSize: 15,
+  fontWeight: 800,
+  marginBottom: 12,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  color: '#0f172a',
+  letterSpacing: '0.02em',
 }
+
+const fadeUp = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: 'easeOut' },
+}
+
+const stagger = (i) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.35, delay: i * 0.06 },
+})
+
+function computeScoresFromAnswers(attempt) {
+  try {
+    const keyBySection = getAnswerKeyBySection(attempt?.test_id) || null
+    if (!keyBySection) return null
+    return scoreAttemptFromKey(attempt?.test_id, attempt?.answers || {}, keyBySection)
+  } catch {
+    return null
+  }
+}
+
+function computeWeakTopics(attempt) {
+  try {
+    if (Array.isArray(attempt?.weak_topics) && attempt.weak_topics.length) return attempt.weak_topics
+    const tid = normalizeTestId(attempt?.test_id)
+    const keyBySection = getAnswerKeyBySection(tid) || {}
+    return calcWeakTopicsForTest(tid, attempt?.answers || {}, keyBySection)
+  } catch {
+    return []
+  }
+}
+
+function resolveScores(attempt) {
+  if (attempt?.scores?.total || attempt?.scores?.composite) return attempt.scores
+  if (attempt?.answers && Object.keys(attempt.answers).length) {
+    try {
+      const testId = attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id
+      const keyBySection = getAnswerKeyBySection(testId)
+      if (keyBySection) {
+        const rescored = scoreAttemptFromKey(testId, attempt.answers, keyBySection)
+        if (rescored?.total || rescored?.composite) return rescored
+      }
+    } catch {}
+  }
+  return attempt?.scores || {}
+}
+
+/* ── component ───────────────────────────────────────── */
 
 export default function Report() {
   const { user, profile } = useAuth()
-  const q = useQuery()
-  const requestedExam = String(q.get('exam') || '').toLowerCase()
-  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : getInitialPreferredExam(user)
-  const examConfig = getExamConfig(exam)
-  const { viewUserId, isAdminPreview, isAdmin, isTutor } = resolveViewContext({ userId: user?.id, profile, search: q.toString() ? `?${q.toString()}` : '' })
+  const location = useLocation()
+  const navigate = useNavigate()
+  const searchParams = useMemo(() => new URLSearchParams(location.search || ''), [location.search])
+  const requestedExam = String(searchParams.get('exam') || '').toLowerCase()
+
+  const { viewUserId, isAdminPreview, isAdmin, isTutor } = useMemo(
+    () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
+    [user?.id, profile, location.search]
+  )
   const targetUser = viewUserId || user?.id
   const canView = (String(targetUser) === String(user?.id)) || isAdmin || isTutor
-  const viewHref = (path) => withViewUser(withExam(path, exam), targetUser, isAdminPreview)
-  const satHref = withViewUser(withExam('/dashboard', 'sat'), targetUser, isAdminPreview)
-  const actHref = withViewUser(withExam('/dashboard', 'act'), targetUser, isAdminPreview)
 
-  const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
+  const [studied, setStudied] = useState({})
   const [studiedRows, setStudiedRows] = useState([])
   const [mistakes, setMistakes] = useState([])
   const [reviewItems, setReviewItems] = useState({})
   const [targetProfile, setTargetProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
 
+  const chosenExam = chooseDashboardExam({ user, attempts, explicitExam: requestedExam })
+  const exam = requestedExam === 'act' || requestedExam === 'sat' ? requestedExam : chosenExam
+  const examConfig = getExamConfig(exam)
+  const examTests = getTestsForExam(exam)
+  const chaptersForExam = getChaptersForExam(exam)
+  const scoreColumns = getScoreColumnsForExam(exam)
+  const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
+
+  /* ── data loading ──────────────────────────────────── */
   useEffect(() => {
-    if (!supabase || !targetUser || !canView) return
+    if (!user || !targetUser || !canView) return
     let cancelled = false
     setLoading(true)
+
     Promise.allSettled([
-      supabase.from('test_attempts').select('*').eq('user_id', targetUser).order('started_at', { ascending: false }),
+      loadDashboardViewData(targetUser),
       supabase.from('post_scores').select('*').eq('user_id', targetUser).order('recorded_at', { ascending: false }),
       getStudiedTopics(targetUser),
       loadMistakes(targetUser),
       loadReviewItems(targetUser),
       supabase.from('profiles').select('*').eq('id', targetUser).maybeSingle(),
-    ]).then(([a, p, st, m, r, pr]) => {
+    ]).then(([dash, ps, st, m, r, pr]) => {
       if (cancelled) return
-      setAttempts(a.status === 'fulfilled' ? (a.value.data || []) : [])
-      setPostScores(p.status === 'fulfilled' ? (p.value.data || []) : [])
-      setStudiedRows(st.status === 'fulfilled' ? (st.value.rows || []) : [])
-      setMistakes(m.status === 'fulfilled' ? (m.value.items || []) : [])
-      setReviewItems(r.status === 'fulfilled' ? (r.value.items || {}) : {})
+      const dashData = dash.status === 'fulfilled' ? dash.value : {}
+      setAttempts(dashData?.attempts || [])
+      setPostScores(ps.status === 'fulfilled' ? (ps.value.data || []) : (dashData?.postScores || []))
+      setStudied(dashData?.studiedMap || {})
+      setStudiedRows(st.status === 'fulfilled' ? (st.value.rows || []) : (dashData?.studiedRows || []))
+      setMistakes(m.status === 'fulfilled' ? (m.value.items || []) : (dashData?.mistakes || []))
+      setReviewItems(r.status === 'fulfilled' ? (r.value.items || {}) : (dashData?.reviewItems || {}))
       setTargetProfile(pr.status === 'fulfilled' ? (pr.value.data || null) : null)
       setLoading(false)
     }).catch(() => {
       if (!cancelled) setLoading(false)
     })
-    return () => {
-      cancelled = true
-    }
-  }, [targetUser, canView])
 
-  function resolveScores(attempt) {
-    if (attempt?.scores?.total || attempt?.scores?.composite) return attempt.scores
-    if (attempt?.answers && Object.keys(attempt.answers).length) {
-      try {
-        const testId = attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id
-        const keyBySection = getAnswerKeyBySection(testId)
-        if (keyBySection) {
-          const rescored = scoreAttemptFromKey(testId, attempt.answers, keyBySection)
-          if (rescored?.total || rescored?.composite) return rescored
-        }
-      } catch {}
-    }
-    return attempt?.scores || {}
-  }
+    return () => { cancelled = true }
+  }, [user, targetUser, canView])
 
-  const report = useMemo(() => {
-    const completed = (attempts || []).filter(a => (a.completed_at || a.scores?.total) && getExamFromTestId(a.test_id) === exam)
-    const completedPre = completed.filter(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
+  /* ── derived data (from Overview) ──────────────────── */
+  const examAttemptIds = new Set(examTests.map((t) => t.id))
+  const examAttempts = attempts.filter((a) => examAttemptIds.has(normalizeTestId(a?.test_id)))
+  const completed = examAttempts.filter((a) => a.completed_at || a.scores?.total)
+  const completedWithScores = completed
+    .map((attempt) => ({
+      attempt,
+      scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}),
+    }))
+    .filter((e) => e.scores?.total)
+
+  const studiedForExam = Object.fromEntries(Object.entries(studied || {}).filter(([ch]) => Boolean(chaptersForExam?.[ch])))
+  const studiedCount = Object.values(studiedForExam).filter(Boolean).length
+  const studiedPct = Math.round((studiedCount / Math.max(1, examConfig.guideCompletionTarget)) * 100)
+  const mistakesForExam = (mistakes || []).filter((m) => getExamFromTestId(m?.test_id) === exam)
+  const validatedCount = mistakesForExam.filter((m) => {
+    const k = `${m.test_id}:${m.section}:${m.q_num}`
+    return reviewItems?.[k]?.last_correct === true
+  }).length
+
+  const best = completedWithScores.reduce((b, e) => (!b || Number(e.scores.total) > Number(b.scores.total) ? e : b), null)
+  const lowest = completedWithScores.reduce((b, e) => (!b || Number(e.scores.total) < Number(b.scores.total) ? e : b), null)
+  const recent = completedWithScores[0] || null
+  const improvement = recent && lowest ? Number(recent.scores.total) - Number(lowest.scores.total) : null
+
+  const sectionAvgs = useMemo(() => {
+    const cols = scoreColumns.filter((c) => c.key !== 'total')
+    return cols.map((col) => {
+      const vals = completedWithScores.map((e) => Number(e.scores[col.key] || 0)).filter((v) => v > 0)
+      const avg = vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null
+      return { label: col.label, key: col.key, avg }
+    })
+  }, [completedWithScores, scoreColumns])
+
+  /* ── derived data (from Report) ────────────────────── */
+  const reportData = useMemo(() => {
+    const completedForExam = (attempts || []).filter(a => (a.completed_at || a.scores?.total) && getExamFromTestId(a.test_id) === exam)
+    const completedPre = completedForExam.filter(a => a.test_id === examConfig.preTestId || (exam === 'sat' && a.test_id === 'practice_test_11'))
     const bestPre = completedPre
       .map(a => {
         const sc = resolveScores(a)
@@ -127,9 +209,9 @@ export default function Report() {
       .filter(Boolean)
       .reduce((m, v) => Math.max(m, v), 0) || null
     const latestPost = postScores?.[0]?.post_score || null
-    const improvement = bestPre && latestPost ? (latestPost - bestPre) : null
-    const studiedCount = (studiedRows || []).filter(r => r.completed && examConfig.chapters?.[r.chapter_id]).length
-    const dueReviews = computeDueCount(reviewItems)
+    const prePostImprovement = bestPre && latestPost ? (latestPost - bestPre) : null
+    const studiedChapterCount = (studiedRows || []).filter(r => r.completed && examConfig.chapters?.[r.chapter_id]).length
+    const dueReviews = computeDueCount(reviewItems, new Date(), { exam })
 
     const activityKeys = (() => {
       const set = new Set()
@@ -154,20 +236,7 @@ export default function Report() {
 
     const streak = computeStreak(activityKeys)
     const extraTests = TESTS.filter(t => t.kind === 'extra' && t.exam === exam)
-    const completedExtra = completed.filter(a => extraTests.some(t => t.id === a.test_id)).length
-
-    const series = completed
-      .map(a => {
-        const sc = resolveScores(a)
-        const total = Number(sc?.composite || sc?.total || 0)
-        return { a, total }
-      })
-      .filter(({ total }) => total > 0)
-      .sort((x, y) => new Date(x.a.started_at).getTime() - new Date(y.a.started_at).getTime())
-      .map(({ a, total }) => {
-        const t = TESTS.find(tt => tt.id === (a.test_id === 'practice_test_11' ? 'pre_test' : a.test_id))
-        return { label: t?.label || a.test_id, date: new Date(a.started_at).toLocaleDateString(), total }
-      })
+    const completedExtra = completedForExam.filter(a => extraTests.some(t => t.id === a.test_id)).length
 
     return {
       generated_at: new Date().toISOString(),
@@ -175,14 +244,13 @@ export default function Report() {
       summary: {
         best_pretest: bestPre,
         latest_post: latestPost,
-        improvement,
-        studied_count: studiedCount,
+        improvement: prePostImprovement,
+        studied_count: studiedChapterCount,
         due_reviews: dueReviews,
         streak_current: streak.current,
         streak_best: streak.best,
         completed_extra: completedExtra,
       },
-      series,
       mistakes: (mistakes || []).filter((m) => getExamFromTestId(m.test_id) === exam).slice(0, 200).map(m => ({
         test: m.test_id,
         section: m.section,
@@ -195,13 +263,12 @@ export default function Report() {
   }, [attempts, postScores, studiedRows, mistakes, reviewItems, targetProfile?.full_name, targetProfile?.email, exam, examConfig.preTestId])
 
   const shareUrl = useMemo(() => {
-    if (!report) return null
-    // Keep share links short and reliable (iMessage can truncate long URLs).
+    if (!reportData) return null
     const sharePayload = {
-      generated_at: report.generated_at,
-      student: { name: report.student?.name || null },
-      summary: report.summary,
-      series: report.series,
+      generated_at: reportData.generated_at,
+      student: { name: reportData.student?.name || null },
+      summary: reportData.summary,
+      series: [],
     }
     try {
       const encoded = encodeReportToQuery(sharePayload)
@@ -209,31 +276,88 @@ export default function Report() {
     } catch {
       return null
     }
-  }, [report])
+  }, [reportData])
 
+  /* ── score trend (composite/total) ─────────────────── */
   const trendData = useMemo(() => {
-    if (!report?.series || report.series.length < 2) return null
+    const sorted = [...completedWithScores].reverse()
     return {
-      labels: report.series.map(s => `${s.label} · ${s.date}`),
+      labels: sorted.map((e) => {
+        const t = TESTS.find((x) => x.id === normalizeTestId(e.attempt.test_id))
+        return t?.shortLabel || t?.label || 'Test'
+      }),
       datasets: [{
-        label: 'Total Score',
-        data: report.series.map(s => s.total),
-        borderColor: '#1a2744',
-        backgroundColor: 'rgba(26,39,68,.08)',
-        pointBackgroundColor: '#f59e0b',
-        tension: 0.25,
-        fill: true,
-      }]
+        label: exam === 'act' ? 'ACT Composite' : 'SAT Total',
+        data: sorted.map((e) => Number(e.scores.total || e.scores.composite || 0)),
+        borderColor: '#0ea5e9',
+        backgroundColor: 'rgba(14,165,233,.15)',
+        tension: 0.3,
+        pointRadius: 5,
+        pointBackgroundColor: '#0ea5e9',
+      }],
     }
-  }, [report?.series])
+  }, [completedWithScores, exam])
+
+  /* ── section trend (per-section lines) ─────────────── */
+  const sectionTrendData = useMemo(() => {
+    const sorted = [...completedWithScores].reverse()
+    const cols = scoreColumns.filter((c) => c.key !== 'total')
+    const colors = ['#2563eb', '#10b981', '#8b5cf6', '#f97316']
+    return {
+      labels: sorted.map((e) => {
+        const t = TESTS.find((x) => x.id === normalizeTestId(e.attempt.test_id))
+        return t?.shortLabel || t?.label || 'Test'
+      }),
+      datasets: cols.map((col, i) => ({
+        label: col.label,
+        data: sorted.map((e) => Number(e.scores[col.key] || 0)),
+        borderColor: colors[i % colors.length],
+        backgroundColor: `${colors[i % colors.length]}22`,
+        tension: 0.3,
+        pointRadius: 4,
+      })),
+    }
+  }, [completedWithScores, scoreColumns])
+
+  /* ── weak topics (aggregated) ──────────────────────── */
+  const topWeakTopics = useMemo(() => {
+    const counts = {}
+    for (const { attempt } of completedWithScores) {
+      const weak = computeWeakTopics(attempt)
+      for (const topic of weak) {
+        const ch = String(topic.ch || '')
+        if (!ch) continue
+        if (!counts[ch]) counts[ch] = { ...topic, ch, count: 0 }
+        counts[ch].count += Number(topic.count || 1)
+      }
+    }
+    return Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 8)
+  }, [completedWithScores])
+
+  /* ── test history table ────────────────────────────── */
+  const testHistory = useMemo(() => {
+    return completedWithScores.map(({ attempt, scores }) => {
+      const test = TESTS.find((t) => t.id === normalizeTestId(attempt.test_id))
+      return {
+        id: attempt.id,
+        label: test?.label || 'Test',
+        date: attempt.started_at ? new Date(attempt.started_at).toLocaleDateString() : '—',
+        total: scores.total || scores.composite || '—',
+        sections: scoreColumns.filter((c) => c.key !== 'total').map((c) => ({ label: c.label, val: scores[c.key] || '—' })),
+      }
+    })
+  }, [completedWithScores, scoreColumns])
+
   const completedAttempts = useMemo(() => (attempts || []).filter(a => a.completed_at || a.scores?.total), [attempts])
+
+  /* ── renders ───────────────────────────────────────── */
 
   if (!canView) {
     return (
-      <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
+      <div className="app-layout has-sidebar">
+        <Sidebar currentExam={exam} />
         <div className="page fade-up">
-          <div className="card" style={{ padding: 18 }}>
+          <div style={{ ...cardStyle, padding: 18 }}>
             <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>Not authorized</div>
             <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
               This report link is restricted.
@@ -246,45 +370,55 @@ export default function Report() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 60px)', color: '#64748b' }}>
-          Building report…
+      <div className="app-layout has-sidebar">
+        <Sidebar currentExam={exam} />
+        <div className="page fade-up" style={{ textAlign: 'center', paddingTop: 80, color: '#64748b' }}>
+          Building report...
         </div>
       </div>
     )
   }
 
+  const statBoxStyle = { display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }
+  const iconBoxStyle = {
+    width: 40, height: 40, borderRadius: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(15,23,42,.08)', color: '#0f172a',
+  }
+  const darkIconBoxStyle = { ...iconBoxStyle, background: 'rgba(255,255,255,.15)', color: 'white' }
+
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar dashboardHref={viewHref('/dashboard')} mistakesHref={viewHref('/mistakes')} currentExam={exam} satHref={satHref} actHref={actHref} />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
-        {isAdminPreview && (() => {
-          return (
-          <div className="card" style={{ marginBottom: 16, background: "linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))", color: "white" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+
+        {/* Admin / Tutor preview banner */}
+        {isAdminPreview && (
+          <motion.div {...stagger(0)} style={{ ...cardStyle, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutor ? "Tutor View" : "Admin View"}</div>
+                <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutor ? 'Tutor View' : 'Admin View'}</div>
                 <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-                  {"You\u0027re viewing this student\u0027s report. Use the result links below to open the same detailed post-test screens they see."}
+                  {"You're viewing this student's report. Use the result links below to open the same detailed post-test screens they see."}
                 </div>
               </div>
-              <Link className="btn btn-outline" to={isTutor ? "/tutor" : "/admin"} style={{ color: "white", borderColor: "rgba(255,255,255,.24)", background: "rgba(255,255,255,.08)" }}>
-                {isTutor ? "Back to Students" : "Back to Admin"}
+              <Link className="btn btn-outline" to={isTutor ? '/tutor' : '/admin'} style={{ color: 'white', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}>
+                {isTutor ? 'Back to Students' : 'Back to Admin'}
               </Link>
             </div>
-          </div>
-          )
-        })()}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
+          </motion.div>
+        )}
+
+        {/* ── Header ─────────────────────────────────── */}
+        <motion.div {...fadeUp} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Icon name="report" size={20} />
+            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '0.01em' }}>
+              <Icon name="report" size={22} />
               Progress Report
             </h1>
-            <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Generated {new Date(report.generated_at).toLocaleString()}
-            </div>
+            <p style={{ color: '#64748b', marginTop: 4, fontSize: 13, lineHeight: 1.6 }}>
+              Your complete {exam.toUpperCase()} performance stats and progress
+              {reportData?.generated_at && <> &middot; Generated {new Date(reportData.generated_at).toLocaleString()}</>}
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -300,7 +434,7 @@ export default function Report() {
             <button
               className="btn btn-outline"
               onClick={() => {
-                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+                const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')
                 a.href = url
@@ -312,93 +446,271 @@ export default function Report() {
               Download JSON
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        {completedAttempts.length > 0 && (
-          <div className="card" style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        {/* ── KPI Stats Grid ─────────────────────────── */}
+        <motion.div {...stagger(1)} className="stats-grid" style={{ marginBottom: 24 }}>
+          {[
+            { label: 'Tests Completed', val: completed.length, icon: 'check', dark: false },
+            { label: exam === 'act' ? 'Best Composite' : 'Best Score', val: best ? best.scores.total : '—', icon: 'sparkle', dark: Boolean(best) },
+            { label: 'Most Recent', val: recent ? recent.scores.total : '—', icon: 'results', dark: false },
+            { label: 'Improvement', val: improvement !== null ? `${improvement > 0 ? '+' : ''}${improvement}` : '—', icon: 'trend', dark: improvement !== null && improvement > 0 },
+            ...sectionAvgs.map((s) => ({ label: `Avg ${s.label}`, val: s.avg ?? '—', icon: 'target', dark: false })),
+            { label: 'Streak', val: `${reportData.summary.streak_current}d`, icon: 'check', dark: false, sub: `Best ${reportData.summary.streak_best}d` },
+            { label: 'Guide Progress', val: `${studiedPct}%`, icon: 'guide', dark: false },
+            { label: 'Mistakes Reviewed', val: `${validatedCount}/${mistakesForExam.length}`, icon: 'mistakes', dark: validatedCount === mistakesForExam.length && mistakesForExam.length > 0 },
+          ].map((s, idx) => (
+            <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`} style={{
+              ...statBoxStyle,
+              ...(s.dark ? {} : idx % 2 === 0
+                ? { borderTop: '3px solid #1e3a8a' }
+                : { borderTop: '3px solid #0ea5e9' }),
+            }}>
+              <div style={s.dark ? darkIconBoxStyle : idx % 2 === 0
+                ? { ...iconBoxStyle, background: 'rgba(30,58,138,.10)', color: '#1e3a8a' }
+                : { ...iconBoxStyle, background: 'rgba(14,165,233,.10)', color: '#0ea5e9' }
+              }>
+                <Icon name={s.icon} size={20} />
+              </div>
               <div>
-                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, color: '#1a2744' }}>Detailed Test Screens</div>
-                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                  Open the exact post-test results pages this student sees after each completed test.
-                </div>
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
+                {s.sub && <div className="stat-sub" style={{ fontSize: 11, color: '#94a3b8' }}>{s.sub}</div>}
               </div>
             </div>
+          ))}
+        </motion.div>
+
+        {/* ── Pre/Post summary card ──────────────────── */}
+        {(reportData.summary.best_pretest || reportData.summary.latest_post) && (
+          <motion.div {...stagger(2)} style={cardStyle}>
+            <h3 style={headingStyle}>
+              <Icon name="results" size={17} />
+              Pre / Post Summary
+            </h3>
+            <div className="stats-grid" style={{ marginBottom: 0 }}>
+              {[
+                { label: 'Best Pre-Test', val: reportData.summary.best_pretest || '—', sub: 'Pre Test' },
+                { label: 'Post-Test', val: reportData.summary.latest_post || '—', sub: 'Most recent' },
+                { label: 'Pre-Post Improvement', val: reportData.summary.improvement != null ? `+${reportData.summary.improvement}` : '—', sub: 'Points', dark: !!reportData.summary.improvement },
+              ].map(s => (
+                <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`}>
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-num">{s.val}</div>
+                  <div className="stat-sub">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
+              Due reviews: {reportData.summary.due_reviews} &middot; Optional tests completed: {reportData.summary.completed_extra}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Score Trend Chart ──────────────────────── */}
+        {completedWithScores.length >= 2 && (
+          <motion.div {...stagger(3)} style={cardStyle}>
+            <h3 style={headingStyle}>
+              <Icon name="chart" size={17} />
+              Score Trend
+            </h3>
+            <div style={{ height: 220 }}>
+              <Line data={trendData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
+                scales: {
+                  x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                  y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: false },
+                },
+              }} />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Section Scores Over Time ───────────────── */}
+        {completedWithScores.length >= 2 && sectionAvgs.length > 1 && (
+          <motion.div {...stagger(4)} style={cardStyle}>
+            <h3 style={headingStyle}>
+              <Icon name="results" size={17} />
+              Section Scores Over Time
+            </h3>
+            <div style={{ height: 220 }}>
+              <Line data={sectionTrendData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+                scales: {
+                  x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+                  y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: false },
+                },
+              }} />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Weak Topics + Test History (side-by-side) ─ */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 18 }}>
+          {/* Weak Topics */}
+          <motion.div {...stagger(5)} style={{ ...cardStyle, marginBottom: 0 }}>
+            <h3 style={headingStyle}>
+              <Icon name="mistakes" size={17} />
+              Top Weak Areas
+            </h3>
+            {topWeakTopics.length === 0 && (
+              <p style={{ color: '#94a3b8', fontSize: 13 }}>No weak topics detected yet. Complete a test to see your weak areas.</p>
+            )}
+            {topWeakTopics.map((topic, i) => {
+              const chMeta = chaptersForExam?.[topic.ch] || {}
+              const label = topic.name || chMeta.name || `Topic ${topic.ch}`
+              const domain = topic.domain || chMeta.domain || ''
+              return (
+                <div key={topic.ch} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                  borderBottom: i < topWeakTopics.length - 1 ? '1px solid #f1f5f9' : 'none',
+                }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(239,68,68,.10)', color: '#ef4444', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {i + 1}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2744' }}>{label}</div>
+                    {domain && <div style={{ fontSize: 11, color: '#94a3b8' }}>{domain}</div>}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', flexShrink: 0 }}>
+                    {topic.count} missed
+                  </span>
+                </div>
+              )
+            })}
+          </motion.div>
+
+          {/* Test History */}
+          <motion.div {...stagger(6)} style={{ ...cardStyle, marginBottom: 0 }}>
+            <h3 style={headingStyle}>
+              <Icon name="test" size={17} />
+              Test History
+            </h3>
+            {testHistory.length === 0 && (
+              <p style={{ color: '#94a3b8', fontSize: 13 }}>No completed tests yet.</p>
+            )}
+            <div style={{ display: 'grid', gap: 8 }}>
+              {testHistory.map((t) => (
+                <Link
+                  key={t.id}
+                  to={viewHref(`/results/${t.id}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                    padding: '10px 12px', border: '1px solid rgba(14,165,233,.15)', borderRadius: 10, textDecoration: 'none', color: '#0f172a',
+                    background: 'white',
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{t.date}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: '#1a2744' }}>{t.total}</span>
+                    {t.sections.map((s) => (
+                      <span key={s.label} style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>
+                        <div style={{ fontWeight: 600 }}>{s.val}</div>
+                        <div style={{ fontSize: 9, opacity: 0.7 }}>{s.label}</div>
+                      </span>
+                    ))}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ── Study Guide Progress ───────────────────── */}
+        <motion.div {...stagger(7)} style={cardStyle}>
+          <h3 style={headingStyle}>
+            <Icon name="guide" size={17} />
+            Study Guide Progress
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+            <div style={{ flex: 1, height: 10, borderRadius: 5, background: '#f1f5f9', overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(100, studiedPct)}%`, height: '100%', borderRadius: 5,
+                background: studiedPct >= 100 ? '#059669' : '#0ea5e9', transition: 'width .5s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: studiedPct >= 100 ? '#059669' : '#1a2744', flexShrink: 0 }}>
+              {studiedCount}/{examConfig.guideCompletionTarget} modules
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>
+            {studiedPct >= 100
+              ? 'All study guide modules completed!'
+              : `${examConfig.guideCompletionTarget - studiedCount} modules remaining`}
+          </div>
+        </motion.div>
+
+        {/* ── Mistake Review Progress ────────────────── */}
+        <motion.div {...stagger(8)} style={cardStyle}>
+          <h3 style={headingStyle}>
+            <Icon name="mistakes" size={17} />
+            Mistake Review Progress
+          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+            <div style={{ flex: 1, height: 10, borderRadius: 5, background: '#f1f5f9', overflow: 'hidden' }}>
+              <div style={{
+                width: `${mistakesForExam.length ? Math.min(100, Math.round((validatedCount / mistakesForExam.length) * 100)) : 0}%`,
+                height: '100%', borderRadius: 5,
+                background: validatedCount === mistakesForExam.length && mistakesForExam.length > 0 ? '#059669' : '#f59e0b',
+                transition: 'width .5s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: validatedCount === mistakesForExam.length && mistakesForExam.length > 0 ? '#059669' : '#1a2744', flexShrink: 0 }}>
+              {validatedCount}/{mistakesForExam.length} reviewed
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>
+            {mistakesForExam.length === 0
+              ? 'No mistakes recorded yet.'
+              : validatedCount === mistakesForExam.length
+                ? 'All mistakes reviewed!'
+                : `${mistakesForExam.length - validatedCount} mistakes still need review`}
+          </div>
+        </motion.div>
+
+        {/* ── Detailed Test Results (admin/tutor) ────── */}
+        {completedAttempts.length > 0 && (
+          <motion.div {...stagger(9)} style={cardStyle}>
+            <h3 style={headingStyle}>
+              <Icon name="test" size={17} />
+              Detailed Test Screens
+            </h3>
+            <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 12 }}>
+              Open the exact post-test results pages for each completed test.
+            </p>
             <div style={{ display: 'grid', gap: 10 }}>
               {completedAttempts.slice(0, 8).map((attempt) => {
                 const label = TESTS.find(t => t.id === (attempt.test_id === 'practice_test_11' ? 'pre_test' : attempt.test_id))?.label || attempt.test_id
                 return (
-                  <div key={attempt.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div key={attempt.id} style={{ border: '1px solid rgba(14,165,233,.15)', borderRadius: 14, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: 900, color: '#1a2744' }}>{label}</div>
                       <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-                        {new Date(attempt.started_at).toLocaleDateString()} · Total {resolveScores(attempt)?.total || resolveScores(attempt)?.composite || '—'}
+                        {new Date(attempt.started_at).toLocaleDateString()} &middot; Total {resolveScores(attempt)?.total || resolveScores(attempt)?.composite || '—'}
                       </div>
                     </div>
                     <Link className="btn btn-outline" to={viewHref(`/results/${attempt.id}`)}>
-                      Open Results →
+                      Open Results
                     </Link>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div className="stats-grid" style={{ marginBottom: 18 }}>
-          {[
-            { label: 'Best Pre-Test', val: report.summary.best_pretest || '—', sub: 'Pre Test', dark: false },
-            { label: 'Post-Test', val: report.summary.latest_post || '—', sub: 'Most recent', dark: false },
-            { label: 'Improvement', val: report.summary.improvement != null ? `+${report.summary.improvement}` : '—', sub: 'Points', dark: !!report.summary.improvement },
-            { label: 'Streak', val: `${report.summary.streak_current} days`, sub: `Best ${report.summary.streak_best}`, dark: false },
-          ].map(s => (
-            <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`}>
-              <div className="stat-label">{s.label}</div>
-              <div className="stat-num">{s.val}</div>
-              <div className="stat-sub">{s.sub}</div>
-            </div>
-          ))}
-        </div>
+        {/* Recent Mistakes section removed per user request */}
 
-        <div className="card" style={{ marginBottom: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ fontWeight: 900, color: '#1a2744' }}>Summary</div>
-            <div style={{ color: '#64748b', fontSize: 13 }}>
-              Due reviews: {report.summary.due_reviews} · Optional tests completed: {report.summary.completed_extra}
-            </div>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 18 }}>
-          <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 8 }}>Study Guide Progress</div>
-          <div style={{ color: '#64748b', fontSize: 13 }}>
-            Completed chapters: <b>{report.summary.studied_count}/34</b>
-          </div>
-        </div>
-
-        {trendData && (
-          <div className="card" style={{ marginBottom: 18 }}>
-            <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 10 }}>Score Trend</div>
-            <div style={{ height: 240 }}>
-              <Line data={trendData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
-            </div>
-          </div>
-        )}
-
-        <div className="card">
-          <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 10 }}>Mistakes (sample)</div>
-          <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-            Showing the most recent {Math.min(20, report.mistakes.length)}.
-          </div>
-          <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-            {report.mistakes.slice(0, 20).map((m, i) => (
-              <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
-                <div style={{ fontWeight: 900, color: '#1a2744' }}>{m.test} · {m.section} · Q{m.q}{m.chapter ? ` · Ch ${m.chapter}` : ''}</div>
-                <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{m.note ? `Note: ${m.note}` : 'No note yet.'}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   )

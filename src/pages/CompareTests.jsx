@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
@@ -13,15 +13,22 @@ const rows = [
 ]
 
 export default function CompareTests() {
-  const { user, setPreferredExam } = useAuth()
+  const { user, profile, setPreferredExam } = useAuth()
   const navigate = useNavigate()
   const [saving, setSaving] = useState('')
 
+  // Tutors/admins don't take tests
+  if (profile?.role === 'tutor') return <Navigate to="/tutor" replace />
+  if (profile?.role === 'admin') return <Navigate to="/admin" replace />
+
   async function choose(exam) {
+    if (saving) return
     setSaving(exam)
-    saveLocalPreferredExam(user?.id, exam)
-    await setPreferredExam(exam).catch(() => {})
-    navigate(`/dashboard?exam=${exam}`, { replace: true })
+    try {
+      saveLocalPreferredExam(user?.id, exam)
+      await setPreferredExam(exam).catch(() => {})
+    } catch {}
+    navigate(`/welcome?exam=${exam}`, { replace: true })
   }
 
   return (
@@ -38,7 +45,7 @@ export default function CompareTests() {
               </span>
               <div>
                 <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 30, fontWeight: 900, color: '#1a2744' }}>Not sure which test fits you best?</div>
-                <div style={{ color: '#64748b', marginTop: 4, fontSize: 15, lineHeight: 1.7 }}>Here’s a quick side-by-side comparison. Pick the one that feels like the better starting point—then we’ll build the right dashboard for it.</div>
+                <div style={{ color: '#64748b', marginTop: 4, fontSize: 15, lineHeight: 1.7 }}>Here's a quick side-by-side comparison. Pick the one that feels like the better starting point—then we'll build the right dashboard for it.</div>
               </div>
             </div>
           </div>
@@ -78,10 +85,10 @@ export default function CompareTests() {
           </div>
 
           <div style={{ marginTop: 22, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" disabled={saving === 'sat'} onClick={() => choose('sat')}>
+            <button className="btn btn-primary" disabled={!!saving} onClick={() => choose('sat')} style={{ opacity: saving && saving !== 'sat' ? 0.5 : 1, transition: 'opacity .2s' }}>
               {saving === 'sat' ? 'Opening SAT…' : 'Try SAT First'}
             </button>
-            <button className="btn btn-primary" disabled={saving === 'act'} onClick={() => choose('act')}>
+            <button className="btn btn-primary" disabled={!!saving} onClick={() => choose('act')} style={{ opacity: saving && saving !== 'act' ? 0.5 : 1, transition: 'opacity .2s' }}>
               {saving === 'act' ? 'Opening ACT…' : 'Try ACT First'}
             </button>
             <button className="btn btn-outline" onClick={() => navigate(-1)}>

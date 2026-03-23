@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { freeResponseMatches } from '../data/testData.js'
@@ -13,40 +14,41 @@ import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
+import Sidebar from '../components/Sidebar.jsx'
+import LessonPlayer from '../components/LessonPlayer.jsx'
+import SAT_LESSON_CONTENT from '../data/satLessonContent.js'
+import ACT_LESSON_CONTENT from '../data/actLessonContent.js'
 
-function Navbar({ homeHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref, showResources = true }) {
-  const navigate = useNavigate()
-  return (
-    <nav className="nav">
-      <BrandLink to={homeHref} />
-      <div className="nav-actions">
-        <TopResourceNav hidden={!showResources} current="guide" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-          title="Go back"
-        >
-          ← Back
-        </button>
-        <Link to={homeHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Dashboard
-        </Link>
-      </div>
-    </nav>
-  )
+/* Navbar removed — using Sidebar */
+
+const cardStaggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.045 } },
+}
+const cardFadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 }
 
-function DomainList({ domains, selectedId, onSelect, completedMap, practiceByChapter, guideContent }) {
+function DomainList({ domains, selectedId, onSelect, completedMap, practiceByChapter, guideContent, lessonData, onOpenLesson }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {Object.entries(domains).map(([domain, chs]) => (
         <div key={domain}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 8, background: '#1e293b', padding: '8px 14px', borderRadius: 8 }}>
             {domain}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 }}>
+          <motion.div
+            variants={cardStaggerContainer}
+            initial="hidden"
+            animate="visible"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              alignItems: 'stretch',
+              gap: 10,
+            }}
+          >
             {chs.map(ch => {
               const hasGuide = Boolean(guideContent?.[ch.id])
               const done = Boolean(completedMap[ch.id])
@@ -60,21 +62,26 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
               const statusBg = done ? 'rgba(16,185,129,.10)' : inProgress ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.10)'
               const statusBorder = done ? 'rgba(16,185,129,.25)' : inProgress ? 'rgba(245,158,11,.35)' : 'rgba(239,68,68,.25)'
               return (
-                <button
+                <motion.button
                   key={ch.id}
+                  variants={cardFadeUp}
                   onClick={() => onSelect(ch.id)}
                   style={{
+                    display: 'flex',
+                    flexDirection: 'column',
                     textAlign: 'left',
                     padding: '12px 14px',
                     borderRadius: 12,
                     border: selectedId === ch.id ? '2px solid #f59e0b' : `1.5px solid ${statusBorder}`,
+                    borderLeft: selectedId === ch.id ? '4px solid #1e3a8a' : `3px solid ${done ? '#10b981' : inProgress ? '#f59e0b' : 'transparent'}`,
                     background: hasGuide ? statusBg : 'white',
                     cursor: 'pointer',
                     overflow: 'hidden',
+                    height: '100%',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                    <div style={{ fontWeight: 900, color: '#1a2744', flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.25 }}>
+                    <div style={{ fontWeight: 900, color: '#0f172a', flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere', lineHeight: 1.25 }}>
                       {(ch.code || ch.id)}: {ch.name}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -109,7 +116,7 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                     </div>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>{ch.domain}{ch.page ? ` · Guide p.${ch.page}` : ''}</div>
-                  <div style={{ marginTop: 8, fontSize: 11, color: hasGuide ? '#10b981' : '#94a3b8', fontWeight: 800 }}>
+                  <div style={{ marginTop: 'auto', paddingTop: 8, fontSize: 11, color: hasGuide ? '#10b981' : '#94a3b8', fontWeight: 800 }}>
                     {hasGuide ? 'Full guide + practice' : 'Guide coming soon'}
                   </div>
                   {hasGuide && (
@@ -117,10 +124,35 @@ function DomainList({ domains, selectedId, onSelect, completedMap, practiceByCha
                       Practice: {Math.min(25, correctCount)}/25 correct
                     </div>
                   )}
-                </button>
+                  {lessonData?.[ch.id] && (
+                    <div
+                      onClick={(e) => { e.stopPropagation(); onOpenLesson(ch.id) }}
+                      style={{
+                        marginTop: 8,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 12px',
+                        borderRadius: 999,
+                        background: 'rgba(14,165,233,.10)',
+                        border: '1px solid rgba(14,165,233,.25)',
+                        color: '#0ea5e9',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'background .15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(14,165,233,.18)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(14,165,233,.10)' }}
+                    >
+                      <span style={{ fontSize: 10, lineHeight: 1 }}>&#9654;</span>
+                      AI Lesson
+                    </div>
+                  )}
+                </motion.button>
               )
             })}
-          </div>
+          </motion.div>
         </div>
       ))}
     </div>
@@ -409,7 +441,7 @@ function PracticeProblem({ problem, idx, onAnswered, answered, concepts, exam, c
               className="btn btn-outline"
               style={{ padding: '7px 12px', fontSize: 12 }}
               onClick={() => setReveal(true)}
-              title="This explanation may reveal the correct answer—use after you’ve tried the hints."
+              title="This explanation may reveal the correct answer—use after you've tried the hints."
             >
               Reveal explanation
             </button>
@@ -440,10 +472,13 @@ export default function Guide() {
     () => resolveViewContext({ userId: user?.id, profile, search: location.search }),
     [user?.id, profile, location.search]
   )
+  const fromParam = useMemo(() => new URLSearchParams(location.search).get('from') || '', [location.search])
   const addToast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [completedMap, setCompletedMap] = useState({})
   const [practiceByChapter, setPracticeByChapter] = useState({})
+  const [lessonChapter, setLessonChapter] = useState(null)
+  const lessonData = exam === 'act' ? ACT_LESSON_CONTENT : SAT_LESSON_CONTENT
   const viewHref = (path) => withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
   const satHref = withViewUser(withExam('/dashboard', 'sat'), viewUserId, isAdminPreview)
   const actHref = withViewUser(withExam('/dashboard', 'act'), viewUserId, isAdminPreview)
@@ -506,6 +541,28 @@ export default function Guide() {
   const corePracticeCount = Math.min(25, problems.length)
   const masteryRedoCount = Math.max(0, expandedProblems.length - corePracticeCount)
 
+  // Auto-mark chapter complete when all 25 practice questions are answered correctly
+  useEffect(() => {
+    if (!selectedId || !viewUserId || isAdminPreview || completedMap[selectedId]) return
+    const practice = practiceByChapter[selectedId] || {}
+    const guideMap = {}
+    for (const [k, v] of Object.entries(practice)) {
+      if (k === 'meta') continue
+      const idx = Number(k)
+      if (Number.isFinite(idx) && v === true) guideMap[idx] = true
+    }
+    const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(guideMap[i]))
+    if (allCorrect) {
+      const updated = { ...completedMap, [selectedId]: true }
+      setCompletedMap(updated)
+      setStudiedTopic(viewUserId, selectedId, true).catch(() => {})
+      if (addToast) {
+        const chData = chapters?.[selectedId]
+        addToast(`${chData?.name || 'Chapter'} — auto-completed!`, 'success')
+      }
+    }
+  }, [selectedId, practiceByChapter, expandedProblems, completedMap, viewUserId, isAdminPreview])
+
   const completedCount = Object.values(completedMap).filter(Boolean).length
   const totalChapters = Object.keys(chapters).length
   const pct = Math.round((completedCount / Math.max(1, totalChapters)) * 100)
@@ -513,29 +570,20 @@ export default function Guide() {
   const selectedGuideMap = selectedId ? extractGuideMap(selectedPractice) : {}
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar
-        homeHref={viewHref('/dashboard')}
-        guideHref={viewHref('/guide')}
-        mistakesHref={viewHref('/mistakes')}
-        calendarHref={viewHref('/calendar')}
-        currentExam={exam}
-        satHref={satHref}
-        actHref={actHref}
-        showResources={showResourceNav}
-      />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
             <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
             <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-              You’re viewing this student’s Study Guide in read-only mode, so their progress won’t change while you troubleshoot.
+              You're viewing this student's Study Guide in read-only mode, so their progress won't change while you troubleshoot.
             </div>
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
 	          <div>
-	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
+	            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Icon name="guide" size={20} />
                 Study Guide
               </h1>
@@ -544,9 +592,9 @@ export default function Guide() {
 	            </div>
 	          </div>
           <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '12px 14px', minWidth: 280 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#0f172a', fontWeight: 800 }}>
               <span>Progress</span>
-              <span>{completedCount}/{totalChapters}</span>
+              <span style={{ color: '#1e3a8a' }}>{completedCount}/{totalChapters}</span>
             </div>
             <div style={{ height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
               <div style={{ height: '100%', width: `${pct}%`, background: '#10b981', transition: 'width .6s ease' }} />
@@ -556,7 +604,7 @@ export default function Guide() {
         </div>
 
         {!selectedId ? (
-          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} practiceByChapter={practiceByChapter} guideContent={guideContent} />
+          <DomainList domains={domains} selectedId={selectedId} onSelect={setSelectedId} completedMap={completedMap} practiceByChapter={practiceByChapter} guideContent={guideContent} lessonData={lessonData} onOpenLesson={setLessonChapter} />
         ) : (
           <div>
             <button onClick={() => setSelectedId(null)} className="btn btn-outline" style={{ marginBottom: 14 }}>
@@ -570,6 +618,31 @@ export default function Guide() {
                     {exam === 'act' ? `ACT Module ${selectedLabel}` : `Chapter ${selectedLabel}`}: {ch?.name}
                   </div>
                   <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>{ch?.domain}{ch?.page ? ` · Guide p.${ch?.page}` : ''}</div>
+                  {lessonData?.[selectedId] && (
+                    <button
+                      onClick={() => setLessonChapter(selectedId)}
+                      style={{
+                        marginTop: 8,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 14px',
+                        borderRadius: 999,
+                        background: 'rgba(14,165,233,.10)',
+                        border: '1px solid rgba(14,165,233,.30)',
+                        color: '#0ea5e9',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'background .15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(14,165,233,.18)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(14,165,233,.10)' }}
+                    >
+                      <span style={{ fontSize: 11, lineHeight: 1 }}>&#9654;</span>
+                      AI Lesson
+                    </button>
+                  )}
                 </div>
 	                {(() => {
 	                  const allCorrect = expandedProblems.length > 0 && expandedProblems.every((_, i) => Boolean(selectedGuideMap[i]))
@@ -595,6 +668,10 @@ export default function Guide() {
                       const ch = chapters?.[selectedId]
                       const label = ch?.name || `Chapter ${selectedId}`
                       addToast(`${label} — completed!`, 'success')
+                      // Navigate back to entry point if specified
+                      if (fromParam === 'dashboard' || fromParam === 'tasks') {
+                        setTimeout(() => navigate(fromParam === 'tasks' ? '/tasks' : viewHref('/dashboard')), 800)
+                      }
                     }
                   }}
                 >
@@ -607,7 +684,7 @@ export default function Guide() {
 
             {!content ? (
               <div className="card" style={{ padding: 18, color: '#64748b' }}>
-                This chapter guide isn’t available yet.
+                This chapter guide isn't available yet.
               </div>
             ) : (
               <>
@@ -640,7 +717,7 @@ export default function Guide() {
 	                <div className="card" style={{ marginBottom: 12, background: '#f8fafc', borderStyle: 'dashed' }}>
 	                  <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>How many to do in this chapter</div>
 	                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>
-	                    Complete <b>{corePracticeCount} core question{corePracticeCount === 1 ? '' : 's'}</b> first, then <b>{masteryRedoCount} mastery redo{masteryRedoCount === 1 ? '' : 's'}</b> to reach the full <b>25/25</b> target. If you see repeats, that’s intentional—they’re there to lock the skill in before the chapter counts as complete.
+	                    Complete <b>25 core questions</b> to reach the full <b>25/25</b> target to lock the skill in before the chapter counts as complete.
 	                  </div>
 	                </div>
 	                <div style={{ display: 'grid', gap: 12 }}>
@@ -671,6 +748,75 @@ export default function Guide() {
           </div>
         )}
       </div>
+
+      {/* AI Lesson modal overlay */}
+      {lessonChapter && lessonData?.[lessonChapter] && (
+        <div
+          onClick={() => setLessonChapter(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            animation: 'lessonModalFadeIn .2s ease',
+          }}
+        >
+          <style>{`
+            @keyframes lessonModalFadeIn {
+              from { opacity: 0 }
+              to { opacity: 1 }
+            }
+          `}</style>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              background: 'white',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,.3)',
+            }}
+          >
+            <button
+              onClick={() => setLessonChapter(null)}
+              style={{
+                position: 'sticky',
+                top: 12,
+                float: 'right',
+                marginRight: 12,
+                marginTop: 12,
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                border: '1px solid #e2e8f0',
+                background: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                color: '#64748b',
+                fontWeight: 700,
+                zIndex: 1,
+                boxShadow: '0 1px 4px rgba(0,0,0,.08)',
+              }}
+              aria-label="Close lesson"
+            >
+              &times;
+            </button>
+            <div style={{ padding: 24 }}>
+              <LessonPlayer title={lessonData[lessonChapter].title} slides={lessonData[lessonChapter].slides} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -192,7 +192,7 @@ function buildChapterQueues(weakTopics, studiedMap, exam = 'sat') {
       chapterId: chKey,
       title,
       subtitle,
-      href: `/guide?chapter=${encodeURIComponent(chKey)}`,
+      href: `/guide?chapter=${encodeURIComponent(chKey)}&from=tasks`,
       subject: chapterSubject(topic),
       weight: Number(topic.count || 1),
       estimatedMinutes: isDone ? 0 : Math.max(15, Math.min(32, 14 + Number(topic.count || 1) * 3)),

@@ -55,37 +55,98 @@ function Timer({ seconds, onExpire, onTick }) {
 }
 
 function BreakScreen({ nextModule, onContinue, modules }) {
-  const [breakTime, setBreakTime] = useState(600) // 10 min break
+  const TOTAL = 600
+  const [breakTime, setBreakTime] = useState(TOTAL)
   const startRef = useRef(Date.now())
+
   useEffect(() => {
     let raf
     const tick = () => {
       const elapsed = (Date.now() - startRef.current) / 1000
-      setBreakTime(Math.max(0, 600 - elapsed))
-      if (elapsed < 600) raf = requestAnimationFrame(tick)
+      setBreakTime(Math.max(0, TOTAL - elapsed))
+      if (elapsed < TOTAL) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [])
+
   const mins = Math.floor(breakTime / 60)
   const secs = Math.floor(breakTime % 60)
-  const breakProgress = Math.max(0, Math.min(100, (breakTime / 600) * 100))
+  const fraction = breakTime / TOTAL // 1 → 0
+
+  // SVG ring params
+  const SIZE = 260
+  const STROKE = 10
+  const R = (SIZE - STROKE) / 2
+  const C = 2 * Math.PI * R // circumference
+  const offset = C * (1 - fraction)
+
+  // Color: green → yellow → red
+  const ringColor = (() => {
+    if (fraction > 0.5) {
+      // green → yellow  (1.0 → 0.5)
+      const t = (fraction - 0.5) / 0.5 // 1→0
+      const r = Math.round(34 + (234 - 34) * (1 - t))
+      const g = Math.round(197 + (179 - 197) * (1 - t))
+      const b = Math.round(94 + (8 - 94) * (1 - t))
+      return `rgb(${r},${g},${b})`
+    }
+    // yellow → red  (0.5 → 0)
+    const t = fraction / 0.5 // 1→0
+    const r = Math.round(239 + (234 - 239) * t)
+    const g = Math.round(68 + (179 - 68) * t)
+    const b = Math.round(68 + (8 - 68) * t)
+    return `rgb(${r},${g},${b})`
+  })()
+
+  const timerColor = fraction > 0.33 ? '#0f172a' : fraction > 0.15 ? '#b45309' : '#dc2626'
+  const glowOpacity = fraction < 0.2 ? 0.35 : 0
+
   return (
     <div className="break-screen">
       <div className="break-panel">
-        <div className="break-chip">Break</div>
+        <div className="break-chip">Break Time</div>
         <div className="break-title">Section Break</div>
         <div className="break-sub">
           Take your 10-minute reset. Next up: <b>{modules?.[nextModule]?.label}</b> — {modules?.[nextModule]?.module}
         </div>
-        <div className={`break-ring${breakTime <= 120 ? ' warning' : ''}`} style={{ '--break-progress': breakProgress }}>
-          <div className="break-timer" style={{ color: breakTime <= 120 ? '#ef4444' : '#1a2744' }}>
+
+        {/* SVG countdown ring */}
+        <div className="break-ring-wrap">
+          <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="break-svg-ring">
+            {/* Track */}
+            <circle cx={SIZE / 2} cy={SIZE / 2} r={R}
+              fill="none" stroke="#e2e8f0" strokeWidth={STROKE} />
+            {/* Glow layer for urgency */}
+            {glowOpacity > 0 && (
+              <circle cx={SIZE / 2} cy={SIZE / 2} r={R}
+                fill="none" stroke="#ef4444" strokeWidth={STROKE + 6} opacity={glowOpacity}
+                strokeDasharray={C} strokeDashoffset={offset}
+                strokeLinecap="round"
+                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', filter: 'blur(6px)' }} />
+            )}
+            {/* Progress arc */}
+            <circle cx={SIZE / 2} cy={SIZE / 2} r={R}
+              fill="none" stroke={ringColor} strokeWidth={STROKE}
+              strokeDasharray={C} strokeDashoffset={offset}
+              strokeLinecap="round"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke 0.8s ease' }} />
+          </svg>
+          <div className="break-timer" style={{ color: timerColor }}>
             {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
           </div>
+          <div className="break-timer-label" style={{ color: timerColor, opacity: 0.5 }}>remaining</div>
         </div>
+
+        <div className="break-tips">
+          <div className="break-tip">Stand up and stretch</div>
+          <div className="break-tip">Take a few deep breaths</div>
+          <div className="break-tip">Grab some water</div>
+        </div>
+
         <div className="break-actions">
-          <button className="btn btn-primary" style={{ padding: '14px 40px', fontSize: 16 }} onClick={onContinue}>
-            Start Next Module →
+          <button className="btn btn-primary break-continue-btn" onClick={onContinue}>
+            Start Next Module
           </button>
         </div>
         <p className="break-footnote">You can wait for the timer or start early whenever you feel ready.</p>
@@ -686,7 +747,7 @@ export default function TestTaking() {
       }
     } catch {}
 
-    navigate(`/setup-plan/${attemptId}`)
+    navigate(`/results/${attemptId}`)
   }
 
   function handleTimerExpire() {
@@ -845,18 +906,7 @@ export default function TestTaking() {
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>
             {Object.keys(modAnswers).length}/{totalQ} answered
           </div>
-          {currentTestId !== examConfig.preTestId && (
-            <a
-              className="btn btn-outline"
-              href={`/guide?exam=${encodeURIComponent(examConfig.exam)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ padding: '6px 10px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.18)', background: 'rgba(255,255,255,.08)' }}
-              title="Open the Study Guide in a new tab (your test stays running here)"
-            >
-              Study Guide ↗
-            </a>
-          )}
+          {/* Study Guide button removed per user request */}
           {isLastModule && (
             <button className="btn" onClick={submitTest} disabled={submitting}
               style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 700, padding: '7px 16px', fontSize: 13 }}>
