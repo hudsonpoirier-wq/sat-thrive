@@ -762,9 +762,9 @@ export default function Dashboard() {
             {[...Array(2)].map((_, dup) => (
               <div key={dup} style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
                 {[
-                  'Study Guide', 'Test Strategies', 'More Practice',
-                  'Mistake Notebook', 'Progress Report',
-                  'College Recruiting', 'Calendar', 'Compare Tests',
+                  'Study Guide', 'Test Strategies', 'More Practice', 'Extra Tests',
+                  'Mistake Notebook', 'Progress Report', 'Tasks', 'Journey Planner',
+                  'College Recruiting', 'Compare Tests', 'Calendar', 'About', 'Settings',
                 ].map((label) => (
                   <span key={`${dup}-${label}`} style={{
                     fontFamily: 'Sora, sans-serif',
@@ -899,8 +899,14 @@ export default function Dashboard() {
               { title: 'Mistake Notebook', desc: 'Track every missed question, review explanations, and validate your understanding to close knowledge gaps.', btn: 'Review mistakes', href: viewHref('/mistakes'), color: '#f59e0b', icon: 'mistakes' },
               { title: 'Progress Report', desc: 'Detailed analytics on score trends, improvement over time, and study completion rates.', btn: 'View report', href: viewHref('/report'), color: '#8b5cf6', icon: 'chart' },
 
+              { title: 'Extra Tests', desc: `Full-length ${examConfig.label} practice tests beyond the pre-test to simulate real exam conditions.`, btn: 'View tests', href: viewHref('/extra-tests'), color: '#0ea5e9', icon: 'test' },
+              { title: 'Tasks', desc: 'View and manage your daily study tasks, track what needs to be done, and stay on top of your prep schedule.', btn: 'View tasks', href: viewHref('/tasks'), color: '#6366f1', icon: 'task' },
+              { title: 'Journey Planner', desc: 'Adaptive daily study plan that updates based on your weak topics, availability, and target test date.', btn: 'View journey', href: viewHref('/journey'), color: '#06b6d4', icon: 'calendar' },
               { title: 'College Recruiting', desc: 'Discover colleges that match your scores, filter by cost, location, and size, and see your admission chances.', btn: 'Explore schools', href: viewHref('/college-recruiting'), color: '#0f172a', icon: 'students' },
               { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: viewHref('/compare-tests'), color: '#dc2626', icon: 'results' },
+              { title: 'Calendar', desc: 'See your full study schedule, set your test date, mark available days, and plan your prep timeline.', btn: 'Open calendar', href: viewHref('/calendar'), color: '#f97316', icon: 'calendar' },
+              { title: 'About', desc: 'Learn about The Agora Project, how it works, and the tools available to help you succeed.', btn: 'Learn more', href: viewHref('/about'), color: '#475569', icon: 'info' },
+              { title: 'Settings', desc: 'Customize your experience — switch between SAT and ACT, update your profile, and manage preferences.', btn: 'Open settings', href: viewHref('/settings'), color: '#64748b', icon: 'settings' },
             ].map((r) => (
               <Link key={r.title} to={r.href} style={{ textDecoration: 'none', display: 'block' }}>
                 <div style={{
