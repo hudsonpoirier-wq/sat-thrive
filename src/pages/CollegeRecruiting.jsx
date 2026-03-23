@@ -1159,10 +1159,15 @@ function CollegeDetailModal({ college, exam, activeScore, onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // Prevent body scroll
+  // Prevent background scroll — target the .page scroll container, not body
   useEffect(() => {
+    const page = document.querySelector('.app-layout .page')
+    if (page) { page.style.overflow = 'hidden' }
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      if (page) { page.style.overflow = '' }
+      document.body.style.overflow = ''
+    }
   }, [])
 
   return (
