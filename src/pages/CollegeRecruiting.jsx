@@ -278,7 +278,10 @@ export default function CollegeRecruiting() {
     if (q) {
       list = list.filter(c =>
         c.name.toLowerCase().includes(q) ||
-        (c.alias && c.alias.toLowerCase().includes(q))
+        (c.alias && c.alias.toLowerCase().includes(q)) ||
+        c.city.toLowerCase().includes(q) ||
+        c.state.toLowerCase() === q ||
+        (STATE_NAMES[c.state] || '').toLowerCase().includes(q)
       )
     }
 
@@ -324,19 +327,41 @@ export default function CollegeRecruiting() {
       switch (sortBy) {
         case 'chance':
           return (b.chance || 0) - (a.chance || 0)
+        case 'chance-reverse':
+          return (a.chance || 0) - (b.chance || 0)
         case 'cost':
           return a.costOut - b.costOut
+        case 'cost-reverse':
+          return b.costOut - a.costOut
         case 'acceptance':
           return b.acceptance - a.acceptance
+        case 'acceptance-reverse':
+          return a.acceptance - b.acceptance
+        case 'enrollment':
+          return b.enrollment - a.enrollment
+        case 'enrollment-reverse':
+          return a.enrollment - b.enrollment
+        case 'sat':
+          return (b.sat75 || 0) - (a.sat75 || 0)
+        case 'sat-reverse':
+          return (a.sat75 || 0) - (b.sat75 || 0)
         case 'name':
           return a.name.localeCompare(b.name)
+        case 'name-reverse':
+          return b.name.localeCompare(a.name)
+        case 'rank-reverse': {
+          const tra = RANK_TIER_ORDER[a.rankTier] || 99
+          const trb = RANK_TIER_ORDER[b.rankTier] || 99
+          if (tra !== trb) return trb - tra
+          return b.rank - a.rank
+        }
         case 'rank':
-        default:
-          // Sort by tier priority, then by array order (rank)
+        default: {
           const ta = RANK_TIER_ORDER[a.rankTier] || 99
           const tb = RANK_TIER_ORDER[b.rankTier] || 99
           if (ta !== tb) return ta - tb
           return a.rank - b.rank
+        }
       }
     })
 
@@ -349,6 +374,7 @@ export default function CollegeRecruiting() {
   /* ── Filter helpers ── */
   function toggle(arr, setter, val) {
     setter(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
+    setVisibleCount(PAGE_SIZE)
   }
 
   function clearAllFilters() {
@@ -560,11 +586,20 @@ export default function CollegeRecruiting() {
               outline: 'none',
             }}
           >
-            <option value="rank">Sort: Rank</option>
-            <option value="chance">Sort: Admission Chance</option>
-            <option value="cost">Sort: Cost (Low to High)</option>
-            <option value="acceptance">Sort: Acceptance Rate</option>
-            <option value="name">Sort: Name (A–Z)</option>
+            <option value="rank">Sort: Rank (Best First)</option>
+            <option value="rank-reverse">Sort: Rank (Lowest First)</option>
+            <option value="chance">Sort: Admission Chance (High → Low)</option>
+            <option value="chance-reverse">Sort: Admission Chance (Low → High)</option>
+            <option value="cost">Sort: Cost (Low → High)</option>
+            <option value="cost-reverse">Sort: Cost (High → Low)</option>
+            <option value="acceptance">Sort: Acceptance Rate (High → Low)</option>
+            <option value="acceptance-reverse">Sort: Acceptance Rate (Low → High)</option>
+            <option value="enrollment">Sort: Enrollment (Large → Small)</option>
+            <option value="enrollment-reverse">Sort: Enrollment (Small → Large)</option>
+            <option value="sat">Sort: SAT Score (High → Low)</option>
+            <option value="sat-reverse">Sort: SAT Score (Low → High)</option>
+            <option value="name">Sort: Name (A → Z)</option>
+            <option value="name-reverse">Sort: Name (Z → A)</option>
           </select>
 
           <motion.button
@@ -751,6 +786,7 @@ export default function CollegeRecruiting() {
                     onChange={e => {
                       const selected = Array.from(e.target.selectedOptions, o => o.value)
                       setStateFilter(selected)
+                      setVisibleCount(PAGE_SIZE)
                     }}
                     style={{
                       width: '100%',
@@ -816,32 +852,52 @@ export default function CollegeRecruiting() {
               <Icon name="search" size={48} />
             </div>
             <h3 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 800, fontSize: 18, color: '#0f172a', margin: '0 0 8px' }}>
-              No colleges match your filters
+              No colleges match{search.trim() ? ` "${search.trim()}"` : ' your filters'}
             </h3>
             <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>
-              Try adjusting your search or filters to see more results.
+              {search.trim() && activeFilterCount > 0
+                ? `You have ${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} active that may be hiding results. Try clearing filters.`
+                : 'Try adjusting your search or filters to see more results.'}
             </p>
-            <button
-              onClick={clearAllFilters}
-              style={{
-                marginTop: 20,
-                padding: '10px 24px',
-                borderRadius: 10,
-                border: 'none',
-                background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              Clear All Filters
-            </button>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20 }}>
+              {search.trim() && activeFilterCount > 0 && (
+                <button
+                  onClick={() => { setTypeFilter([]); setCostFilter([]); setRegionFilter([]); setStateFilter([]); setSizeFilter([]); setSettingFilter([]); setTagFilter([]); setTierFilter([]); setMajorFilter(''); setVisibleCount(PAGE_SIZE) }}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear Filters (Keep Search)
+                </button>
+              )}
+              <button
+                onClick={clearAllFilters}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: 10,
+                  border: search.trim() && activeFilterCount > 0 ? '1.5px solid #e2e8f0' : 'none',
+                  background: search.trim() && activeFilterCount > 0 ? 'white' : 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                  color: search.trim() && activeFilterCount > 0 ? '#334155' : 'white',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear Everything
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))',
             gap: 16,
           }}>
             {displayedColleges.map((college, i) => (

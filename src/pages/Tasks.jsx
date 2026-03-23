@@ -127,7 +127,7 @@ function TaskCard({ task, index, completed = false }) {
           }}
         >
           {completed ? 'Done' : 'Start'}
-          {!completed && <Icon name="arrow" size={12} />}
+          {!completed && <Icon name="arrowRight" size={12} />}
         </span>
       </Link>
     </motion.div>
@@ -307,9 +307,10 @@ export default function Tasks() {
     withViewUser(withExam(path, exam), viewUserId, isAdminPreview)
 
   const examAttemptIds = new Set(examTests.map((t) => t.id))
-  const examAttempts = attempts.filter((a) =>
-    examAttemptIds.has(a?.test_id)
-  )
+  const examAttempts = attempts.filter((a) => {
+    const tid = a?.test_id === 'practice_test_11' ? 'pre_test' : a?.test_id
+    return examAttemptIds.has(tid)
+  })
   const studiedForExam = Object.fromEntries(
     Object.entries(studied || {}).filter(([chId]) =>
       Boolean(chaptersForExam?.[chId])
