@@ -662,7 +662,7 @@ export default function Dashboard() {
   return (
     <div className="app-layout has-sidebar">
       <Sidebar currentExam={exam} />
-      <div className="page fade-up">
+      <div className="page fade-up" style={{ overflowX: 'hidden' }}>
         {isAdminPreview && (() => {
           const isTutorUser = profile?.role === "tutor"
           return (
@@ -697,6 +697,9 @@ export default function Dashboard() {
             borderRadius: 20,
             marginBottom: 0,
             overflow: 'hidden',
+            flexWrap: 'wrap',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
           }}
         >
           <motion.img
@@ -720,11 +723,12 @@ export default function Dashboard() {
           >
             <div style={{
               fontFamily: 'Sora, sans-serif',
-              fontSize: 52,
+              fontSize: 'clamp(28px, 5vw, 52px)',
               fontWeight: 900,
               color: 'white',
               letterSpacing: '-0.02em',
               lineHeight: 1.1,
+              wordBreak: 'break-word',
             }}>
               The Agora Project
             </div>
@@ -782,7 +786,7 @@ export default function Dashboard() {
         {!isTutor && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
             gap: 16,
             marginBottom: 28,
           }}>
