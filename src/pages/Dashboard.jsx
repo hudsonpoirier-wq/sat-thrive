@@ -762,8 +762,8 @@ export default function Dashboard() {
             {[...Array(2)].map((_, dup) => (
               <div key={dup} style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
                 {[
-                  'Study Guide', 'Test Strategies', 'More Practice', 'Extra Tests',
-                  'Mistake Notebook', 'Progress Report', 'Journey Planner',
+                  'Study Guide', 'Test Strategies', 'More Practice',
+                  'Mistake Notebook', 'Progress Report',
                   'College Recruiting', 'Calendar', 'Compare Tests',
                 ].map((label) => (
                   <span key={`${dup}-${label}`} style={{
@@ -782,6 +782,107 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
+	        {/* Pre Test CTA (hidden after completion, hidden for tutors) */}
+        {!isTutor && (completedPre.length === 0 || preInProgress) && (
+          <AnimateOnScroll animation="anim-slide-up" duration={600} delay={200}>
+	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#0c4a6e,#1e3a8a)', color:'white'}}>
+	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
+	              <div>
+	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
+	                  <Icon name="test" size={18} />
+	                  {preTestConfig?.label || 'Pre Test'}
+	                </div>
+	                <div style={{fontSize:13, opacity:.7}}>
+	                  {examConfig.moduleOrder.length} sections · {totalQuestions} questions · {totalDuration} · Timed like the real {examConfig.label}
+	                </div>
+	              </div>
+	              {preInProgress ? (
+	                <div style={{display:'flex', gap:10}}>
+	                  <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
+	                    style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
+	                    {readOnlyView ? 'Preview only' : '▶ Resume'}
+	                  </button>
+	                </div>
+	              ) : (
+	                <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
+	                  style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
+	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
+	                </button>
+	              )}
+	            </div>
+	            {confirmStart && (
+	              <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
+	                <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
+	                <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
+	                  This is a full timed {examConfig.label} test ({totalDuration}). Once you start, your timer runs.
+	                </div>
+	                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
+	                    Cancel
+	                  </button>
+	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#0f172a', fontWeight: 800 }}>
+	                    {readOnlyView ? 'Preview only' : 'Start Test'}
+	                  </button>
+	                </div>
+	              </div>
+	            )}
+	          </div>
+          </AnimateOnScroll>
+	        )}
+
+        {/* Score overview — students only */}
+        {!isTutor && (
+          <AnimateOnScroll animation="anim-fade-up" stagger={120} as="div" className="stats-grid">
+            <ScoreOverviewCard
+              label={bestScoreLabel}
+              value={bestSatRecord ? formatExamSubscore(exam, bestSatRecord.scores, 'total') : '—'}
+              sub={bestSatRecord ? `${TESTS.find((t) => t.id === (bestSatRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : bestSatRecord.attempt.test_id))?.label || 'Completed test'}` : 'All-time high'}
+              icon="sparkle"
+              dark={Boolean(bestSatRecord?.scores?.total)}
+              to={bestSatRecord ? viewHref(`/results/${bestSatRecord.attempt.id}`) : ''}
+            />
+            <ScoreOverviewCard
+              label="Highest Test"
+              value={highestTestRecord ? formatExamSubscore(exam, highestTestRecord.scores, 'total') : '—'}
+              sub={highestTestRecord ? `${TESTS.find((t) => t.id === (highestTestRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : highestTestRecord.attempt.test_id))?.label || 'Highest full-length test'}` : 'No full-length test recorded yet'}
+              icon="test"
+              to={highestTestRecord ? viewHref(`/results/${highestTestRecord.attempt.id}`) : ''}
+            />
+            <ScoreOverviewCard
+              label="Most Recent Test"
+              value={mostRecentRecord ? formatExamSubscore(exam, mostRecentRecord.scores, 'total') : '—'}
+              sub={mostRecentRecord ? `${TESTS.find((t) => t.id === (mostRecentRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : mostRecentRecord.attempt.test_id))?.label || 'Latest test'} · ${new Date(mostRecentRecord.attempt.started_at).toLocaleDateString()}` : 'No completed attempt yet'}
+              icon="results"
+              to={mostRecentRecord ? viewHref(`/results/${mostRecentRecord.attempt.id}`) : ''}
+            />
+            <ScoreOverviewCard
+              label="Total Improvement"
+              value={improvement !== null ? `${improvement > 0 ? '+' : ''}${improvement}` : '—'}
+              sub={improvement !== null ? improvementLabel : `${completed.length} completed · ${inProgress.length} in progress`}
+              icon="chart"
+              dark={improvement !== null && improvement !== 0}
+            />
+            <ScoreOverviewCard
+              label="Percentile"
+              value={bestPercentile !== null ? `${bestPercentile}${bestPercentile < 100 ? '' : ''}` : '—'}
+              sub={bestPercentile !== null ? `Top ${100 - bestPercentile}% of test takers` : 'Complete a test to see percentile'}
+              icon="target"
+              dark={bestPercentile !== null && bestPercentile >= 75}
+            />
+            <ScoreOverviewCard
+              label="Superscore"
+              value={superscore ? superscore.total : '—'}
+              sub={superscore
+                ? exam === 'act'
+                  ? `E ${superscore.sections.english} · M ${superscore.sections.math} · R ${superscore.sections.reading} · S ${superscore.sections.science}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
+                  : `R&W ${superscore.sections.rw} + M ${superscore.sections.math}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
+                : 'Best section scores across all tests'}
+              icon="star"
+              dark={Boolean(superscore)}
+            />
+        </AnimateOnScroll>
+        )}
+
         {/* Resource cards grid */}
         {!isTutor && (
           <div style={{
@@ -794,10 +895,10 @@ export default function Dashboard() {
               { title: 'Study Guide', desc: `Master every ${examConfig.label} topic with guided lessons, practice questions, and chapter-by-chapter progress tracking.`, btn: 'Learn more', href: viewHref('/guide'), color: '#1e3a8a', icon: 'guide' },
               { title: 'Test Strategies', desc: `Time management, elimination techniques, and section-specific tips to maximize your ${examConfig.label} score.`, btn: 'Learn more', href: viewHref('/strategies'), color: '#166534', icon: 'target' },
               { title: 'More Practice', desc: 'Additional practice questions organized by topic to reinforce weak areas and build confidence.', btn: 'Practice now', href: viewHref('/practice'), color: '#84cc16', icon: 'star' },
-              { title: 'Extra Tests', desc: `Full-length ${examConfig.label} practice tests beyond the pre-test to simulate real exam conditions.`, btn: 'View tests', href: viewHref('/extra-tests'), color: '#0ea5e9', icon: 'test' },
+
               { title: 'Mistake Notebook', desc: 'Track every missed question, review explanations, and validate your understanding to close knowledge gaps.', btn: 'Review mistakes', href: viewHref('/mistakes'), color: '#f59e0b', icon: 'mistakes' },
               { title: 'Progress Report', desc: 'Detailed analytics on score trends, improvement over time, and study completion rates.', btn: 'View report', href: viewHref('/report'), color: '#8b5cf6', icon: 'chart' },
-              { title: 'Journey Planner', desc: 'Adaptive daily study plan that updates based on your weak topics, availability, and target test date.', btn: 'View journey', href: viewHref('/journey'), color: '#06b6d4', icon: 'calendar' },
+
               { title: 'College Recruiting', desc: 'Discover colleges that match your scores, filter by cost, location, and size, and see your admission chances.', btn: 'Explore schools', href: viewHref('/college-recruiting'), color: '#0f172a', icon: 'students' },
               { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: viewHref('/compare-tests'), color: '#dc2626', icon: 'results' },
             ].map((r) => (
@@ -875,448 +976,6 @@ export default function Dashboard() {
             </div>
           </div>
           </AnimateOnScroll>
-        )}
-
-        {/* Score overview — students only */}
-        {!isTutor && (
-          <AnimateOnScroll animation="anim-fade-up" stagger={120} as="div" className="stats-grid">
-            <ScoreOverviewCard
-              label={bestScoreLabel}
-              value={bestSatRecord ? formatExamSubscore(exam, bestSatRecord.scores, 'total') : '—'}
-              sub={bestSatRecord ? `${TESTS.find((t) => t.id === (bestSatRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : bestSatRecord.attempt.test_id))?.label || 'Completed test'}` : 'All-time high'}
-              icon="sparkle"
-              dark={Boolean(bestSatRecord?.scores?.total)}
-              to={bestSatRecord ? viewHref(`/results/${bestSatRecord.attempt.id}`) : ''}
-            />
-            <ScoreOverviewCard
-              label="Highest Test"
-              value={highestTestRecord ? formatExamSubscore(exam, highestTestRecord.scores, 'total') : '—'}
-              sub={highestTestRecord ? `${TESTS.find((t) => t.id === (highestTestRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : highestTestRecord.attempt.test_id))?.label || 'Highest full-length test'}` : 'No full-length test recorded yet'}
-              icon="test"
-              to={highestTestRecord ? viewHref(`/results/${highestTestRecord.attempt.id}`) : ''}
-            />
-            <ScoreOverviewCard
-              label="Most Recent Test"
-              value={mostRecentRecord ? formatExamSubscore(exam, mostRecentRecord.scores, 'total') : '—'}
-              sub={mostRecentRecord ? `${TESTS.find((t) => t.id === (mostRecentRecord.attempt.test_id === 'practice_test_11' ? 'pre_test' : mostRecentRecord.attempt.test_id))?.label || 'Latest test'} · ${new Date(mostRecentRecord.attempt.started_at).toLocaleDateString()}` : 'No completed attempt yet'}
-              icon="results"
-              to={mostRecentRecord ? viewHref(`/results/${mostRecentRecord.attempt.id}`) : ''}
-            />
-            <ScoreOverviewCard
-              label="Total Improvement"
-              value={improvement !== null ? `${improvement > 0 ? '+' : ''}${improvement}` : '—'}
-              sub={improvement !== null ? improvementLabel : `${completed.length} completed · ${inProgress.length} in progress`}
-              icon="chart"
-              dark={improvement !== null && improvement !== 0}
-            />
-            <ScoreOverviewCard
-              label="Percentile"
-              value={bestPercentile !== null ? `${bestPercentile}${bestPercentile < 100 ? '' : ''}` : '—'}
-              sub={bestPercentile !== null ? `Top ${100 - bestPercentile}% of test takers` : 'Complete a test to see percentile'}
-              icon="target"
-              dark={bestPercentile !== null && bestPercentile >= 75}
-            />
-            <ScoreOverviewCard
-              label="Superscore"
-              value={superscore ? superscore.total : '—'}
-              sub={superscore
-                ? exam === 'act'
-                  ? `E ${superscore.sections.english} · M ${superscore.sections.math} · R ${superscore.sections.reading} · S ${superscore.sections.science}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
-                  : `R&W ${superscore.sections.rw} + M ${superscore.sections.math}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
-                : 'Best section scores across all tests'}
-              icon="star"
-              dark={Boolean(superscore)}
-            />
-        </AnimateOnScroll>
-        )}
-
-	        {/* Pre Test CTA (hidden after completion, hidden for tutors) */}
-        {!isTutor && (completedPre.length === 0 || preInProgress) && (
-          <AnimateOnScroll animation="anim-slide-up" duration={600} delay={200}>
-	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#0c4a6e,#1e3a8a)', color:'white'}}>
-	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
-	              <div>
-	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
-	                  <Icon name="test" size={18} />
-	                  {preTestConfig?.label || 'Pre Test'}
-	                </div>
-	                <div style={{fontSize:13, opacity:.7}}>
-	                  {examConfig.moduleOrder.length} sections · {totalQuestions} questions · {totalDuration} · Timed like the real {examConfig.label}
-	                </div>
-	              </div>
-	              {preInProgress ? (
-	                <div style={{display:'flex', gap:10}}>
-	                  <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
-	                    style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
-	                    {readOnlyView ? 'Preview only' : '▶ Resume'}
-	                  </button>
-	                </div>
-	              ) : (
-	                <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
-	                  style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
-	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
-	                </button>
-	              )}
-	            </div>
-	            {confirmStart && (
-	              <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
-	                <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
-	                <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
-	                  This is a full timed {examConfig.label} test ({totalDuration}). Once you start, your timer runs.
-	                </div>
-	                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
-	                    Cancel
-	                  </button>
-	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#0f172a', fontWeight: 800 }}>
-	                    {readOnlyView ? 'Preview only' : 'Start Test'}
-	                  </button>
-	                </div>
-	              </div>
-	            )}
-	          </div>
-          </AnimateOnScroll>
-	        )}
-
-        {/* Today / work-ahead */}
-        {!isTutor && hasTakenPretest && journeySchedule && (
-          <AnimateOnScroll animation="anim-fade-up" duration={600} delay={100}>
-          <div id="today-tasks-card" className="card dashboard-section-card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
-              <div>
-                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <SectionIcon name="task" color="#0ea5e9" />
-                  Today's Tasks
-                </h2>
-                <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening the following study day's tasks early.
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="calendar" size={16} />
-                  {journeySchedule.hasTestDate ? 'Calendar runs through 3 days before your test.' : 'Set a test date to expand the full calendar.'}
-                </div>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => navigate(calendarEntryHref)}
-                  style={{ padding: '8px 12px', fontSize: 12 }}
-                >
-                  {satDate ? 'Edit Test Date & Availability' : 'Set Test Date & Availability'}
-                </button>
-                <Link className="btn btn-outline" to={calendarEntryHref} style={{ padding: '8px 12px', fontSize: 12 }}>
-                  {satDate ? 'View Calendar →' : 'Set Test Date →'}
-                </Link>
-              </div>
-            </div>
-
-            {journeySchedule.needsMoreTime && (
-              <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.28)', color: '#92400e', fontSize: 13, lineHeight: 1.6 }}>
-                Based on your remaining work and availability, plan for <b>about {journeySchedule.requiredMinutesPerDay} minutes on each study day</b> to stay on track. If that feels too heavy, add more available days or move your test date back.
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
-              {scheduleDayCards.map((day, idx) => (
-                <div
-                  key={day.key}
-                  className="journey-day-card"
-                  role="link"
-                  tabIndex={0}
-                  onClick={() => navigate(viewHref(`/calendar?day=${encodeURIComponent(day.key)}`))}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      navigate(viewHref(`/calendar?day=${encodeURIComponent(day.key)}`))
-                    }
-                  }}
-                  style={{
-                    '--day-index': idx,
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 14,
-                    padding: 14,
-                    background: idx === 0 ? 'linear-gradient(135deg, rgba(14,165,233,.10), rgba(99,102,241,.10))' : '#f8fafc',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 900, color: '#0f172a' }}>
-                        {scheduleCardTitle(day, idx)}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
-                    </div>
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 900,
-                      padding: '4px 10px',
-                      borderRadius: 999,
-                      background: day.focus === 'Reading' ? 'rgba(59,130,246,.12)' : day.focus === 'Math' ? 'rgba(16,185,129,.12)' : 'rgba(148,163,184,.14)',
-                      color: day.focus === 'Reading' ? '#2563eb' : day.focus === 'Math' ? '#059669' : '#64748b',
-                    }}>
-                      {day.focus}
-                    </div>
-                  </div>
-                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
-                    {day.estimatedMinutes ? `Planned for about ${day.estimatedMinutes} minutes · ` : ''}Missed work automatically rolls into your next available study day.
-                  </div>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {day.tasks.length ? day.tasks.map((task) => (
-                      <ScheduleTaskLink key={task.id} task={task} compact stopParentClick completed={!!task.completed} />
-                    )) : (
-                      <div style={{ padding: '12px', border: '1px dashed #cbd5e1', borderRadius: 12, color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
-                        No assigned tasks for this day. Use it as a catch-up or light review day.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          </AnimateOnScroll>
-        )}
-
-        {/* Journey tracker + Study Guide */}
-        {!isTutor && (
-        <AnimateOnScroll animation="anim-fade-left" duration={600} delay={100}>
-        <div className="card dashboard-section-card" style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <SectionIcon name="task" color="#0ea5e9" />
-                Smart Journey
-              </h2>
-              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                Work through these steps to be ready for the final test. <b>Click the tiles</b> to jump to each step.
-              </div>
-            </div>
-            <div style={{ minWidth: 260 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                <span>Study Progress</span>
-                <span>{studiedCount}/{examConfig.guideCompletionTarget}</span>
-              </div>
-              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
-                <div style={{ height: '100%', width: `${Math.min(100, studiedPct)}%`, background: studiedPct >= 80 ? '#10b981' : studiedPct >= 40 ? '#f59e0b' : '#ef4444', transition: 'width .6s ease' }} />
-              </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>{studiedPct}% complete</div>
-            </div>
-          </div>
-
-          <div className="journey-grid" style={{ marginTop: 16 }}>
-            {(() => {
-              const toReview = Math.max(0, (latestMistakes?.length || 0) - (latestValidated || 0))
-              const steps = [
-                {
-                  title: '1) Take the Pretest',
-                  status: hasTakenPretest ? 'DONE' : (preInProgress ? 'IN PROGRESS' : 'TODO'),
-                  desc: 'Take the full timed Pre Test to set your baseline.',
-                  onClick: () => {
-                    if (readOnlyView) return
-                    if (preInProgress?.id) navigate(`/test/${preInProgress.id}`)
-                    else startNewTest(examConfig.preTestId)
-                  },
-                },
-                {
-                  title: '2) Study Plan',
-                  status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
-                  desc: `Set your ${examConfig.label} date (or best estimate) and use the plan for guidance (updates after each test).`,
-                  onClick: () => navigate(viewHref('/calendar')),
-                },
-                {
-                  title: '3) Review Results',
-                  status: !hasTakenPretest ? 'LOCKED' : (viewedLatestResults ? 'DONE' : 'TODO'),
-                  desc: latestCompleted?.id ? 'Open your most recent results and identify weak topics.' : 'Complete a test to unlock results.',
-                  onClick: () => {
-                    if (!latestCompleted?.id) return
-                    navigate(viewHref(`/results/${latestCompleted.id}`))
-                  },
-                },
-                {
-                  title: '4) Review Missed Questions',
-                  status: !hasTakenPretest ? 'LOCKED' : reviewJourneyStatus,
-                  desc: !hasTakenPretest
-                    ? 'Take the Pre Test to generate your mistake list.'
-                    : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
-                  onClick: () => navigate(viewHref('/mistakes')),
-                },
-                {
-                  title: '5) Study Guide',
-                  status: studiedCount >= examConfig.guideCompletionTarget ? 'DONE' : (hasStartedGuide ? 'IN PROGRESS' : 'TODO'),
-                  desc: 'Master chapters (25/25) to mark them complete.',
-                  onClick: () => navigate(viewHref('/guide')),
-                },
-              ]
-
-              const statusColor = (st) => (
-                st === 'DONE' ? '#10b981'
-                  : st === 'IN PROGRESS' ? '#f59e0b'
-                    : st === 'NOT STARTED' ? '#ef4444'
-                      : st === 'READY' ? '#1a2744'
-                        : st === 'LOCKED' ? '#94a3b8'
-                          : '#94a3b8'
-              )
-
-              return steps.map((s) => {
-                const disabled = s.status === 'LOCKED'
-                return (
-                  <button
-                    key={s.title}
-                    className={`journey-step-card journey-step-${String(s.status || '').toLowerCase().replace(/\s+/g, '-')}`}
-                    onClick={s.onClick}
-                    disabled={disabled}
-                    style={{
-                      textAlign: 'left',
-                      border: '1px solid rgba(14,165,233,.12)',
-                      borderRadius: 14,
-                      padding: 16,
-                      background: disabled ? '#f1f5f9' : '#ffffff',
-                      cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.6 : 1,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ fontWeight: 900, color: '#0f172a' }}>{s.title}</div>
-                      <div style={{
-                        fontSize: 11,
-                        fontWeight: 900,
-                        color: statusColor(s.status),
-                        background: s.status === 'DONE' ? 'rgba(16,185,129,.1)' : s.status === 'IN PROGRESS' ? 'rgba(245,158,11,.1)' : 'transparent',
-                        padding: '3px 10px',
-                        borderRadius: 999,
-                      }}>{s.status}</div>
-                    </div>
-                    <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
-                  </button>
-                )
-              })
-            })()}
-          </div>
-
-	          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-	            <button className="btn btn-outline" onClick={() => navigate(viewHref('/report'))} disabled={!hasTakenPretest}>
-	              Progress Report →
-	            </button>
-	            {(() => {
-	              const unlocked = studiedCount >= examConfig.guideCompletionTarget && hasTakenPretest
-	              return (
-	            <button
-	              className="btn"
-	              onClick={() => startNewTest(examConfig.finalTestId)}
-	              disabled={!unlocked || readOnlyView}
-	              style={{
-	                background: unlocked ? '#10b981' : '#e2e8f0',
-	                color: unlocked ? 'white' : '#64748b',
-	                fontWeight: 900,
-	              }}
-	              title={unlocked ? 'Final test unlocked' : 'Finish the Journey Tracker to unlock the Final Test'}
-	            >
-	              {unlocked ? 'Final Test' : 'Final Test (Unlocks after Journey Tracker)'}
-	            </button>
-	              )
-	            })()}
-	          </div>
-	          {!(studiedCount >= examConfig.guideCompletionTarget && hasTakenPretest) && (
-	            <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: '#64748b' }}>
-	              The <b>Final Test unlocks automatically</b> once you complete the Journey Tracker (Pre Test + review results + review missed questions + complete the Study Guide).
-	            </div>
-	          )}
-	        </div>
-        </AnimateOnScroll>
-        )}
-
-        {/* Optional extra practice */}
-        {!isTutor && hasTakenPretest && (
-          <>
-            {extraTests.length > 0 && (
-              <AnimateOnScroll animation="anim-fade-right" duration={600} delay={100}>
-              <div className="card dashboard-practice-card dashboard-section-card" style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <SectionIcon name="sparkle" color="#f59e0b" />
-                      Extra Practice (Optional)
-                    </h2>
-                    <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                      Optional skill builders to reinforce weak topics and track improvement.
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 900 }}>
-                    Completed: {completedExtra.length}/{extraTests.length}
-                  </div>
-                </div>
-
-                <div className={`dashboard-practice-grid${exam === 'act' ? ' act' : ''}`} style={{ '--practice-count': extraTests.length }}>
-                  {extraTests.map((t) => {
-                    const done = completed.some((a) => a.test_id === t.id && (a.completed_at || a.scores?.total))
-                    const prog = inProgress.find((a) => a.test_id === t.id)
-                    return (
-                      <div key={t.id} className={`dashboard-practice-tile${confirmExtraTestId === t.id ? ' expanded' : ''}`}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ fontWeight: 900, color: '#0f172a', minWidth: 0, lineHeight: 1.35, overflowWrap: 'break-word' }}>{t.label}</div>
-                          <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>
-                            {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
-                          </div>
-                        </div>
-                        <div className="dashboard-practice-actions">
-                          {prog ? (
-                            <button className="btn" style={{ background: '#0ea5e9', color: 'white', fontWeight: 900 }} disabled={readOnlyView} onClick={() => navigate(`/test/${prog.id}`)}>
-                              {readOnlyView ? 'Preview only' : 'Resume →'}
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                className="btn"
-                                style={{ background: '#0ea5e9', color: 'white', fontWeight: 900 }}
-                                disabled={readOnlyView}
-                                onClick={() => setConfirmExtraTestId((prev) => (prev === t.id ? null : t.id))}
-                              >
-                                {readOnlyView ? 'Preview only' : 'Start →'}
-                              </button>
-                              {confirmExtraTestId === t.id && (
-                                <div style={{ marginTop: 10, width: '100%', background: 'rgba(255,255,255,.65)', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
-                                  <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Start this optional test now?</div>
-                                  <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                                    This is optional, but it helps reinforce weak topics and track improvement.
-                                  </div>
-                                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-                                    <button className="btn btn-outline" style={{ padding: '8px 12px' }} onClick={() => setConfirmExtraTestId(null)}>
-                                      Cancel
-                                    </button>
-                                    <button
-                                      className="btn"
-                                      style={{ background: '#0ea5e9', color: 'white', fontWeight: 900, padding: '8px 12px' }}
-                                      onClick={() => {
-                                        setConfirmExtraTestId(null)
-                                        startNewTest(t.id)
-                                      }}
-                                    >
-                                      Start
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          {done && (
-                            <button
-                              className="btn btn-outline"
-                              onClick={() => {
-                                const last = completed.find((a) => a.test_id === t.id)
-                                if (last) navigate(viewHref(`/results/${last.id}`))
-                              }}
-                            >
-                              View Results →
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              </AnimateOnScroll>
-            )}
-          </>
         )}
 
         {/* Completed tests */}
