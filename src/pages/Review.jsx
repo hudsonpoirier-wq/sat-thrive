@@ -8,6 +8,7 @@ import { getTestConfig } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
+import Sidebar from '../components/Sidebar.jsx'
 import {
   loadMistakes,
   loadReviewItems,
@@ -18,31 +19,7 @@ import {
   updateMistakeNote,
 } from '../lib/mistakesStore.js'
 
-function Navbar() {
-  const navigate = useNavigate()
-  return (
-    <nav className="nav">
-      <BrandLink />
-      <div className="nav-actions">
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-          title="Go back"
-        >
-          <Icon name="back" size={15} />
-          Back
-        </button>
-        <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Dashboard
-        </Link>
-        <Link to="/mistakes" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Mistakes
-        </Link>
-      </div>
-    </nav>
-  )
-}
+/* Navbar removed — using Sidebar */
 
 function pdfPageFor(testId, section, qNum) {
   const map = (testId === 'pre_test')
@@ -180,8 +157,8 @@ export default function Review() {
 
   if (!current?.itemKey) {
     return (
-      <div style={{ minHeight: '100vh', background: 'transparent' }}>
-        <Navbar />
+      <div className="app-layout has-sidebar">
+        <Sidebar currentExam="sat" />
         <div className="page fade-up">
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No reviews due</div>
@@ -208,8 +185,8 @@ export default function Review() {
   })()
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam="sat" />
       <div className="page fade-up">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
@@ -232,7 +209,7 @@ export default function Review() {
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 8 }}>Missing answer key</div>
             <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              This review item can’t be checked yet because the answer key isn’t loaded for this test.
+              This review item can't be checked yet because the answer key isn't loaded for this test.
             </div>
           </div>
         ) : (
@@ -297,7 +274,7 @@ export default function Review() {
               </div>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
                 {isFR
-                  ? <>Enter your answer as a number or simple expression (examples: <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>). Equivalent fractions and comma-formatted numbers count. Don’t include units or extra words.</>
+                  ? <>Enter your answer as a number or simple expression (examples: <code>1/2</code>, <code>0.5</code>, <code>15,000</code>, <code>pi</code>, <code>3*pi/2</code>). Equivalent fractions and comma-formatted numbers count. Don't include units or extra words.</>
                   : 'Pick A, B, C, or D.'}
               </div>
 
@@ -366,7 +343,7 @@ export default function Review() {
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Write the exact rule/step you’ll use next time."
+                  placeholder="Write the exact rule/step you'll use next time."
                   style={{
                     width: '100%',
                     minHeight: 90,
@@ -382,7 +359,7 @@ export default function Review() {
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                   <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                    Quick formula: “I missed ___ because ___. Next time I will ___.”
+                    Quick formula: "I missed ___ because ___. Next time I will ___."
                   </div>
                   <button
                     className="btn"

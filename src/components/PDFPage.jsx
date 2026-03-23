@@ -125,7 +125,7 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
     render().catch(() => {
       if (cancelled) return
       setStatus('error')
-      // Auto-retry once on transient failures (prevents “refresh fixes it” glitches).
+      // Auto-retry once on transient failures (prevents "refresh fixes it" glitches).
       if (!autoRetriedRef.current) {
         autoRetriedRef.current = true
         setTimeout(() => {
@@ -160,7 +160,7 @@ export default function PDFPage({ pdfUrl, pageIndex, zoom = 1, maxScale = 2.6, c
             </div>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>PDF not loaded</div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
-              Couldn’t load <code>{fileLabel(pdfUrl)}</code>. Try again (this can happen on spotty connections).
+              Couldn't load <code>{fileLabel(pdfUrl)}</code>. Try again (this can happen on spotty connections).
             </div>
             <button
               className="btn btn-outline"

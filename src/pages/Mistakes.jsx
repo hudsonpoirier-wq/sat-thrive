@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { PDF_PAGE_MAP, answerMatches, isMultipleChoiceAnswer } from '../data/testData.js'
 import { EXTRA_PDF_PAGE_MAPS } from '../data/extraPdfPageMaps.js'
@@ -18,10 +19,26 @@ import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { buildQuestionHintLadder } from '../lib/questionHints.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
 import { useToast } from '../components/Toast.jsx'
+import Sidebar from '../components/Sidebar.jsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
+
+/* ── framer-motion variants ── */
+const listStagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.045 } },
+}
+const listItem = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+}
+const panelSlideIn = {
+  initial: { opacity: 0, x: 30 },
+  animate: { opacity: 1, x: 0 },
+  transition: { duration: 0.35, ease: 'easeOut' },
+}
 
 const textCache = {}
 
@@ -30,29 +47,7 @@ const ALL_GUIDE_CONTENT = {
   ...getGuideContentForExam('act'),
 }
 
-function Navbar({ dashboardHref, guideHref, mistakesHref, calendarHref, currentExam, satHref, actHref, showResources = true }) {
-  const navigate = useNavigate()
-  return (
-    <nav className="nav">
-      <BrandLink to={dashboardHref} />
-      <div className="nav-actions">
-        <TopResourceNav hidden={!showResources} current="mistakes" calendarHref={calendarHref} guideHref={guideHref} mistakesHref={mistakesHref} />
-        <ExamSwitcher currentExam={currentExam} satHref={satHref} actHref={actHref} />
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-          title="Go back"
-        >
-          ← Back
-        </button>
-        <Link to={dashboardHref} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-          Dashboard
-        </Link>
-      </div>
-    </nav>
-  )
-}
+/* Navbar removed — using Sidebar */
 
 function parseItemKey(k) {
   const parts = String(k || '').split(':')
@@ -260,7 +255,7 @@ export default function Mistakes() {
     }
   }, [viewUserId])
 
-  const dueCount = useMemo(() => computeDueCount(reviewItems), [reviewItems])
+  const dueCount = useMemo(() => computeDueCount(reviewItems, new Date(), { exam }), [reviewItems, exam])
 
   const filtered = useMemo(() => {
     const now = Date.now()
@@ -382,7 +377,18 @@ export default function Mistakes() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontFamily: 'Sora,sans-serif' }}>
-        Loading mistake notebook…
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12,
+            background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+            margin: '0 auto 12px',
+            animation: 'pulse 1.5s ease-in-out infinite',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="mistakes" size={20} style={{ color: 'white' }} />
+          </div>
+          <span style={{ fontSize: 14 }}>Loading mistake notebook…</span>
+        </div>
       </div>
     )
   }
@@ -400,17 +406,28 @@ export default function Mistakes() {
   })()
 
   const answerPanel = selected ? (
-    <div className={`mistake-answer-box act-floating ${redoFeedback ? (redoFeedback.ok ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''}`} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ fontWeight: 900, color: '#1a2744' }}>Answer Q{selected.q_num} (quick redo)</div>
-        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-          {selectedCorrect != null ? 'Click Check to validate.' : 'Answer key missing for this question.'}
+    <motion.div
+      {...panelSlideIn}
+      className={`${redoFeedback ? (redoFeedback.ok ? 'answer-feedback-correct' : 'answer-feedback-wrong') : ''}`}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 26, height: 26, borderRadius: 8,
+            background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+            color: '#fff', fontSize: 11, fontWeight: 900,
+          }}>Q{selected.q_num}</span>
+          <span style={{ fontWeight: 900, color: '#0f172a', fontSize: 15 }}>Quick Redo</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>
+          {selectedCorrect != null ? 'Click Check to validate' : 'Answer key missing'}
         </div>
       </div>
 
       {selectedCorrect == null ? (
         <div style={{ marginTop: 10, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-          This question can’t be validated yet because the answer key isn’t loaded.
+          This question can't be validated yet because the answer key isn't loaded.
         </div>
       ) : (
         <>
@@ -558,122 +575,304 @@ export default function Mistakes() {
           )}
         </>
       )}
-    </div>
+    </motion.div>
   ) : null
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <Navbar
-        dashboardHref={viewHref('/dashboard')}
-        guideHref={viewHref('/guide')}
-        mistakesHref={viewHref('/mistakes')}
-        calendarHref={viewHref('/calendar')}
-        currentExam={exam}
-        satHref={satHref}
-        actHref={actHref}
-        showResources={showResourceNav}
-      />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
         {isAdminPreview && (
           <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))', color: 'white' }}>
             <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>Admin View</div>
             <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-              You’re viewing this student’s Mistake Notebook in read-only mode. Notes and validations won’t overwrite their data.
+              You're viewing this student's Mistake Notebook in read-only mode. Notes and validations won't overwrite their data.
             </div>
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
-          <div>
-            <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 22, fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Icon name="mistakes" size={20} />
-              Mistake Notebook
-            </h1>
-            <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Your missed questions auto-save here. Adding an explanation is <b>optional</b>, but it helps you avoid repeating the same mistake.
+        <motion.div
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
+          style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 20 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.15, ease: 'easeOut' }}
+              style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(14,165,233,.3)', flexShrink: 0,
+              }}
+            >
+              <Icon name="mistakes" size={22} style={{ color: '#fff' }} />
+            </motion.div>
+            <div>
+              <h1 style={{ fontFamily: 'Sora,sans-serif', fontSize: 24, fontWeight: 900, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+                Mistake Notebook
+              </h1>
+              <div style={{ marginTop: 4, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+                Your missed questions auto-save here. Adding an explanation is <b>optional</b>, but it helps you avoid repeating the same mistake.
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button className="btn btn-outline" onClick={() => setFilterDue(v => !v)}>
-              {filterDue ? 'Showing: Due now' : `Filter: Due now (${dueCount})`}
+        </motion.div>
+
+        {/* ── Stats bar + filter pills ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.1 }}
+          style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}
+        >
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, delay: 0.15 }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 20,
+                background: 'rgba(14,165,233,.08)', color: '#0369a1',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              {filtered.length} mistake{filtered.length !== 1 ? 's' : ''}
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, delay: 0.2 }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 20,
+                background: 'rgba(16,185,129,.08)', color: '#047857',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              {solvedIds.size} validated
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, delay: 0.25 }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 20,
+                background: dueCount > 0 ? 'rgba(239,68,68,.08)' : 'rgba(148,163,184,.08)',
+                color: dueCount > 0 ? '#dc2626' : '#64748b',
+                fontSize: 12, fontWeight: 800,
+              }}
+            >
+              {dueCount} due
+            </motion.span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setFilterDue(false)}
+              style={{
+                padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800,
+                border: filterDue ? '1.5px solid #e2e8f0' : 'none',
+                background: !filterDue ? 'linear-gradient(135deg, #0ea5e9, #3b82f6)' : '#fff',
+                color: !filterDue ? '#fff' : '#475569',
+                cursor: 'pointer', transition: 'all .2s ease',
+                boxShadow: !filterDue ? '0 2px 8px rgba(14,165,233,.25)' : '0 1px 3px rgba(0,0,0,.04)',
+              }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterDue(true)}
+              style={{
+                padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800,
+                border: !filterDue ? '1.5px solid #e2e8f0' : 'none',
+                background: filterDue ? 'linear-gradient(135deg, #0ea5e9, #3b82f6)' : '#fff',
+                color: filterDue ? '#fff' : '#475569',
+                cursor: 'pointer', transition: 'all .2s ease',
+                boxShadow: filterDue ? '0 2px 8px rgba(14,165,233,.25)' : '0 1px 3px rgba(0,0,0,.04)',
+              }}
+            >
+              Due now ({dueCount})
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {filtered.length === 0 ? (
-          <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>No mistakes yet</div>
-              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-              Take a {exam === 'act' ? 'practice ACT' : 'Pre Test or optional Skill Builder test'}. Any missed questions will appear here.
-              </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            style={{
+              maxWidth: 480, margin: '60px auto', textAlign: 'center',
+              padding: '48px 32px', borderRadius: 20,
+              background: '#fff',
+              border: '1.5px solid rgba(16,185,129,.15)',
+              boxShadow: '0 4px 24px rgba(16,185,129,.08)',
+            }}
+          >
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(16,185,129,.3)',
+              marginBottom: 16,
+            }}>
+              <Icon name="check" size={28} style={{ color: '#fff' }} />
             </div>
+            <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 900, fontSize: 18, color: '#0f172a', marginBottom: 8 }}>
+              {filterDue ? 'Nothing due right now' : 'No mistakes yet'}
+            </div>
+            <div style={{ color: '#64748b', fontSize: 14, lineHeight: 1.7 }}>
+              {filterDue
+                ? "You're all caught up! Check back later or switch to All to review previous mistakes."
+                : `Take a ${exam === 'act' ? 'practice ACT' : 'Pre Test or optional Skill Builder test'}. Any missed questions will appear here for review.`}
+            </div>
+          </motion.div>
         ) : (
-          <>
+          <AnimatePresence mode="wait">
             {!selected ? (
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: 14, borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontWeight: 900, color: '#1a2744' }}>Mistakes ({filtered.length})</div>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>Click one to open its full question page</div>
-                </div>
-                <div style={{ maxHeight: 720, overflow: 'auto' }}>
-                  {filtered.map((m) => {
-                    const k = `${m.test_id}:${m.section}:${m.q_num}`
-                    const cfg = getTestConfig(m.test_id) || { label: m.test_id, pdfUrl: '/practice-test-11.pdf' }
-                    const secLabel = getExamConfigForTest(m.test_id)?.modules?.[m.section]?.label || m.section
-                    const dueAt = reviewItems?.[k]?.due_at
-                    const dueSoon = dueAt && new Date(dueAt).getTime() <= Date.now()
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => setSelected(m)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: 14,
-                          border: 0,
-                          borderBottom: '1px solid #e2e8f0',
-                          background: solvedIds.has(m.id) ? '#f0fdf4' : 'transparent',
-                          cursor: 'pointer',
-                          opacity: solvedIds.has(m.id) ? 0.7 : 1,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ fontWeight: 900, color: solvedIds.has(m.id) ? '#10b981' : '#1a2744' }}>
-                            {solvedIds.has(m.id) ? '✓ ' : ''}{cfg.label} · {secLabel} · Q{m.q_num}
-                          </div>
-                          <div style={{ fontSize: 12, fontWeight: 900, color: solvedIds.has(m.id) ? '#10b981' : (dueSoon ? '#ef4444' : '#94a3b8') }}>
-                            {solvedIds.has(m.id) ? 'DONE' : (dueSoon ? 'DUE' : '—')}
+              <motion.div
+                key="mistake-list"
+                variants={listStagger}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+              >
+                {filtered.map((m) => {
+                  const k = `${m.test_id}:${m.section}:${m.q_num}`
+                  const cfg = getTestConfig(m.test_id) || { label: m.test_id, pdfUrl: '/practice-test-11.pdf' }
+                  const secLabel = getExamConfigForTest(m.test_id)?.modules?.[m.section]?.label || m.section
+                  const dueAt = reviewItems?.[k]?.due_at
+                  const dueSoon = dueAt && new Date(dueAt).getTime() <= Date.now()
+                  const solved = solvedIds.has(m.id)
+                  return (
+                    <motion.button
+                      key={m.id}
+                      variants={listItem}
+                      whileHover={{ y: -2, boxShadow: '0 6px 20px rgba(14,165,233,.12)', borderColor: '#0ea5e9' }}
+                      onClick={() => setSelected(m)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '14px 16px',
+                        border: solved
+                          ? '1.5px solid rgba(16,185,129,.25)'
+                          : '1.5px solid rgba(14,165,233,.12)',
+                        borderLeft: solved
+                          ? '3px solid #10b981'
+                          : '1.5px solid rgba(14,165,233,.12)',
+                        borderRadius: 14,
+                        background: solved
+                          ? 'linear-gradient(135deg, rgba(16,185,129,.04), rgba(16,185,129,.01))'
+                          : '#fff',
+                        cursor: 'pointer',
+                        opacity: solved ? 0.75 : 1,
+                        boxShadow: '0 2px 8px rgba(15,23,42,.05)',
+                        transition: 'all .2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            minWidth: 28, height: 28, borderRadius: 8,
+                            background: solved
+                              ? 'rgba(16,185,129,.12)'
+                              : 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                            color: solved ? '#059669' : '#fff',
+                            fontSize: 11, fontWeight: 900, flexShrink: 0,
+                            padding: '0 6px',
+                          }}>
+                            Q{m.q_num}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 14, color: solved ? '#059669' : '#0f172a' }}>
+                              {solved ? '✓ ' : ''}{cfg.label} · {secLabel}
+                            </div>
+                            <div style={{ marginTop: 3, fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+                              {m.chapter_id ? `Ch ${m.chapter_id}` : 'No chapter'} · Your answer: <b style={{ color: '#64748b' }}>{String(m.given || '').trim() || 'Unanswered'}</b>
+                            </div>
                           </div>
                         </div>
-                        <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
-                          {m.chapter_id ? `Study Guide: Ch ${m.chapter_id}` : 'Study Guide: —'} · Your answer: <b>{String(m.given || '').trim() || 'Unanswered'}</b>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 12,
+                          background: solved
+                            ? 'rgba(16,185,129,.1)'
+                            : dueSoon ? 'rgba(239,68,68,.08)' : 'rgba(148,163,184,.06)',
+                          color: solved ? '#059669' : (dueSoon ? '#dc2626' : '#94a3b8'),
+                          flexShrink: 0,
+                        }}>
+                          {solved ? 'DONE' : (dueSoon ? 'DUE' : '—')}
+                        </span>
+                      </div>
+                    </motion.button>
+                  )
+                })}
+              </motion.div>
             ) : (
-              <div className="card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <motion.div
+                key="mistake-detail"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                style={{ overflow: 'visible' }}
+              >
+                {/* Nav bar */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14,
+                  background: '#fff', border: '1.5px solid rgba(14,165,233,.12)', borderRadius: 14,
+                  boxShadow: '0 2px 8px rgba(15,23,42,.04)', padding: '12px 16px',
+                }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn btn-outline" onClick={() => setSelected(null)}>
                       <Icon name="back" size={16} />
                       Back to list
                     </button>
                     <Link className="btn btn-outline" to={viewHref('/dashboard')}>
                       <Icon name="home" size={16} />
-                      Back to Dashboard
+                      Dashboard
                     </Link>
                   </div>
-                    <div style={{ fontWeight: 900, color: '#1a2744', fontSize: 15 }}>
-                    <span style={{ fontWeight: 900 }}>Answering:</span> {selectedCfg?.label || selected.test_id} · {selectedModule?.label || selected.section} · <span style={{ fontWeight: 900 }}>Q{selected.q_num}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: 28, height: 28, borderRadius: 8,
+                      background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)',
+                      color: '#fff', fontSize: 11, fontWeight: 900, padding: '0 6px',
+                    }}>Q{selected.q_num}</span>
+                    <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
+                      {selectedCfg?.label || selected.test_id} · {selectedModule?.label || selected.section}
+                    </span>
                   </div>
                   <a className="btn btn-outline" href={selectedCfg?.pdfUrl || '/practice-test-11.pdf'} target="_blank" rel="noreferrer">Open PDF →</a>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                {/* Answer box - sticky at page level, outside any overflow container */}
+                <div style={{
+                  position: 'sticky', top: 0, zIndex: 20,
+                  background: '#fff',
+                  borderRadius: 16,
+                  border: '1.5px solid rgba(14,165,233,.18)',
+                  boxShadow: '0 4px 24px rgba(15,23,42,.12)',
+                  marginBottom: 14,
+                  padding: '18px 20px',
+                }}>
+                  {answerPanel}
+                </div>
+
+                {/* Zoom controls */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10,
+                  background: '#fff', border: '1.5px solid rgba(14,165,233,.12)', borderRadius: 12,
+                  padding: '10px 16px',
+                }}>
                   <div style={{ fontSize: 12, color: '#64748b', fontWeight: 800 }}>
-                    Use zoom if the page is hard to read. <span style={{ color: '#1a2744', fontWeight: 900 }}>Your answer box stays visible below</span> while you scroll the question.
+                    Scroll down to see the question. Answer box stays pinned at the top.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.8, Math.round((z - 0.25) * 100) / 100))}>− Zoom</button>
@@ -684,11 +883,11 @@ export default function Mistakes() {
                   </div>
                 </div>
 
-                {answerPanel}
-
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, background: 'white', marginBottom: 14 }}>
+                {/* PDF viewer - full width, scrolls below the sticky answer box */}
+                <div style={{ border: '1.5px solid rgba(14,165,233,.12)', borderRadius: 16, background: 'white', boxShadow: '0 2px 8px rgba(15,23,42,.04)' }}>
                   {Array.isArray(selectedSectionRange) ? (
                     <PDFSectionStack
+                      key={selectedItemKey}
                       pdfUrl={selectedCfg?.pdfUrl || '/practice-test-11.pdf'}
                       startPage={selectedSectionRange[0]}
                       endPage={selectedSectionRange[1]}
@@ -709,18 +908,18 @@ export default function Mistakes() {
 
                 {exam !== 'act' && (
                   <div style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: '#64748b', marginBottom: 6 }}>Optional explanation (save what you learned)</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>Optional explanation (save what you learned)</div>
                     <textarea
                       value={selected.note || ''}
                       onChange={(e) => setSelected(prev => ({ ...prev, note: e.target.value }))}
-                      placeholder="Write 2–4 sentences: what you missed, what the question was testing, and the exact rule/step you’ll use next time."
+                      placeholder="Write 2–4 sentences: what you missed, what the question was testing, and the exact rule/step you'll use next time."
                       readOnly={isAdminPreview}
                       style={{
                         width: '100%',
                         minHeight: 110,
                         padding: 12,
                         borderRadius: 12,
-                        border: '1.5px solid #e2e8f0',
+                        border: '1.5px solid rgba(14,165,233,.12)',
                         outline: 'none',
                         resize: 'vertical',
                         fontFamily: 'DM Sans, system-ui, -apple-system, Segoe UI, sans-serif',
@@ -730,11 +929,11 @@ export default function Mistakes() {
                     />
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                       <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                        Tip: Avoid “I’ll be more careful.” Write the specific method you’ll apply.
+                        Tip: Avoid "I'll be more careful." Write the specific method you'll apply.
                       </div>
                       <button
                         className="btn"
-                        style={{ background: '#1a2744', color: 'white', fontWeight: 900 }}
+                        style={{ background: 'linear-gradient(135deg, #0ea5e9, #3b82f6)', color: 'white', fontWeight: 800, borderRadius: 10, boxShadow: '0 2px 8px rgba(14,165,233,.2)' }}
                         disabled={isAdminPreview || savingId === selected.id}
                         onClick={async () => {
                           if (isAdminPreview) return
@@ -749,9 +948,9 @@ export default function Mistakes() {
                     </div>
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
-          </>
+          </AnimatePresence>
         )}
       </div>
     </div>

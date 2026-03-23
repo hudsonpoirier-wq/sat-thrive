@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
@@ -8,6 +9,8 @@ import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
 import ExamSwitcher from '../components/ExamSwitcher.jsx'
 import TopResourceNav from '../components/TopResourceNav.jsx'
+import Sidebar from '../components/Sidebar.jsx'
+import AnimateOnScroll from '../components/AnimateOnScroll.jsx'
 import { useToast } from '../components/Toast.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { TESTS, getTestsForExam, getExamFromTestId, normalizeTestId } from '../data/tests.js'
@@ -21,6 +24,7 @@ import {
   getScoreColumnsForExam,
   scoreAttemptFromKey,
   calcWeakTopicsForTest,
+  scoreToPercentile,
 } from '../data/examData.js'
 import { loadDashboardViewData, loadProfileSafe } from '../lib/dashboardData.js'
 import { resolveViewContext, withViewUser, withExam } from '../lib/viewAs.js'
@@ -106,24 +110,39 @@ function Navbar({ viewUserId, isAdminPreview, currentExam, showResources = false
   )
 }
 
+function SectionIcon({ name, color = '#0ea5e9' }) {
+  return (
+    <span style={{
+      width: 32, height: 32, borderRadius: 10,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      background: `linear-gradient(135deg, #1e3a8a, ${color})`,
+      color: 'white', flexShrink: 0,
+      boxShadow: `0 3px 10px ${color}33`,
+    }}>
+      <Icon name={name} size={16} />
+    </span>
+  )
+}
+
 function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
   const content = (
-    <div className={`stat-box stat-box-animated${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', height: '100%' }}>
+    <div className={`stat-box stat-box-animated${dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', height: '100%' }}>
       <div style={{
-        width: 42,
-        height: 42,
-        borderRadius: 12,
+        width: 46,
+        height: 46,
+        borderRadius: 14,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: dark ? 'rgba(255,255,255,.14)' : 'rgba(14,165,233,.10)',
-        color: dark ? 'white' : '#0f172a',
+        background: dark ? 'rgba(255,255,255,.18)' : 'linear-gradient(135deg, #1e3a8a, #0ea5e9)',
+        color: dark ? 'white' : '#ffffff',
+        boxShadow: dark ? 'none' : '0 4px 12px rgba(14,165,233,.25)',
       }}>
         <Icon name={icon} size={20} />
       </div>
       <div style={{ minWidth: 0 }}>
         <div className="stat-label">{label}</div>
-        <div className="stat-num" style={{ fontSize: 22 }}>
+        <div className="stat-num" style={{ fontSize: 24 }}>
           <AnimatedNumber value={value} />
         </div>
         <div className="stat-sub">{sub}</div>
@@ -141,7 +160,7 @@ function ScoreOverviewCard({ label, value, sub, icon, dark = false, to = '' }) {
 
 function ScheduleTaskLink({ task, compact = false, stopParentClick = false, completed = false }) {
   const doneAccent = '#059669'
-  const accent = completed ? doneAccent : (task.type === 'guide' ? '#1a2744' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9')
+  const accent = completed ? doneAccent : (task.type === 'guide' ? '#0ea5e9' : task.type === 'mistakes' ? '#f59e0b' : '#0ea5e9')
   const icon = completed ? 'check' : (task.type === 'guide' ? 'guide' : task.type === 'mistakes' ? 'mistakes' : 'results')
   return (
     <Link
@@ -150,30 +169,33 @@ function ScheduleTaskLink({ task, compact = false, stopParentClick = false, comp
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: 10,
-        padding: compact ? '8px 10px' : '10px 12px',
-        border: completed ? '1px solid rgba(5,150,105,.3)' : '1px solid #e2e8f0',
+        gap: 12,
+        padding: compact ? '10px 12px' : '12px 14px',
+        border: completed ? '2px solid rgba(5,150,105,.35)' : '1px solid rgba(14,165,233,.15)',
         borderRadius: 12,
         textDecoration: 'none',
         color: completed ? '#059669' : '#0f172a',
-        background: completed ? 'rgba(5,150,105,.06)' : 'white',
+        background: completed ? 'linear-gradient(135deg, rgba(5,150,105,.06), rgba(5,150,105,.02))' : 'white',
+        boxShadow: '0 2px 6px rgba(15,23,42,.04)',
+        transition: 'all .2s ease',
       }}
     >
       <span style={{
-        width: compact ? 28 : 32,
-        height: compact ? 28 : 32,
+        width: compact ? 30 : 34,
+        height: compact ? 30 : 34,
         borderRadius: 10,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: completed ? 'rgba(5,150,105,.15)' : `${accent}14`,
-        color: accent,
+        background: completed ? 'rgba(5,150,105,.15)' : `linear-gradient(135deg, ${accent}, ${accent}dd)`,
+        color: completed ? doneAccent : 'white',
         flexShrink: 0,
+        boxShadow: completed ? 'none' : `0 3px 8px ${accent}33`,
       }}>
         <Icon name={icon} size={compact ? 15 : 16} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <div style={{ fontSize: compact ? 12 : 13, fontWeight: 900, color: completed ? '#059669' : '#1a2744', lineHeight: 1.35 }}>
+        <div style={{ fontSize: compact ? 12 : 13, fontWeight: 900, color: completed ? '#059669' : '#0f172a', lineHeight: 1.35 }}>
           {completed && '✓ '}{task.title}
         </div>
         <div style={{ fontSize: 12, color: completed ? '#6ee7b7' : '#64748b', lineHeight: 1.5, marginTop: 2 }}>{task.subtitle}</div>
@@ -418,6 +440,36 @@ export default function Dashboard() {
   const improvement = mostRecentRecord && lowestScoreRecord
     ? Number(mostRecentRecord.scores?.total || 0) - Number(lowestScoreRecord.scores?.total || 0)
     : null
+
+  // Percentile based on best score
+  const bestTotal = bestSatRecord ? Number(bestSatRecord.scores?.total || bestSatRecord.scores?.composite || 0) : 0
+  const bestPercentile = bestTotal > 0 ? scoreToPercentile(exam, bestTotal) : null
+
+  // Superscore: best section scores across all completed attempts
+  const superscore = useMemo(() => {
+    if (!completedWithScores.length) return null
+    if (exam === 'act') {
+      let bestEng = 0, bestMath = 0, bestRead = 0, bestSci = 0
+      for (const { scores } of completedWithScores) {
+        bestEng = Math.max(bestEng, Number(scores.english || 0))
+        bestMath = Math.max(bestMath, Number(scores.math || 0))
+        bestRead = Math.max(bestRead, Number(scores.reading || 0))
+        bestSci = Math.max(bestSci, Number(scores.science || 0))
+      }
+      if (!bestEng && !bestMath && !bestRead && !bestSci) return null
+      const composite = Math.round((bestEng + bestMath + bestRead + bestSci) / 4)
+      return { total: composite, sections: { english: bestEng, math: bestMath, reading: bestRead, science: bestSci } }
+    } else {
+      let bestRW = 0, bestMath = 0
+      for (const { scores } of completedWithScores) {
+        bestRW = Math.max(bestRW, Number(scores.rw || 0))
+        bestMath = Math.max(bestMath, Number(scores.math || 0))
+      }
+      if (!bestRW && !bestMath) return null
+      return { total: bestRW + bestMath, sections: { rw: bestRW, math: bestMath } }
+    }
+  }, [completedWithScores, exam])
+  const superscorePercentile = superscore ? scoreToPercentile(exam, superscore.total) : null
   const studiedCount = Object.values(studiedForExam).filter(Boolean).length
   const studiedPct = Math.round((studiedCount / Math.max(1, examConfig.guideCompletionTarget)) * 100)
   const hasStartedGuide = (studiedRowsForExam || []).some((r) => {
@@ -592,32 +644,34 @@ export default function Dashboard() {
     datasets: [{
       label: 'Total Score',
       data: trendAttempts.map(x => x.scores.total),
-      borderColor: '#1a2744',
-      backgroundColor: 'rgba(26,39,68,.08)',
+      borderColor: '#0ea5e9',
+      backgroundColor: 'rgba(14,165,233,.08)',
       pointBackgroundColor: '#f59e0b',
       tension: 0.25,
       fill: true,
     }]
   } : null
 
-  if (loading) return <>
-    <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} currentExam={exam} showResources={false} />
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100vh - 60px)',color:'#64748b'}}>Loading…</div>
-  </>
+  if (loading) return (
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
+      <div className="page" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#64748b'}}>Loading…</div>
+    </div>
+  )
 
   return (
-    <>
-      <Navbar viewUserId={viewUserId} isAdminPreview={isAdminPreview} currentExam={exam} showResources={hasTakenPretest} />
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
         {isAdminPreview && (() => {
           const isTutorUser = profile?.role === "tutor"
           return (
-          <div className="card" style={{ marginBottom: 18, background: "linear-gradient(135deg, rgba(26,39,68,.96), rgba(30,58,138,.94))", color: "white" }}>
+          <div className="card" style={{ marginBottom: 18, background: "linear-gradient(135deg, #0c4a6e, #1e3a8a)", color: "white" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <div>
                 <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 4 }}>{isTutorUser ? "Tutor View" : "Admin View"}</div>
                 <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.88 }}>
-                  {"You\u0027re previewing "}{displayProfile?.full_name || "this student"}{"’s dashboard. Troubleshooting links work, but data-changing actions are read-only here."}
+                  {"You\u0027re previewing "}{displayProfile?.full_name || "this student"}{"'s dashboard. Troubleshooting links work, but data-changing actions are read-only here."}
                 </div>
               </div>
               <Link className="btn btn-outline" to={isTutorUser ? "/tutor" : "/admin"} style={{ color: "white", borderColor: "rgba(255,255,255,.24)", background: "rgba(255,255,255,.08)" }}>
@@ -628,37 +682,200 @@ export default function Dashboard() {
           )
         })()}
 
-        {/* Welcome */}
-        <div style={{marginBottom:28}}>
-          <h1 style={{fontFamily:'Sora,sans-serif',fontSize:26,fontWeight:800,color:'#1a2744'}}>
-            {`Hey there ${displayProfile?.full_name?.split(' ')[0] || 'there'}!`}
-          </h1>
-          <p style={{color:'#64748b',marginTop:4}}>Your Agora Project dashboard — track your {examResultLabel(exam)}</p>
+        {/* Hero — logo + brand text, full width */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 28,
+            padding: '56px 32px',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0ea5e9 100%)',
+            borderRadius: 20,
+            marginBottom: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <motion.img
+            src="/logo.png"
+            alt="The Agora Project"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+            style={{
+              width: 160,
+              height: 160,
+              flexShrink: 0,
+              filter: 'drop-shadow(0 8px 24px rgba(0,0,0,.3))',
+            }}
+          />
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.35 }}
+            style={{ textAlign: 'left' }}
+          >
+            <div style={{
+              fontFamily: 'Sora, sans-serif',
+              fontSize: 52,
+              fontWeight: 900,
+              color: 'white',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+            }}>
+              The Agora Project
+            </div>
+            <div style={{
+              fontSize: 20,
+              color: 'rgba(255,255,255,.65)',
+              fontWeight: 500,
+              marginTop: 10,
+            }}>
+              Built for speed, focus, and results
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Sliding resource marquee */}
+        <div style={{
+          overflow: 'hidden',
+          background: '#f8fafc',
+          borderRadius: '0 0 16px 16px',
+          padding: '14px 0',
+          marginBottom: 24,
+          position: 'relative',
+        }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 60, background: 'linear-gradient(90deg, #f8fafc, transparent)', zIndex: 1 }} />
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 60, background: 'linear-gradient(270deg, #f8fafc, transparent)', zIndex: 1 }} />
+          <motion.div
+            animate={{ x: ['0%', '-50%'] }}
+            transition={{ repeat: Infinity, duration: 25, ease: 'linear' }}
+            style={{ display: 'flex', gap: 32, whiteSpace: 'nowrap', width: 'max-content' }}
+          >
+            {[...Array(2)].map((_, dup) => (
+              <div key={dup} style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+                {[
+                  'Study Guide', 'Test Strategies', 'More Practice', 'Extra Tests',
+                  'Mistake Notebook', 'Progress Report', 'Journey Planner',
+                  'College Recruiting', 'Calendar', 'Compare Tests',
+                ].map((label) => (
+                  <span key={`${dup}-${label}`} style={{
+                    fontFamily: 'Sora, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#64748b',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9', flexShrink: 0 }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </motion.div>
         </div>
+
+        {/* Resource cards grid */}
+        {!isTutor && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: 16,
+            marginBottom: 28,
+          }}>
+            {[
+              { title: 'Study Guide', desc: `Master every ${examConfig.label} topic with guided lessons, practice questions, and chapter-by-chapter progress tracking.`, btn: 'Learn more', href: viewHref('/guide'), color: '#1e3a8a', icon: 'guide' },
+              { title: 'Test Strategies', desc: `Time management, elimination techniques, and section-specific tips to maximize your ${examConfig.label} score.`, btn: 'Learn more', href: viewHref('/strategies'), color: '#166534', icon: 'target' },
+              { title: 'More Practice', desc: 'Additional practice questions organized by topic to reinforce weak areas and build confidence.', btn: 'Practice now', href: viewHref('/practice'), color: '#84cc16', icon: 'star' },
+              { title: 'Extra Tests', desc: `Full-length ${examConfig.label} practice tests beyond the pre-test to simulate real exam conditions.`, btn: 'View tests', href: viewHref('/extra-tests'), color: '#0ea5e9', icon: 'test' },
+              { title: 'Mistake Notebook', desc: 'Track every missed question, review explanations, and validate your understanding to close knowledge gaps.', btn: 'Review mistakes', href: viewHref('/mistakes'), color: '#f59e0b', icon: 'mistakes' },
+              { title: 'Progress Report', desc: 'Detailed analytics on score trends, improvement over time, and study completion rates.', btn: 'View report', href: viewHref('/report'), color: '#8b5cf6', icon: 'chart' },
+              { title: 'Journey Planner', desc: 'Adaptive daily study plan that updates based on your weak topics, availability, and target test date.', btn: 'View journey', href: viewHref('/journey'), color: '#06b6d4', icon: 'calendar' },
+              { title: 'College Recruiting', desc: 'Discover colleges that match your scores, filter by cost, location, and size, and see your admission chances.', btn: 'Explore schools', href: viewHref('/college-recruiting'), color: '#0f172a', icon: 'students' },
+              { title: 'Compare SAT vs ACT', desc: 'See how the digital SAT and ACT compare to choose which test fits your strengths and how to decide.', btn: 'Compare tests', href: '/compare-tests', color: '#dc2626', icon: 'results' },
+            ].map((r) => (
+              <Link key={r.title} to={r.href} style={{ textDecoration: 'none', display: 'block' }}>
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: 16,
+                  padding: '28px 24px',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'box-shadow .2s ease, transform .2s ease',
+                  border: '1px solid #e2e8f0',
+                }}
+                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,.08)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'translateY(0)' }}
+                >
+                  <div style={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    background: `${r.color}18`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 18, flexShrink: 0,
+                  }}>
+                    <Icon name={r.icon} size={22} style={{ color: r.color }} />
+                  </div>
+                  <div style={{
+                    fontFamily: 'Sora, sans-serif',
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    marginBottom: 10,
+                  }}>{r.title}</div>
+                  <div style={{
+                    fontSize: 14,
+                    color: '#64748b',
+                    lineHeight: 1.7,
+                    flex: 1,
+                    marginBottom: 18,
+                  }}>{r.desc}</div>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    padding: '8px 18px',
+                    borderRadius: 999,
+                    border: `1.5px solid ${r.color}`,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: r.color,
+                    background: 'transparent',
+                  }}>{r.btn}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* Tutor CTA — primary action for tutors */}
         {isTutor && !isAdminPreview && (
-          <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, #1a2744, #312e81)', color: 'white', padding: 24 }}>
+          <AnimateOnScroll animation="anim-scale-up" duration={500} delay={100}>
+          <div className="card dashboard-tutor-cta">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 900, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h2 className="dashboard-section-title" style={{ color: 'white', marginBottom: 4 }}>
                   <Icon name="students" size={20} />
                   Your Students
-                </div>
+                </h2>
                 <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.6 }}>
-                  View student progress, test results, and analytics from your Tutor Dashboard.
+                  View student progress, test results, and analytics.
                 </div>
               </div>
-              <button className="btn" onClick={() => navigate('/tutor')} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
-                Open Tutor Dashboard →
+              <button className="btn" onClick={() => navigate('/tutor')}>
+                Open Tutor Dashboard
               </button>
             </div>
           </div>
+          </AnimateOnScroll>
         )}
 
         {/* Score overview — students only */}
         {!isTutor && (
-	        <div className="stats-grid">
+          <AnimateOnScroll animation="anim-fade-up" stagger={120} as="div" className="stats-grid">
             <ScoreOverviewCard
               label={bestScoreLabel}
               value={bestSatRecord ? formatExamSubscore(exam, bestSatRecord.scores, 'total') : '—'}
@@ -688,12 +905,31 @@ export default function Dashboard() {
               icon="chart"
               dark={improvement !== null && improvement !== 0}
             />
-        </div>
+            <ScoreOverviewCard
+              label="Percentile"
+              value={bestPercentile !== null ? `${bestPercentile}${bestPercentile < 100 ? '' : ''}` : '—'}
+              sub={bestPercentile !== null ? `Top ${100 - bestPercentile}% of test takers` : 'Complete a test to see percentile'}
+              icon="target"
+              dark={bestPercentile !== null && bestPercentile >= 75}
+            />
+            <ScoreOverviewCard
+              label="Superscore"
+              value={superscore ? superscore.total : '—'}
+              sub={superscore
+                ? exam === 'act'
+                  ? `E ${superscore.sections.english} · M ${superscore.sections.math} · R ${superscore.sections.reading} · S ${superscore.sections.science}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
+                  : `R&W ${superscore.sections.rw} + M ${superscore.sections.math}${superscorePercentile ? ` · ${superscorePercentile}th %ile` : ''}`
+                : 'Best section scores across all tests'}
+              icon="star"
+              dark={Boolean(superscore)}
+            />
+        </AnimateOnScroll>
         )}
 
 	        {/* Pre Test CTA (hidden after completion, hidden for tutors) */}
         {!isTutor && (completedPre.length === 0 || preInProgress) && (
-	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#1a2744,#1e3a8a)', color:'white'}}>
+          <AnimateOnScroll animation="anim-slide-up" duration={600} delay={200}>
+	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#0c4a6e,#1e3a8a)', color:'white'}}>
 	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
 	              <div>
 	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
@@ -707,13 +943,13 @@ export default function Dashboard() {
 	              {preInProgress ? (
 	                <div style={{display:'flex', gap:10}}>
 	                  <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
-	                    style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
+	                    style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
 	                    {readOnlyView ? 'Preview only' : '▶ Resume'}
 	                  </button>
 	                </div>
 	              ) : (
 	                <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
-	                  style={{background:'#f59e0b', color:'#1a2744', fontWeight:700}}>
+	                  style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
 	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
 	                </button>
 	              )}
@@ -728,26 +964,28 @@ export default function Dashboard() {
 	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
 	                    Cancel
 	                  </button>
-	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#1a2744', fontWeight: 800 }}>
+	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#0f172a', fontWeight: 800 }}>
 	                    {readOnlyView ? 'Preview only' : 'Start Test'}
 	                  </button>
 	                </div>
 	              </div>
 	            )}
 	          </div>
+          </AnimateOnScroll>
 	        )}
 
         {/* Today / work-ahead */}
         {!isTutor && hasTakenPretest && journeySchedule && (
+          <AnimateOnScroll animation="anim-fade-up" duration={600} delay={100}>
           <div id="today-tasks-card" className="card dashboard-section-card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
               <div>
-                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="task" size={18} />
-                  Today’s Tasks
+                <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <SectionIcon name="task" color="#0ea5e9" />
+                  Today's Tasks
                 </h2>
                 <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening the following study day’s tasks early.
+                  Your schedule adapts automatically based on what is still unfinished. You can also work ahead by opening the following study day's tasks early.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -799,7 +1037,7 @@ export default function Dashboard() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 10 }}>
                     <div>
-                      <div style={{ fontWeight: 900, color: '#1a2744' }}>
+                      <div style={{ fontWeight: 900, color: '#0f172a' }}>
                         {scheduleCardTitle(day, idx)}
                       </div>
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{day.label}</div>
@@ -831,15 +1069,17 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+          </AnimateOnScroll>
         )}
 
         {/* Journey tracker + Study Guide */}
         {!isTutor && (
+        <AnimateOnScroll animation="anim-fade-left" duration={600} delay={100}>
         <div className="card dashboard-section-card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="task" size={18} />
+              <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SectionIcon name="task" color="#0ea5e9" />
                 Smart Journey
               </h2>
               <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
@@ -922,17 +1162,24 @@ export default function Dashboard() {
                     disabled={disabled}
                     style={{
                       textAlign: 'left',
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid rgba(14,165,233,.12)',
                       borderRadius: 14,
-                      padding: 14,
-                      background: disabled ? '#f1f5f9' : '#f8fafc',
+                      padding: 16,
+                      background: disabled ? '#f1f5f9' : '#ffffff',
                       cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.7 : 1,
+                      opacity: disabled ? 0.6 : 1,
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                      <div style={{ fontWeight: 900, color: '#1a2744' }}>{s.title}</div>
-                      <div style={{ fontSize: 12, fontWeight: 900, color: statusColor(s.status) }}>{s.status}</div>
+                      <div style={{ fontWeight: 900, color: '#0f172a' }}>{s.title}</div>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 900,
+                        color: statusColor(s.status),
+                        background: s.status === 'DONE' ? 'rgba(16,185,129,.1)' : s.status === 'IN PROGRESS' ? 'rgba(245,158,11,.1)' : 'transparent',
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                      }}>{s.status}</div>
                     </div>
                     <div style={{ marginTop: 6, color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>{s.desc}</div>
                   </button>
@@ -970,17 +1217,19 @@ export default function Dashboard() {
 	            </div>
 	          )}
 	        </div>
+        </AnimateOnScroll>
         )}
 
         {/* Optional extra practice */}
         {!isTutor && hasTakenPretest && (
           <>
             {extraTests.length > 0 && (
+              <AnimateOnScroll animation="anim-fade-right" duration={600} delay={100}>
               <div className="card dashboard-practice-card dashboard-section-card" style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ minWidth: 0 }}>
-                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Icon name="sparkle" size={18} />
+                    <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <SectionIcon name="sparkle" color="#f59e0b" />
                       Extra Practice (Optional)
                     </h2>
                     <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
@@ -999,21 +1248,21 @@ export default function Dashboard() {
                     return (
                       <div key={t.id} className={`dashboard-practice-tile${confirmExtraTestId === t.id ? ' expanded' : ''}`}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ fontWeight: 900, color: '#1a2744', minWidth: 0, lineHeight: 1.35, overflowWrap: 'break-word' }}>{t.label}</div>
+                          <div style={{ fontWeight: 900, color: '#0f172a', minWidth: 0, lineHeight: 1.35, overflowWrap: 'break-word' }}>{t.label}</div>
                           <div style={{ fontSize: 12, fontWeight: 900, color: done ? '#10b981' : '#94a3b8', whiteSpace: 'nowrap' }}>
                             {done ? 'DONE' : prog ? 'IN PROGRESS' : 'OPTIONAL'}
                           </div>
                         </div>
                         <div className="dashboard-practice-actions">
                           {prog ? (
-                            <button className="btn" style={{ background: '#1a2744', color: 'white', fontWeight: 900 }} disabled={readOnlyView} onClick={() => navigate(`/test/${prog.id}`)}>
+                            <button className="btn" style={{ background: '#0ea5e9', color: 'white', fontWeight: 900 }} disabled={readOnlyView} onClick={() => navigate(`/test/${prog.id}`)}>
                               {readOnlyView ? 'Preview only' : 'Resume →'}
                             </button>
                           ) : (
                             <>
                               <button
                                 className="btn"
-                                style={{ background: '#1a2744', color: 'white', fontWeight: 900 }}
+                                style={{ background: '#0ea5e9', color: 'white', fontWeight: 900 }}
                                 disabled={readOnlyView}
                                 onClick={() => setConfirmExtraTestId((prev) => (prev === t.id ? null : t.id))}
                               >
@@ -1021,7 +1270,7 @@ export default function Dashboard() {
                               </button>
                               {confirmExtraTestId === t.id && (
                                 <div style={{ marginTop: 10, width: '100%', background: 'rgba(255,255,255,.65)', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12 }}>
-                                  <div style={{ fontWeight: 900, color: '#1a2744', marginBottom: 6 }}>Start this optional test now?</div>
+                                  <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Start this optional test now?</div>
                                   <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
                                     This is optional, but it helps reinforce weak topics and track improvement.
                                   </div>
@@ -1031,7 +1280,7 @@ export default function Dashboard() {
                                     </button>
                                     <button
                                       className="btn"
-                                      style={{ background: '#1a2744', color: 'white', fontWeight: 900, padding: '8px 12px' }}
+                                      style={{ background: '#0ea5e9', color: 'white', fontWeight: 900, padding: '8px 12px' }}
                                       onClick={() => {
                                         setConfirmExtraTestId(null)
                                         startNewTest(t.id)
@@ -1061,18 +1310,18 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
+              </AnimateOnScroll>
             )}
           </>
         )}
 
         {/* Completed tests */}
         {!isTutor && completed.length > 0 && (
+          <AnimateOnScroll animation="anim-blur-in" duration={700} delay={100}>
           <div className="card dashboard-section-card">
-            <h2 style={{fontFamily:'Sora,sans-serif', fontSize:16, fontWeight:700, marginBottom:16}}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="results" size={18} />
-                Your Test Results
-              </span>
+            <h2 style={{fontFamily:'Sora,sans-serif', fontSize:17, fontWeight:900, marginBottom:16, display:'flex', alignItems:'center', gap:10}}>
+              <SectionIcon name="results" color="#1e3a8a" />
+              Your Test Results
             </h2>
 	            <div style={{overflowX:'auto'}}>
 	              <table style={{width:'100%', borderCollapse:'collapse'}}>
@@ -1086,7 +1335,7 @@ export default function Dashboard() {
                         'Gain',
                         ''
                       ].map(h => (
-	                        <th key={h} style={{padding:'8px 12px', textAlign:'left', fontSize:11, color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'.5px', background:'#f8fafc', borderBottom:'1px solid #e8ecf0'}}>
+	                        <th key={h} style={{padding:'8px 12px', textAlign:'left', fontSize:11, color:'#0f172a', fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px', background:'#f0f4f8', borderBottom:'1px solid #e2e8f0'}}>
 	                        {h}
 	                      </th>
 	                    ))}
@@ -1100,7 +1349,7 @@ export default function Dashboard() {
 		                    const gain = post ? post.post_score - (rowScores?.total || 0) : null
 		                    return (
 		                      <tr key={a.id} style={{borderBottom:'1px solid #f1f5f9'}}>
-		                        <td style={{padding:'12px', fontWeight:800, color:'#1a2744'}}>{cfg?.label || a.test_id}</td>
+		                        <td style={{padding:'12px', fontWeight:800, color:'#0f172a'}}>{cfg?.label || a.test_id}</td>
 		                        <td style={{padding:'12px'}}>{new Date(a.started_at).toLocaleDateString()}</td>
                         {scoreColumns.map((column) => (
                           <td
@@ -1148,7 +1397,7 @@ export default function Dashboard() {
                           )}
                         </td>
                         <td style={{padding:'12px'}}>
-                          <Link to={viewHref(`/results/${a.id}`)} style={{fontSize:12, color:'#1a2744', fontWeight:600}}>
+                          <Link to={viewHref(`/results/${a.id}`)} style={{fontSize:12, color:'#0f172a', fontWeight:600}}>
                             View →
                           </Link>
                         </td>
@@ -1159,13 +1408,15 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
+          </AnimateOnScroll>
         )}
 
         {/* Score trend (hidden until pretest is taken) */}
         {!isTutor && hasTakenPretest && trendData && (
+          <AnimateOnScroll animation="anim-scale-up" duration={700} delay={150}>
           <div className="card dashboard-section-card" style={{ marginTop: 24 }}>
-            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 16, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="chart" size={18} />
+            <h2 style={{ fontFamily: 'Sora,sans-serif', fontSize: 17, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <SectionIcon name="chart" color="#10b981" />
               Your Improvement
             </h2>
             <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
@@ -1180,14 +1431,15 @@ export default function Dashboard() {
                   plugins: { legend: { display: false } },
                   scales: {
                     x: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { display: false } },
-                    y: { ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { color: '#f1f5f9' } }
+                    y: { min: exam === 'act' ? 1 : 400, max: exam === 'act' ? 36 : 1600, ticks: { font: { family: 'DM Sans', size: 10 } }, grid: { color: '#f1f5f9' } }
                   }
                 }}
               />
             </div>
           </div>
+          </AnimateOnScroll>
         )}
       </div>
-    </>
+    </div>
   )
 }

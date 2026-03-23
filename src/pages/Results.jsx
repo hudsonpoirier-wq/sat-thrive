@@ -15,6 +15,7 @@ import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 
+import Sidebar from '../components/Sidebar.jsx'
 import { hasUnlockedResources, setUnlockedResources } from '../lib/pretestGate.js'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
@@ -265,6 +266,7 @@ export default function Results() {
     }
     return normalizeWeakTopics(attempt?.weak_topics || [])
   }, [attempt?.test_id, answers, keyBySection, attempt?.weak_topics])
+  const isPriorScore = scores?.source === 'prior_score'
   const isPreTest = (attempt?.test_id === examConfig.preTestId) || (attempt?.test_id === 'practice_test_11' && exam === 'sat') || !attempt?.test_id
   const showResourceNav = hasUnlockedResources(viewUserId, exam) || Boolean(isPreTest && attempt?.completed_at)
   const scoreColumns = getScoreColumnsForExam(exam)
@@ -335,8 +337,11 @@ export default function Results() {
   // Date prompt and availability are now handled by the /setup-plan screen before results.
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>
-      Loading results…
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100vh', color: '#64748b' }}>
+        Loading results…
+      </div>
     </div>
   )
 
@@ -358,29 +363,8 @@ export default function Results() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      {/* Nav */}
-      <nav className="nav">
-        <BrandLink to={viewHref('/dashboard')} />
-        <div className="nav-actions">
-          <TopResourceNav hidden={!showResourceNav} calendarHref={viewHref('/calendar')} guideHref={viewHref('/guide')} mistakesHref={viewHref('/mistakes')} />
-          <ExamSwitcher currentExam={exam} satHref={satHref} actHref={actHref} />
-          <button
-            className="btn btn-outline"
-            onClick={() => navigate(-1)}
-            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}
-            title="Go back"
-          >
-            <Icon name="back" size={15} />
-            Back
-          </button>
-          <Link to={viewHref('/dashboard')} className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-            <Icon name="home" size={15} />
-            Dashboard
-          </Link>
-        </div>
-      </nav>
-
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam={exam} />
       <div className="page fade-up">
         {isAdminPreview && (() => {
           const isTutorUser = profile?.role === "tutor"
@@ -419,7 +403,7 @@ export default function Results() {
             ))}
           </div>
           <div style={{ marginTop: 16, fontSize: 13, opacity: .6 }}>
-            Completed {new Date(attempt.completed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            {isPriorScore ? 'Entered prior score' : `Completed ${new Date(attempt.completed_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`}
           </div>
           {currentTestConfig?.explanationUrl && (
             <div style={{ marginTop: 14 }}>
@@ -430,17 +414,31 @@ export default function Results() {
           )}
         </div>
 
+        {isPriorScore && (
+          <div className="card" style={{ marginBottom: 24, padding: 20, background: 'linear-gradient(135deg, rgba(14,165,233,.06), rgba(99,102,241,.04))', border: '1px solid rgba(14,165,233,.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Icon name="info" size={18} style={{ color: '#0ea5e9' }} />
+              <div>
+                <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 14, color: '#0f172a', marginBottom: 2 }}>Prior Score Entry</div>
+                <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+                  This score was manually entered, not taken on the platform. Detailed insights like section breakdowns, weak topics, and question review are only available for tests taken here.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 	        {/* Section breakdown */}
-	        {keyBySection ? (
+	        {!isPriorScore && (keyBySection ? (
 	          <SectionBreakdown answers={answers} keyBySection={keyBySection} moduleOrder={examConfig.moduleOrder} modules={examConfig.modules} />
 	        ) : (
 	          <div className="card" style={{ marginBottom: 24, color: '#64748b', lineHeight: 1.7 }}>
-	            Detailed module-by-module review isn’t available for this test yet.
+	            Detailed module-by-module review isn't available for this test yet.
 	          </div>
-	        )}
+	        ))}
 
 	        {/* Weak topics */}
-	        {isPreTest && weakTopics.length > 0 && (
+	        {!isPriorScore && isPreTest && weakTopics.length > 0 && (
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="warning" size={17} />
@@ -461,7 +459,7 @@ export default function Results() {
         )}
 
 	        {/* Domain chart */}
-	        {isPreTest && Object.keys(domainCounts).length > 0 && (
+	        {!isPriorScore && isPreTest && Object.keys(domainCounts).length > 0 && (
           <div className="card" style={{ marginBottom: 24 }}>
             <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon name="chart" size={17} />
@@ -481,7 +479,7 @@ export default function Results() {
         )}
 
         {/* Smart Journey Planner */}
-        <div className="card" style={{ marginBottom: 24 }}>
+        {!isPriorScore && <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16, flexWrap: 'wrap' }}>
             <div>
               <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -489,7 +487,7 @@ export default function Results() {
                 Smart Journey Planner
               </h3>
               <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                Instead of a static weekly plan, your next steps update from this test’s weak topics, your availability, and your target {examConfig.label} date.
+                Instead of a static weekly plan, your next steps update from this test's weak topics, your availability, and your target {examConfig.label} date.
               </p>
             </div>
             <Link className="btn btn-outline" to={viewHref('/calendar')} style={{ flexShrink: 0 }}>
@@ -561,10 +559,10 @@ export default function Results() {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
 	        {/* Q-by-Q review */}
-	        {keyBySection && (
+	        {!isPriorScore && keyBySection && (
             <QuestionReview
               answers={answers}
               keyBySection={keyBySection}

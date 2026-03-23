@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import BrandLink from '../components/BrandLink.jsx'
+import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/AppIcons.jsx'
 import { TESTS, getExamFromTestId } from '../data/tests.js'
 import { getAnswerKeyBySection } from '../data/answerKeys.js'
@@ -10,8 +10,11 @@ import { ANSWER_KEY } from '../data/testData.js'
 import { calcWeakTopicsForTest, getExamConfig, getExamConfigForTest, getQuestionCountForTest, getScoreColumnsForExam, scoreAttemptFromKey } from '../data/examData.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
+import { motion } from 'framer-motion'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend)
+
+/* ── helpers (unchanged) ────────────────────────────────────── */
 
 function toDayKey(iso) {
   try {
@@ -81,10 +84,113 @@ function formatTopWeakness(attempt) {
   return `${label}${domain ? ` · ${domain}` : ''}`
 }
 
-const cardStyle = { background: 'rgba(255,255,255,.07)', borderRadius: 16, padding: 20, border: '1px solid rgba(255,255,255,.1)' }
-const kpiStyle = { ...cardStyle, textAlign: 'center', padding: '18px 12px' }
-const labelStyle = { fontSize: 11, color: 'rgba(255,255,255,.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 4 }
-const bigNumStyle = { fontSize: 28, fontWeight: 800, color: '#fff' }
+function relativeTime(dateStr) {
+  if (!dateStr) return 'Never'
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  if (Number.isNaN(then)) return 'Never'
+  const diff = now - then
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days}d ago`
+  if (days < 30) return `${Math.floor(days / 7)}w ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+function getInitials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return parts[0].slice(0, 2).toUpperCase()
+}
+
+/* ── style tokens ───────────────────────────────────────────── */
+
+const cardBase = {
+  background: '#ffffff',
+  borderRadius: 16,
+  border: '1px solid rgba(14,165,233,.12)',
+  boxShadow: '0 2px 12px rgba(15,23,42,.05)',
+}
+
+const kpiCard = {
+  ...cardBase,
+  textAlign: 'center',
+  padding: '20px 16px',
+  position: 'relative',
+  overflow: 'hidden',
+}
+
+const kpiLabel = {
+  fontSize: 11,
+  color: '#64748b',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '.5px',
+  marginBottom: 6,
+}
+
+const kpiBig = {
+  fontSize: 30,
+  fontWeight: 800,
+  color: '#0f172a',
+  fontFamily: 'Sora, sans-serif',
+}
+
+const sectionTitle = {
+  fontFamily: 'Sora, sans-serif',
+  fontSize: 15,
+  fontWeight: 700,
+  color: '#0f172a',
+  margin: '0 0 16px 0',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+}
+
+/* ── animation variants ─────────────────────────────────────── */
+
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [.22, 1, .36, 1] } },
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [.22, 1, .36, 1] } },
+}
+
+/* ── avatar colors ──────────────────────────────────────────── */
+
+const avatarColors = [
+  ['#0ea5e9', '#0284c7'],
+  ['#8b5cf6', '#7c3aed'],
+  ['#f59e0b', '#d97706'],
+  ['#10b981', '#059669'],
+  ['#ec4899', '#db2777'],
+  ['#ef4444', '#dc2626'],
+  ['#06b6d4', '#0891b2'],
+  ['#6366f1', '#4f46e5'],
+]
+
+function avatarGradient(name) {
+  let hash = 0
+  for (const ch of (name || '')) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0
+  const idx = Math.abs(hash) % avatarColors.length
+  return `linear-gradient(135deg, ${avatarColors[idx][0]}, ${avatarColors[idx][1]})`
+}
+
+/* ── main component ─────────────────────────────────────────── */
 
 export default function TutorDashboard() {
   const { profile } = useAuth()
@@ -155,15 +261,137 @@ export default function TutorDashboard() {
   const computed = useMemo(() => {
     const studentById = new Map(students.map(s => [s.id, s]))
     const bestByUser = new Map()
+    const allScoresByUser = new Map()
+    const attemptsByUser = new Map()
+    const now = Date.now()
+    const weekAgo = now - 7 * 86400000
+    const testsThisWeekByUser = new Map()
+    const lastActiveByUser = new Map()
+
     for (const a of filteredAttempts) {
       const rec = attemptAccuracyRecord(a)
       const prev = bestByUser.get(a.user_id)
       if (!prev || rec.percent > prev.percent || (rec.percent === prev.percent && rec.total > prev.total)) bestByUser.set(a.user_id, rec)
+
+      // Track all scores for trend
+      if (!allScoresByUser.has(a.user_id)) allScoresByUser.set(a.user_id, [])
+      allScoresByUser.get(a.user_id).push({ total: attemptTotalScore(a), date: a.completed_at || a.started_at })
+
+      // Track attempts per user
+      if (!attemptsByUser.has(a.user_id)) attemptsByUser.set(a.user_id, [])
+      attemptsByUser.get(a.user_id).push(a)
+
+      // Count tests completed this week
+      const completedTime = new Date(a.completed_at || 0).getTime()
+      if (completedTime >= weekAgo) {
+        testsThisWeekByUser.set(a.user_id, (testsThisWeekByUser.get(a.user_id) || 0) + 1)
+      }
+
+      // Track last active
+      const activeTime = new Date(a.completed_at || a.started_at || 0).getTime()
+      const existing = lastActiveByUser.get(a.user_id)
+      if (!existing || activeTime > existing) lastActiveByUser.set(a.user_id, activeTime)
     }
+
+    // Compute score trend per user (comparing first half to second half of attempts)
+    const scoreTrendByUser = new Map()
+    for (const [uid, scores] of allScoresByUser) {
+      const sorted = scores.filter(s => s.total > 0).sort((a, b) => new Date(a.date) - new Date(b.date))
+      if (sorted.length >= 2) {
+        const mid = Math.floor(sorted.length / 2)
+        const firstHalf = sorted.slice(0, mid)
+        const secondHalf = sorted.slice(mid)
+        const avgFirst = firstHalf.reduce((s, v) => s + v.total, 0) / firstHalf.length
+        const avgSecond = secondHalf.reduce((s, v) => s + v.total, 0) / secondHalf.length
+        const diff = avgSecond - avgFirst
+        scoreTrendByUser.set(uid, { diff, direction: diff > 10 ? 'up' : diff < -10 ? 'down' : 'flat' })
+      }
+    }
+
+    // Determine primary exam per user (whichever has more attempts)
+    const examByUser = new Map()
+    for (const [uid, userAttempts] of attemptsByUser) {
+      let sat = 0, act = 0
+      for (const a of userAttempts) {
+        const ex = getExamFromTestId(normalizeTestId(a.test_id))
+        if (ex === 'act') act++; else sat++
+      }
+      examByUser.set(uid, act > sat ? 'act' : 'sat')
+    }
+
+    // Compute study progress per user: unique tests taken / total tests available for that exam
+    const studyProgressByUser = new Map()
+    for (const [uid, userAttempts] of attemptsByUser) {
+      const exam = examByUser.get(uid) || 'sat'
+      const cfg = getExamConfig(exam)
+      const totalTests = cfg?.tests?.length || 1
+      const uniqueTests = new Set(userAttempts.map(a => normalizeTestId(a.test_id)))
+      studyProgressByUser.set(uid, Math.min(1, uniqueTests.size / totalTests))
+    }
+
     const postByAttemptId = new Map()
     for (const p of postScores) { if (p?.attempt_id && !postByAttemptId.has(p.attempt_id)) postByAttemptId.set(p.attempt_id, p) }
-    return { studentById, bestByUser, postByAttemptId }
+
+    return { studentById, bestByUser, postByAttemptId, allScoresByUser, attemptsByUser, testsThisWeekByUser, lastActiveByUser, scoreTrendByUser, examByUser, studyProgressByUser }
   }, [students, filteredAttempts, postScores])
+
+  /* ── summary stats ──────────────────────────────────────── */
+
+  const summaryStats = useMemo(() => {
+    const now = Date.now()
+    const weekAgo = now - 7 * 86400000
+    const totalStudents = students.length
+
+    // Average score improvement
+    let totalImprovement = 0, improvementCount = 0
+    for (const [, trend] of computed.scoreTrendByUser) {
+      if (trend.diff !== 0) { totalImprovement += trend.diff; improvementCount++ }
+    }
+    const avgImprovement = improvementCount > 0 ? totalImprovement / improvementCount : 0
+
+    // Most active student (most tests this week)
+    let mostActiveId = null, mostActiveCount = 0
+    for (const [uid, count] of computed.testsThisWeekByUser) {
+      if (count > mostActiveCount) { mostActiveId = uid; mostActiveCount = count }
+    }
+    const mostActiveStudent = mostActiveId ? computed.studentById.get(mostActiveId) : null
+
+    // Students needing attention (no activity in 7+ days or zero attempts)
+    const needAttention = students.filter(st => {
+      const lastActive = computed.lastActiveByUser.get(st.id)
+      if (!lastActive) return true
+      return lastActive < weekAgo
+    })
+
+    // Total tests this week
+    let totalTestsWeek = 0
+    for (const [, c] of computed.testsThisWeekByUser) totalTestsWeek += c
+
+    return { totalStudents, avgImprovement, mostActiveStudent, mostActiveCount, needAttention, totalTestsWeek }
+  }, [students, computed])
+
+  /* ── activity feed ──────────────────────────────────────── */
+
+  const activityFeed = useMemo(() => {
+    const items = []
+    for (const a of filteredAttempts.slice(0, 50)) {
+      const st = computed.studentById.get(a.user_id)
+      if (!st) continue
+      const total = attemptTotalScore(a)
+      items.push({
+        id: a.id,
+        student: st,
+        type: 'test',
+        label: testLabel(a.test_id),
+        score: total,
+        date: a.completed_at || a.started_at,
+        exam: getExamFromTestId(normalizeTestId(a.test_id)),
+      })
+    }
+    return items.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20)
+  }, [filteredAttempts, computed])
+
+  /* ── analytics (unchanged logic) ────────────────────────── */
 
   const analytics = useMemo(() => {
     const examMode = analyticsExam === 'act' ? 'act' : 'sat'
@@ -245,7 +473,7 @@ export default function TutorDashboard() {
         const idx = Math.min(starts.length - 1, Math.floor(examMode === 'act' ? (cl - 1) / 5 : (cl - 400) / 100))
         counts[idx] += 1
       }
-      return { labels: starts.map(s => examMode === 'act' ? `${s}-${Math.min(36, s + 4)}` : `${s}-${Math.min(1600, s + 99)}`), datasets: [{ label: 'Students', data: counts, backgroundColor: 'rgba(26,39,68,.85)', borderRadius: 6, borderSkipped: false }] }
+      return { labels: starts.map(s => examMode === 'act' ? `${s}-${Math.min(36, s + 4)}` : `${s}-${Math.min(1600, s + 99)}`), datasets: [{ label: 'Students', data: counts, backgroundColor: '#0ea5e9', borderRadius: 6, borderSkipped: false }] }
     })()
     const domainsChart = { labels: topDomains.map(([d]) => d), datasets: [{ label: 'Misses', data: topDomains.map(([, c]) => c), backgroundColor: topDomains.map((_, i) => ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#64748b'][i % 8]), borderRadius: 6, borderSkipped: false }] }
     const chaptersChart = { labels: topChapters.map(([ch]) => `Ch ${ch}`), datasets: [{ label: 'Misses', data: topChapters.map(([, c]) => c), backgroundColor: '#ef4444', borderRadius: 6, borderSkipped: false }] }
@@ -258,99 +486,336 @@ export default function TutorDashboard() {
     { id: 'analytics', label: 'Analytics', icon: 'chart' },
   ]
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Loading…</div>
+  if (loading) return (
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam="sat" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100vh', color: '#64748b' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #0ea5e9, #1e3a8a)', margin: '0 auto 12px', animation: 'pulse 1.5s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="students" size={20} style={{ color: 'white' }} />
+          </div>
+          <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 14 }}>Loading dashboard...</span>
+        </div>
+      </div>
+    </div>
+  )
 
   const s = analytics.summary
-  const chartOpts = (title, yMax) => ({ responsive: true, plugins: { legend: { display: true, labels: { color: 'rgba(255,255,255,.6)', font: { size: 11 } } }, tooltip: { backgroundColor: '#1a2744' } }, scales: { x: { ticks: { color: 'rgba(255,255,255,.5)', font: { size: 10 } }, grid: { display: false } }, y: { beginAtZero: true, max: yMax || undefined, ticks: { color: 'rgba(255,255,255,.45)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.06)' } } } })
+  const chartOpts = (title, yMax) => ({ responsive: true, plugins: { legend: { display: true, labels: { color: '#64748b', font: { size: 11 } } }, tooltip: { backgroundColor: '#0f172a' } }, scales: { x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } }, y: { beginAtZero: true, max: yMax || undefined, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#f1f5f9' } } } })
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-      <nav className="nav">
-        <BrandLink />
-        <div className="nav-actions">
-          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.8)', borderColor: 'rgba(255,255,255,.24)', background: 'rgba(255,255,255,.08)' }}>
-            My Dashboard
-          </Link>
-        </div>
-      </nav>
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam="sat" />
+      <div className="page fade-up">
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
-            <Icon name="students" size={20} style={{ marginRight: 8, verticalAlign: '-3px' }} />
+        {/* ── Header ──────────────────────────────────────── */}
+        <motion.div initial="hidden" animate="show" variants={fadeUp} style={{ marginBottom: 28 }}>
+          <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 26, fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg, #0ea5e9, #1e3a8a)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', boxShadow: '0 4px 14px rgba(14,165,233,.3)',
+            }}>
+              <Icon name="students" size={20} />
+            </span>
             {profile?.affiliation || 'My Students'}
           </h1>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', marginTop: 4 }}>{students.length} student{students.length !== 1 ? 's' : ''} enrolled</div>
-        </div>
+          <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, marginBottom: 0 }}>
+            {students.length} student{students.length !== 1 ? 's' : ''} enrolled
+            {summaryStats.totalTestsWeek > 0 && <span> &middot; {summaryStats.totalTestsWeek} test{summaryStats.totalTestsWeek !== 1 ? 's' : ''} this week</span>}
+          </p>
+        </motion.div>
 
-        {/* Tabs */}
+        {/* ── Summary KPIs ────────────────────────────────── */}
+        <motion.div
+          initial="hidden" animate="show" variants={containerVariants}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}
+        >
+          <motion.div variants={cardVariants} style={kpiCard}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #0ea5e9, #3b82f6)' }} />
+            <div style={kpiLabel}>Total Students</div>
+            <div style={kpiBig}>{summaryStats.totalStudents}</div>
+          </motion.div>
+          <motion.div variants={cardVariants} style={kpiCard}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #10b981, #059669)' }} />
+            <div style={kpiLabel}>Avg Score Change</div>
+            <div style={{ ...kpiBig, color: summaryStats.avgImprovement > 0 ? '#059669' : summaryStats.avgImprovement < 0 ? '#dc2626' : '#0f172a' }}>
+              {summaryStats.avgImprovement > 0 ? '+' : ''}{Math.round(summaryStats.avgImprovement) || '—'}
+            </div>
+          </motion.div>
+          <motion.div variants={cardVariants} style={kpiCard}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #f59e0b, #d97706)' }} />
+            <div style={kpiLabel}>Most Active</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', fontFamily: 'Sora, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {summaryStats.mostActiveStudent?.full_name || '—'}
+            </div>
+            {summaryStats.mostActiveCount > 0 && (
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{summaryStats.mostActiveCount} test{summaryStats.mostActiveCount !== 1 ? 's' : ''} this week</div>
+            )}
+          </motion.div>
+          <motion.div variants={cardVariants} style={kpiCard}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: summaryStats.needAttention.length > 0 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 'linear-gradient(90deg, #10b981, #059669)' }} />
+            <div style={kpiLabel}>Need Attention</div>
+            <div style={{ ...kpiBig, color: summaryStats.needAttention.length > 0 ? '#dc2626' : '#059669' }}>
+              {summaryStats.needAttention.length}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>inactive 7+ days</div>
+          </motion.div>
+        </motion.div>
+
+        {/* ── Tabs ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' }}>
           {tabs.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: '8px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 700,
-              background: tab === t.id ? '#1a2744' : 'rgba(255,255,255,.06)', color: tab === t.id ? '#fff' : 'rgba(255,255,255,.5)', transition: 'all .2s',
+              padding: '8px 18px', borderRadius: 10,
+              border: tab === t.id ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0',
+              cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 700,
+              background: tab === t.id ? 'rgba(14,165,233,.08)' : 'white',
+              color: tab === t.id ? '#0ea5e9' : '#64748b',
+              transition: 'all .2s',
             }}>
               <Icon name={t.icon} size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />{t.label}
             </button>
           ))}
         </div>
 
-        {/* Students tab */}
+        {/* ═══════════════════════════════════════════════════
+            STUDENTS TAB
+        ═══════════════════════════════════════════════════ */}
         {tab === 'students' && (
-          <div style={cardStyle}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: 'rgba(255,255,255,.85)' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,.1)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', color: 'rgba(255,255,255,.45)' }}>
-                    <th style={{ padding: '10px 12px', textAlign: 'left' }}>Name</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left' }}>Email</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Joined</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Tests</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Best Score</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((st) => {
-                    const best = computed.bestByUser.get(st.id)
-                    const userAttempts = filteredAttempts.filter(a => a.user_id === st.id)
-                    return (
-                      <tr key={st.id} style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{st.full_name || '—'}</td>
-                        <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,.5)' }}>{st.email}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'rgba(255,255,255,.4)' }}>{st.created_at ? new Date(st.created_at).toLocaleDateString() : '—'}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>{userAttempts.length}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700 }}>{best?.display || '—'}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <Link to={`/dashboard?user=${st.id}`} style={{ color: '#0ea5e9', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>View</Link>
-                          {' · '}
-                          <Link to={`/report?user=${st.id}`} style={{ color: '#8b5cf6', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Report</Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!students.length && (
-                    <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'rgba(255,255,255,.35)' }}>No students with your affiliation yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div>
+            {/* Student cards grid */}
+            <motion.div
+              initial="hidden" animate="show" variants={containerVariants}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 32 }}
+            >
+              {students.map((st) => {
+                const best = computed.bestByUser.get(st.id)
+                const userAttempts = computed.attemptsByUser.get(st.id) || []
+                const testsWeek = computed.testsThisWeekByUser.get(st.id) || 0
+                const lastActive = computed.lastActiveByUser.get(st.id)
+                const trend = computed.scoreTrendByUser.get(st.id)
+                const exam = computed.examByUser.get(st.id) || 'sat'
+                const progress = computed.studyProgressByUser.get(st.id) || 0
+                const progressPercent = Math.round(progress * 100)
+                const isInactive = !lastActive || (Date.now() - lastActive > 7 * 86400000)
+
+                return (
+                  <motion.div key={st.id} variants={cardVariants} style={{
+                    ...cardBase,
+                    padding: 0,
+                    overflow: 'hidden',
+                    transition: 'box-shadow .2s, border-color .2s',
+                    cursor: 'default',
+                  }}
+                  whileHover={{ boxShadow: '0 6px 24px rgba(14,165,233,.12)', borderColor: 'rgba(14,165,233,.25)' }}
+                  >
+                    {/* Card header */}
+                    <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', gap: 14, borderBottom: '1px solid rgba(14,165,233,.08)' }}>
+                      {/* Avatar */}
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 12,
+                        background: avatarGradient(st.full_name || st.email),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 800,
+                        flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+                      }}>
+                        {getInitials(st.full_name || st.email)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 15, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {st.full_name || '—'}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px',
+                            padding: '2px 8px', borderRadius: 6,
+                            background: exam === 'act' ? 'rgba(139,92,246,.1)' : 'rgba(14,165,233,.1)',
+                            color: exam === 'act' ? '#7c3aed' : '#0284c7',
+                          }}>
+                            {exam.toUpperCase()}
+                          </span>
+                          {isInactive && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+                              background: 'rgba(239,68,68,.08)', color: '#dc2626',
+                            }}>
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <Link to={`/dashboard?user=${st.id}`} style={{
+                          width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'rgba(14,165,233,.08)', color: '#0ea5e9', textDecoration: 'none',
+                          transition: 'background .15s',
+                        }} title="View Dashboard">
+                          <Icon name="eye" size={15} />
+                        </Link>
+                        <Link to={`/report?user=${st.id}`} style={{
+                          width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'rgba(139,92,246,.08)', color: '#8b5cf6', textDecoration: 'none',
+                          transition: 'background .15s',
+                        }} title="View Report">
+                          <Icon name="report" size={15} />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Card body */}
+                    <div style={{ padding: '14px 20px 18px' }}>
+                      {/* Stats row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+                        {/* Best Score */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>Best Score</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', fontFamily: 'Sora, sans-serif' }}>
+                              {best?.total || '—'}
+                            </span>
+                            {trend && (
+                              <span style={{
+                                fontSize: 14,
+                                color: trend.direction === 'up' ? '#059669' : trend.direction === 'down' ? '#dc2626' : '#94a3b8',
+                                lineHeight: 1,
+                              }}>
+                                {trend.direction === 'up' ? '\u2191' : trend.direction === 'down' ? '\u2193' : '\u2192'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Tests Taken */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>Tests</div>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', fontFamily: 'Sora, sans-serif' }}>
+                            {userAttempts.length}
+                          </span>
+                        </div>
+                        {/* This Week */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>This Week</div>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: testsWeek > 0 ? '#059669' : '#94a3b8', fontFamily: 'Sora, sans-serif' }}>
+                            {testsWeek}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                          <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px' }}>Study Progress</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: progressPercent >= 75 ? '#059669' : progressPercent >= 40 ? '#d97706' : '#64748b' }}>{progressPercent}%</span>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progressPercent}%` }}
+                            transition={{ duration: 0.8, ease: [.22, 1, .36, 1], delay: 0.3 }}
+                            style={{
+                              height: '100%', borderRadius: 3,
+                              background: progressPercent >= 75
+                                ? 'linear-gradient(90deg, #10b981, #059669)'
+                                : progressPercent >= 40
+                                  ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                                  : 'linear-gradient(90deg, #94a3b8, #64748b)',
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Last active */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                          <Icon name="clock" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+                          {lastActive ? relativeTime(new Date(lastActive).toISOString()) : 'No activity'}
+                        </span>
+                        {best?.display && (
+                          <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{best.display}</span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+              {!students.length && (
+                <motion.div variants={cardVariants} style={{ ...cardBase, padding: 48, textAlign: 'center', color: '#94a3b8', gridColumn: '1 / -1' }}>
+                  <Icon name="students" size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
+                  <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 600 }}>No students enrolled yet</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>Students with your affiliation will appear here.</div>
+                </motion.div>
+              )}
+            </motion.div>
+
+            {/* Activity Feed */}
+            {activityFeed.length > 0 && (
+              <motion.div initial="hidden" animate="show" variants={fadeUp}>
+                <h3 style={sectionTitle}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'linear-gradient(135deg, #0ea5e9, #1e3a8a)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 13,
+                  }}>
+                    <Icon name="activity" size={14} />
+                  </span>
+                  Recent Activity
+                </h3>
+                <div style={{ ...cardBase, padding: 0, overflow: 'hidden' }}>
+                  {activityFeed.map((item, i) => (
+                    <div key={item.id} style={{
+                      padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12,
+                      borderBottom: i < activityFeed.length - 1 ? '1px solid rgba(14,165,233,.06)' : 'none',
+                      transition: 'background .15s',
+                    }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        background: avatarGradient(item.student.full_name || item.student.email),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontFamily: 'Sora, sans-serif', fontSize: 11, fontWeight: 800,
+                        flexShrink: 0,
+                      }}>
+                        {getInitials(item.student.full_name || item.student.email)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{item.student.full_name || '—'}</span>
+                        <span style={{ fontSize: 13, color: '#64748b' }}> completed </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{item.label}</span>
+                        {item.score > 0 && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: '#0284c7', marginLeft: 6,
+                            padding: '1px 6px', borderRadius: 4, background: 'rgba(14,165,233,.08)',
+                          }}>
+                            {item.score}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{relativeTime(item.date)}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
         )}
 
-        {/* Results tab */}
+        {/* ═══════════════════════════════════════════════════
+            RESULTS TAB
+        ═══════════════════════════════════════════════════ */}
         {tab === 'results' && (
-          <div style={cardStyle}>
+          <motion.div initial="hidden" animate="show" variants={fadeUp} style={cardBase}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: 'rgba(255,255,255,.85)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: '#334155' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,.1)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', color: 'rgba(255,255,255,.45)' }}>
-                    <th style={{ padding: '10px 12px', textAlign: 'left' }}>Student</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left' }}>Test</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Date</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Total</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left' }}>Top Weakness</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Link</th>
+                  <tr style={{ borderBottom: '1px solid rgba(14,165,233,.12)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', color: '#64748b' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Student</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Test</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Date</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Total</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Top Weakness</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Link</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -358,13 +823,26 @@ export default function TutorDashboard() {
                     const st = computed.studentById.get(a.user_id)
                     const total = attemptTotalScore(a)
                     return (
-                      <tr key={a.id} style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{st?.full_name || '—'}</td>
-                        <td style={{ padding: '10px 12px' }}>{testLabel(a.test_id)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'rgba(255,255,255,.4)' }}>{a.completed_at ? new Date(a.completed_at).toLocaleDateString() : '—'}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700 }}>{total || '—'}</td>
-                        <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,.5)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTopWeakness(a)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background .15s' }}>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 7,
+                              background: avatarGradient(st?.full_name || st?.email),
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: 'white', fontFamily: 'Sora, sans-serif', fontSize: 10, fontWeight: 800,
+                              flexShrink: 0,
+                            }}>
+                              {getInitials(st?.full_name || st?.email)}
+                            </div>
+                            <span style={{ fontWeight: 600 }}>{st?.full_name || '—'}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>{testLabel(a.test_id)}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8' }}>{a.completed_at ? new Date(a.completed_at).toLocaleDateString() : '—'}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700 }}>{total || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#64748b', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatTopWeakness(a)}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                           <Link to={`/results/${a.id}?user=${a.user_id}`} style={{ color: '#0ea5e9', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>View</Link>
                         </td>
                       </tr>
@@ -373,60 +851,62 @@ export default function TutorDashboard() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Analytics tab */}
+        {/* ═══════════════════════════════════════════════════
+            ANALYTICS TAB
+        ═══════════════════════════════════════════════════ */}
         {tab === 'analytics' && (
-          <div style={{ display: 'grid', gap: 20 }}>
+          <motion.div initial="hidden" animate="show" variants={containerVariants} style={{ display: 'grid', gap: 20 }}>
             {/* Exam toggle */}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <motion.div variants={cardVariants} style={{ display: 'flex', gap: 8 }}>
               {['sat', 'act'].map((ex) => (
                 <button key={ex} onClick={() => setAnalyticsExam(ex)} style={{
-                  padding: '7px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 700,
-                  background: analyticsExam === ex ? '#1a2744' : 'rgba(255,255,255,.06)', color: analyticsExam === ex ? '#fff' : 'rgba(255,255,255,.4)', transition: 'all .2s',
+                  padding: '7px 20px', borderRadius: 8, cursor: 'pointer', fontFamily: 'Sora, sans-serif', fontSize: 13, fontWeight: 700,
+                  background: analyticsExam === ex ? '#0ea5e9' : 'white', color: analyticsExam === ex ? '#fff' : '#64748b', border: analyticsExam === ex ? '2px solid #0ea5e9' : '1.5px solid #e2e8f0', transition: 'all .2s',
                 }}>{ex.toUpperCase()}</button>
               ))}
-            </div>
+            </motion.div>
 
             {/* KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-              <div style={kpiStyle}><div style={labelStyle}>Students</div><div style={bigNumStyle}>{students.length}</div></div>
-              <div style={kpiStyle}><div style={labelStyle}>Active (7d)</div><div style={bigNumStyle}>{s.active7}</div></div>
-              <div style={kpiStyle}><div style={labelStyle}>Active (30d)</div><div style={bigNumStyle}>{s.active30}</div></div>
-              <div style={kpiStyle}><div style={labelStyle}>Avg {s.exam === 'act' ? 'Composite' : 'Total'}</div><div style={bigNumStyle}>{s.avgTotal ? Math.round(s.avgTotal) : '—'}</div></div>
-              <div style={kpiStyle}><div style={labelStyle}>Median</div><div style={bigNumStyle}>{s.median ? Math.round(s.median) : '—'}</div></div>
+            <motion.div variants={cardVariants} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              <div style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #0ea5e9, #3b82f6)' }} /><div style={kpiLabel}>Students</div><div style={kpiBig}>{students.length}</div></div>
+              <div style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #10b981, #059669)' }} /><div style={kpiLabel}>Active (7d)</div><div style={kpiBig}>{s.active7}</div></div>
+              <div style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #f59e0b, #d97706)' }} /><div style={kpiLabel}>Active (30d)</div><div style={kpiBig}>{s.active30}</div></div>
+              <div style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)' }} /><div style={kpiLabel}>Avg {s.exam === 'act' ? 'Composite' : 'Total'}</div><div style={kpiBig}>{s.avgTotal ? Math.round(s.avgTotal) : '—'}</div></div>
+              <div style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #ec4899, #db2777)' }} /><div style={kpiLabel}>Median</div><div style={kpiBig}>{s.median ? Math.round(s.median) : '—'}</div></div>
               {analytics.scoreColumns.filter(c => c.key !== 'total').map((col) => (
-                <div key={col.key} style={kpiStyle}><div style={labelStyle}>Avg {col.label}</div><div style={bigNumStyle}>{s.avgSections?.[col.key] ? Math.round(s.avgSections[col.key]) : '—'}</div></div>
+                <div key={col.key} style={kpiCard}><div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #06b6d4, #0891b2)' }} /><div style={kpiLabel}>Avg {col.label}</div><div style={kpiBig}>{s.avgSections?.[col.key] ? Math.round(s.avgSections[col.key]) : '—'}</div></div>
               ))}
-            </div>
+            </motion.div>
 
             {/* Activity */}
             {analytics.activitySeries.labels.length > 0 && (
-              <div style={cardStyle}><div style={{ ...labelStyle, marginBottom: 12 }}>Activity Over Time</div><Line data={analytics.activitySeries} options={chartOpts('Activity')} /></div>
+              <motion.div variants={cardVariants} style={{ ...cardBase, padding: 20 }}><div style={{ ...kpiLabel, marginBottom: 12 }}>Activity Over Time</div><Line data={analytics.activitySeries} options={chartOpts('Activity')} /></motion.div>
             )}
 
             {/* Score Distribution */}
-            <div style={cardStyle}><div style={{ ...labelStyle, marginBottom: 12 }}>Score Distribution</div><Bar data={analytics.histogram} options={chartOpts('Distribution')} /></div>
+            <motion.div variants={cardVariants} style={{ ...cardBase, padding: 20 }}><div style={{ ...kpiLabel, marginBottom: 12 }}>Score Distribution</div><Bar data={analytics.histogram} options={chartOpts('Distribution')} /></motion.div>
 
             {/* Weakness charts */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <motion.div variants={cardVariants} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               {analytics.domainsChart.labels.length > 0 && (
-                <div style={cardStyle}><div style={{ ...labelStyle, marginBottom: 12 }}>Most Missed Domains</div><Bar data={analytics.domainsChart} options={chartOpts('Domains')} /></div>
+                <div style={{ ...cardBase, padding: 20 }}><div style={{ ...kpiLabel, marginBottom: 12 }}>Most Missed Domains</div><Bar data={analytics.domainsChart} options={chartOpts('Domains')} /></div>
               )}
               {analytics.chaptersChart.labels.length > 0 && (
-                <div style={cardStyle}><div style={{ ...labelStyle, marginBottom: 12 }}>Most Missed Chapters</div><Bar data={analytics.chaptersChart} options={chartOpts('Chapters')} /></div>
+                <div style={{ ...cardBase, padding: 20 }}><div style={{ ...kpiLabel, marginBottom: 12 }}>Most Missed Chapters</div><Bar data={analytics.chaptersChart} options={chartOpts('Chapters')} /></div>
               )}
-            </div>
+            </motion.div>
 
             {/* Test summary table */}
             {analytics.testRows.length > 0 && (
-              <div style={cardStyle}>
-                <div style={{ ...labelStyle, marginBottom: 12 }}>Test Summary</div>
+              <motion.div variants={cardVariants} style={{ ...cardBase, padding: 20 }}>
+                <div style={{ ...kpiLabel, marginBottom: 12 }}>Test Summary</div>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: 'rgba(255,255,255,.85)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: '#334155' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,.1)', fontSize: 10, textTransform: 'uppercase', color: 'rgba(255,255,255,.4)' }}>
+                      <tr style={{ borderBottom: '1px solid rgba(14,165,233,.12)', fontSize: 10, textTransform: 'uppercase', color: '#94a3b8' }}>
                         <th style={{ padding: '8px 10px', textAlign: 'left' }}>Test</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center' }}>Attempts</th>
                         <th style={{ padding: '8px 10px', textAlign: 'center' }}>Avg Total</th>
@@ -438,7 +918,7 @@ export default function TutorDashboard() {
                     </thead>
                     <tbody>
                       {analytics.testRows.map((row) => (
-                        <tr key={row.id} style={{ borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                        <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 10px', fontWeight: 600 }}>{row.label}</td>
                           <td style={{ padding: '8px 10px', textAlign: 'center' }}>{row.count}</td>
                           <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>{row.avgTotal ? Math.round(row.avgTotal) : '—'}</td>
@@ -451,9 +931,9 @@ export default function TutorDashboard() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

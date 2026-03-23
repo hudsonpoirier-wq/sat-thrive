@@ -4,8 +4,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
 import { clearAdminTestingData } from '../lib/studyProgress.js'
 import { extractAnswerKeyFromPdf } from '../lib/answerKeyExtract.js'
-import UserMenu from '../components/UserMenu.jsx'
-import BrandLink from '../components/BrandLink.jsx'
+import Sidebar from '../components/Sidebar.jsx'
 import Icon from '../components/AppIcons.jsx'
 import { TESTS, getExamFromTestId } from '../data/tests.js'
 import { ANSWER_KEY } from '../data/testData.js'
@@ -13,15 +12,149 @@ import { getAnswerKeyBySection } from '../data/answerKeys.js'
 import { calcWeakTopicsForTest, getExamConfig, getExamConfigForTest, getQuestionCountForTest, getScoreColumnsForExam, scoreAttemptFromKey } from '../data/examData.js'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend } from 'chart.js'
+import { motion } from 'framer-motion'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend)
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
+/* ── constants ── */
 const FINAL_TEST_ID = 'final_test'
 const REGRADER_VERSION = '2026-03-18-01'
 
+/* ── style tokens ── */
+const cardStyle = {
+  background: '#fff',
+  border: '1.5px solid rgba(14,165,233,.12)',
+  borderRadius: 16,
+  boxShadow: '0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(14,165,233,.06)',
+  padding: '28px 28px',
+  marginBottom: 20,
+}
+
+const sectionHeading = {
+  fontFamily: 'Sora, sans-serif',
+  fontSize: 16,
+  fontWeight: 700,
+  color: '#0f172a',
+  margin: '0 0 16px 0',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+}
+
+const iconBadge = {
+  width: 32,
+  height: 32,
+  borderRadius: 9,
+  background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#fff',
+  flexShrink: 0,
+}
+
+const thStyle = {
+  padding: '10px 14px',
+  textAlign: 'left',
+  fontSize: 11,
+  color: '#64748b',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '.5px',
+  background: '#f8fafc',
+  borderBottom: '1.5px solid rgba(14,165,233,.10)',
+  whiteSpace: 'nowrap',
+}
+
+const tdStyle = {
+  padding: '12px 14px',
+  fontSize: 13,
+  color: '#334155',
+}
+
+const statCard = {
+  background: '#fff',
+  border: '1.5px solid rgba(14,165,233,.12)',
+  borderRadius: 14,
+  boxShadow: '0 1px 3px rgba(0,0,0,.03)',
+  padding: '18px 20px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+}
+
+const statIconWrap = {
+  width: 42,
+  height: 42,
+  borderRadius: 12,
+  background: 'rgba(14,165,233,.08)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#0ea5e9',
+  flexShrink: 0,
+}
+
+const pillBtn = (active) => ({
+  padding: '8px 16px',
+  border: `1.5px solid ${active ? 'rgba(14,165,233,.35)' : 'rgba(14,165,233,.12)'}`,
+  borderRadius: 10,
+  background: active ? 'rgba(14,165,233,.08)' : '#fff',
+  fontFamily: 'Sora, sans-serif',
+  fontWeight: 600,
+  fontSize: 12,
+  color: active ? '#0c4a6e' : '#64748b',
+  cursor: 'pointer',
+  transition: 'all .2s',
+  whiteSpace: 'nowrap',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+})
+
+const actionBtn = {
+  padding: '7px 14px',
+  fontSize: 12,
+  fontWeight: 600,
+  fontFamily: 'Sora, sans-serif',
+  color: '#0f172a',
+  background: '#fff',
+  border: '1.5px solid rgba(14,165,233,.18)',
+  borderRadius: 9,
+  cursor: 'pointer',
+  transition: 'all .2s',
+}
+
+const actionBtnDanger = {
+  ...actionBtn,
+  borderColor: '#fecaca',
+  color: '#b91c1c',
+}
+
+const rolePill = (role) => ({
+  padding: '3px 10px',
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 700,
+  background: role === 'admin' ? '#fef3c7' : role === 'tutor' ? '#dbeafe' : '#f0fdf4',
+  color: role === 'admin' ? '#92400e' : role === 'tutor' ? '#1e40af' : '#166534',
+})
+
+const examPill = (exam) => ({
+  padding: '3px 10px',
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 800,
+  background: exam === 'act' ? 'rgba(59,130,246,.10)' : 'rgba(245,158,11,.12)',
+  color: exam === 'act' ? '#2563eb' : '#b45309',
+})
+
+const fadeCard = { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 } }
+
+/* ── helpers ── */
 function toDayKey(iso) {
   try {
     if (!iso) return null
@@ -137,15 +270,15 @@ function computeAttemptWeakTopics(attempt) {
 function formatTopWeakness(attempt) {
   const weakTopics = computeAttemptWeakTopics(attempt)
   const topWeak = weakTopics?.[0]
-  if (!topWeak) return '—'
+  if (!topWeak) return '\u2014'
   const exam = getExamFromTestId(attempt?.test_id)
   const cfg = getExamConfig(exam)
   const chapterMeta = cfg?.chapters?.[topWeak.ch] || {}
   const label = topWeak.name || chapterMeta?.name || topWeak.ch || 'Weak area'
   const domain = topWeak.domain || chapterMeta?.domain || ''
-  const moduleCode = chapterMeta?.code ? `${chapterMeta.code} · ` : ''
+  const moduleCode = chapterMeta?.code ? `${chapterMeta.code} \u00b7 ` : ''
   const page = Number.isFinite(Number(topWeak.page ?? chapterMeta?.page)) ? ` (p.${Number(topWeak.page ?? chapterMeta?.page)})` : ''
-  return `${moduleCode}${label}${domain ? ` · ${domain}` : ''}${page}`
+  return `${moduleCode}${label}${domain ? ` \u00b7 ${domain}` : ''}${page}`
 }
 
 function pairedTTest(pairs) {
@@ -170,16 +303,49 @@ function pairedTTest(pairs) {
   let pLabel, conf, sig
   if (tAbs > cv[2]) { pLabel = 'p < 0.01'; conf = '99%'; sig = true }
   else if (tAbs > cv[1]) { pLabel = 'p < 0.05'; conf = '95%'; sig = true }
-  else { pLabel = 'p ≥ 0.05'; conf = '<95%'; sig = false }
+  else { pLabel = 'p \u2265 0.05'; conf = '<95%'; sig = false }
   const d = mean / sd
   const ci = 1.96 * se
   return { n, mean, sd, se, t, df, pLabel, conf, sig, d, ci, lo: mean - ci, hi: mean + ci }
 }
 
+/* ── chart option presets ── */
+const chartFont = { family: 'DM Sans', size: 11 }
+const lightGrid = { color: '#f1f5f9' }
+const noGrid = { display: false }
+
+function barOpts({ legend = true, yMin, yMax } = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: legend, labels: { font: chartFont } } },
+    scales: {
+      x: { grid: noGrid, ticks: { font: chartFont } },
+      y: { grid: lightGrid, ticks: { font: chartFont }, beginAtZero: yMin == null, ...(yMin != null ? { min: yMin } : {}), ...(yMax != null ? { max: yMax } : {}) },
+    },
+  }
+}
+
+function lineOpts() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { font: chartFont } } },
+    scales: {
+      x: { grid: noGrid, ticks: { font: chartFont } },
+      y: { grid: lightGrid, ticks: { font: chartFont }, beginAtZero: true },
+    },
+  }
+}
+
+/* ══════════════════════════════════════════════
+   Component
+   ══════════════════════════════════════════════ */
 export default function Admin() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' && String(profile?.email || '').toLowerCase() === 'agora@admin.org'
+
   const [students, setStudents] = useState([])
   const [attempts, setAttempts] = useState([])
   const [postScores, setPostScores] = useState([])
@@ -193,8 +359,8 @@ export default function Admin() {
   const [analyticsExam, setAnalyticsExam] = useState('sat')
   const [affiliationFilter, setAffiliationFilter] = useState('')
 
+  /* ── data fetching ── */
   const fetchAdminSnapshot = useCallback(async () => {
-    // Try profiles with affiliation column first; fall back to without it if the column doesn't exist yet
     let profileResult = await supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false })
     if (profileResult.error && !profileResult.data) {
       profileResult = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
@@ -234,9 +400,7 @@ export default function Admin() {
     load().catch(() => {
       if (!cancelled) setLoading(false)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [profile, isAdmin, navigate, fetchAdminSnapshot])
 
   useEffect(() => {
@@ -260,7 +424,6 @@ export default function Admin() {
       debounce = setTimeout(refresh, 250)
     }
 
-    // Unique channel name per browser tab so multiple admins don't conflict
     const channelId = `admin-live:${Date.now()}-${Math.random().toString(36).slice(2)}`
     const channel = supabase
       .channel(channelId)
@@ -283,6 +446,7 @@ export default function Admin() {
     }
   }, [isAdmin, fetchAdminSnapshot])
 
+  /* ── admin actions ── */
   async function resetStudentData(userId, email) {
     if (!supabase || !isAdmin) return
     const ok = window.confirm(
@@ -295,30 +459,22 @@ export default function Admin() {
       const rpc = await supabase.rpc('admin_reset_user', { target_user_id: userId })
       if (rpc.error) {
         const msg = String(rpc.error.message || '')
-        // Back-compat: if the RPC isn't installed yet, fall back to direct deletes.
         if (msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('admin_reset_user')) {
           const ps = await supabase.from('post_scores').delete().eq('user_id', userId)
           if (ps.error) throw ps.error
           const ta = await supabase.from('test_attempts').delete().eq('user_id', userId)
           if (ta.error) throw ta.error
           const st = await supabase.from('studied_topics').delete().eq('user_id', userId)
-          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
-            throw st.error
-          }
+          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) throw st.error
           const ms = await supabase.from('mistakes').delete().eq('user_id', userId)
-          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) {
-            throw ms.error
-          }
+          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) throw ms.error
           const rv = await supabase.from('review_items').delete().eq('user_id', userId)
-          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) {
-            throw rv.error
-          }
+          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) throw rv.error
         } else {
           throw rpc.error
         }
       }
       setResetMsg('Success: student reset complete.')
-      // Refresh tables
       const [a, p] = await Promise.all([
         supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').eq('is_sandbox', false).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
         supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').eq('is_sandbox', false).order('recorded_at', { ascending: false }).limit(5000),
@@ -377,17 +533,11 @@ export default function Admin() {
           const ta = await supabase.from('test_attempts').delete().eq('user_id', profile.id)
           if (ta.error) throw ta.error
           const st = await supabase.from('studied_topics').delete().eq('user_id', profile.id)
-          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) {
-            throw st.error
-          }
+          if (st.error && !String(st.error.message || '').includes("Could not find the table 'public.studied_topics'")) throw st.error
           const ms = await supabase.from('mistakes').delete().eq('user_id', profile.id)
-          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) {
-            throw ms.error
-          }
+          if (ms.error && !String(ms.error.message || '').toLowerCase().includes('could not find the table')) throw ms.error
           const rv = await supabase.from('review_items').delete().eq('user_id', profile.id)
-          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) {
-            throw rv.error
-          }
+          if (rv.error && !String(rv.error.message || '').toLowerCase().includes('could not find the table')) throw rv.error
         } else {
           throw rpc.error
         }
@@ -419,7 +569,6 @@ export default function Admin() {
       const msg = `Success: regraded ${out.updated || 0} of ${out.scanned || 0} completed attempts.`
       if (!silent) setResetMsg(msg)
       try { localStorage.setItem(`agora_regrader_version:${profile?.id || 'admin'}`, REGRADER_VERSION) } catch {}
-
       const [a, p] = await Promise.all([
         supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
         supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
@@ -445,9 +594,7 @@ export default function Admin() {
     }
   }, [isAdmin, profile?.id])
 
-  // keysByTest is now loaded as part of fetchAdminSnapshot and refreshed in real-time
-
-  // Build paired data
+  /* ── computed / memo ── */
   const computed = useMemo(() => {
     const studentById = new Map(students.map(s => [s.id, s]))
     const attemptsByUser = new Map()
@@ -461,11 +608,8 @@ export default function Admin() {
       attemptsByUser.set(a.user_id, list)
       const totalAny = attemptAccuracyRecord(a)
       const prevBest = bestByUser.get(a.user_id)
-      if (
-        !prevBest ||
-        totalAny.percent > prevBest.percent ||
-        (totalAny.percent === prevBest.percent && totalAny.total > prevBest.total)
-      ) bestByUser.set(a.user_id, totalAny)
+      if (!prevBest || totalAny.percent > prevBest.percent || (totalAny.percent === prevBest.percent && totalAny.total > prevBest.total))
+        bestByUser.set(a.user_id, totalAny)
       const isPre = a.test_id === 'pre_test' || a.test_id === 'practice_test_11' || !a.test_id
       if (isPre) {
         const total = attemptTotalScore(a)
@@ -488,29 +632,20 @@ export default function Admin() {
       const post = postByAttemptId.get(a.id)
       if (!post) continue
       const student = studentById.get(a.user_id)
-      pairsPost.push({
-        pre: a.scores?.total,
-        post: post.post_score,
-        name: student?.full_name || 'Unknown',
-      })
+      pairsPost.push({ pre: a.scores?.total, post: post.post_score, name: student?.full_name || 'Unknown' })
     }
     const pairsOptional = []
     for (const [userId, pre] of bestPreByUser.entries()) {
       const post = bestExtraByUser.get(userId)
       if (!pre || !post) continue
       const student = studentById.get(userId)
-      pairsOptional.push({
-        pre,
-        post,
-        name: student?.full_name || 'Unknown',
-      })
+      pairsOptional.push({ pre, post, name: student?.full_name || 'Unknown' })
     }
     return { studentById, attemptsByUser, bestByUser, bestPreByUser, bestExtraByUser, postByAttemptId, pairsPost, pairsOptional }
   }, [students, attempts, postScores])
 
   const pairs = computed.pairsPost
   const pairsOpt = computed.pairsOptional
-
   const stats = pairedTTest(pairs)
   const avgImprovement = pairs.length > 0 ? Math.round(pairs.reduce((s, p) => s + (p.post - p.pre), 0) / pairs.length) : null
   const statsOpt = pairedTTest(pairsOpt)
@@ -520,7 +655,7 @@ export default function Admin() {
     labels: pairs.map(p => p.name?.split(' ')[0] || '?'),
     datasets: [
       { label: 'Pre-Test', data: pairs.map(p => p.pre), backgroundColor: '#94a3b8', borderRadius: 6, borderSkipped: false },
-      { label: 'Post-Test', data: pairs.map(p => p.post), backgroundColor: '#1a2744', borderRadius: 6, borderSkipped: false },
+      { label: 'Post-Test', data: pairs.map(p => p.post), backgroundColor: '#0ea5e9', borderRadius: 6, borderSkipped: false },
     ]
   } : null
 
@@ -561,7 +696,7 @@ export default function Admin() {
     { id: 'tests', label: 'Tests', icon: 'test' },
   ]
 
-  // Compute all unique affiliations and per-affiliation stats (including unaffiliated)
+  /* ── affiliation data ── */
   const affiliationData = useMemo(() => {
     const affiliations = new Map()
     const unaffiliated = { name: 'Unaffiliated', students: [], studentIds: new Set() }
@@ -583,38 +718,21 @@ export default function Admin() {
       const totals = groupAttempts.map(a => Number(a.scores?.composite || a.scores?.total || 0)).filter(t => t > 0)
       const sorted = totals.slice().sort((a, b) => a - b)
       const avg = totals.length ? totals.reduce((s, v) => s + v, 0) / totals.length : null
-      result.push({
-        name: group.name,
-        studentCount: group.students.length,
-        attemptCount: groupAttempts.length,
-        avgScore: avg,
-        median: sorted.length ? quantile(sorted, 0.5) : null,
-        studentIds: group.studentIds,
-      })
+      result.push({ name: group.name, studentCount: group.students.length, attemptCount: groupAttempts.length, avgScore: avg, median: sorted.length ? quantile(sorted, 0.5) : null, studentIds: group.studentIds })
     }
     result.sort((a, b) => b.studentCount - a.studentCount)
-    // Add unaffiliated group at the end if any exist
     if (unaffiliated.students.length > 0) {
       const groupAttempts = attempts.filter(a => unaffiliated.studentIds.has(a.user_id))
       const totals = groupAttempts.map(a => Number(a.scores?.composite || a.scores?.total || 0)).filter(t => t > 0)
       const sorted = totals.slice().sort((a, b) => a - b)
       const avg = totals.length ? totals.reduce((s, v) => s + v, 0) / totals.length : null
-      result.push({
-        name: 'Unaffiliated',
-        studentCount: unaffiliated.students.length,
-        attemptCount: groupAttempts.length,
-        avgScore: avg,
-        median: sorted.length ? quantile(sorted, 0.5) : null,
-        studentIds: unaffiliated.studentIds,
-        isUnaffiliated: true,
-      })
+      result.push({ name: 'Unaffiliated', studentCount: unaffiliated.students.length, attemptCount: groupAttempts.length, avgScore: avg, median: sorted.length ? quantile(sorted, 0.5) : null, studentIds: unaffiliated.studentIds, isUnaffiliated: true })
     }
     return result
   }, [students, attempts])
 
   const affiliationNames = useMemo(() => affiliationData.map(a => a.name), [affiliationData])
 
-  // Filter students/attempts by selected affiliation for the main analytics
   const filteredStudents = useMemo(() => {
     if (!affiliationFilter) return students
     if (affiliationFilter === '__unaffiliated__') return students.filter(s => !(s.affiliation || '').trim())
@@ -629,6 +747,7 @@ export default function Admin() {
     return attempts.filter(a => filteredStudentIds.has(a.user_id))
   }, [attempts, affiliationFilter, filteredStudentIds])
 
+  /* ── analytics ── */
   const analytics = useMemo(() => {
     const examMode = analyticsExam === 'act' ? 'act' : 'sat'
     const analyticsExamConfig = getExamConfig(examMode)
@@ -644,18 +763,14 @@ export default function Admin() {
     const totalsExtra = []
     const totalsFinal = []
     const sectionBuckets = Object.fromEntries(
-      analyticsScoreColumns
-        .filter((column) => column.key !== 'total')
-        .map((column) => [column.key, []])
+      analyticsScoreColumns.filter((column) => column.key !== 'total').map((column) => [column.key, []])
     )
 
     const byTest = new Map()
-    const attemptsByDay = new Map() // day -> count
+    const attemptsByDay = new Map()
     const completesByDay = new Map()
-
     const weakByDomain = new Map()
     const weakByChapter = new Map()
-
     const activeUsers7 = new Set()
     const activeUsers30 = new Set()
 
@@ -666,9 +781,7 @@ export default function Admin() {
         if (!keyBySection) return null
         const scaled = scoreAttemptFromKey(tid, attempt?.answers || {}, keyBySection)
         return scaled?.total ? scaled : null
-      } catch {
-        return null
-      }
+      } catch { return null }
     }
 
     for (const a of allAttempts) {
@@ -677,21 +790,16 @@ export default function Admin() {
       const sc = a.scores || {}
       let total = Number(sc.composite || sc.total || 0)
       const sectionValues = Object.fromEntries(
-        analyticsScoreColumns
-          .filter((column) => column.key !== 'total')
-          .map((column) => [column.key, Number(sc[column.key] || sc.sections?.[column.key] || 0)])
+        analyticsScoreColumns.filter((column) => column.key !== 'total').map((column) => [column.key, Number(sc[column.key] || sc.sections?.[column.key] || 0)])
       )
       const started = new Date(a.started_at || a.completed_at || 0).getTime()
 
-      // Some older rows only stored `total` (or lost section splits). Recompute from answers when possible.
       if (a.answers && Object.keys(a.answers || {}).length && (!total || Object.values(sectionValues).some((value) => !value))) {
-        const computed = computeScaledFromAnswers(a)
-        if (computed) {
-          if (!total) total = Number(computed.composite || computed.total || 0)
+        const comp = computeScaledFromAnswers(a)
+        if (comp) {
+          if (!total) total = Number(comp.composite || comp.total || 0)
           for (const column of analyticsScoreColumns.filter((entry) => entry.key !== 'total')) {
-            if (!sectionValues[column.key]) {
-              sectionValues[column.key] = Number(computed[column.key] || computed.sections?.[column.key] || 0)
-            }
+            if (!sectionValues[column.key]) sectionValues[column.key] = Number(comp[column.key] || comp.sections?.[column.key] || 0)
           }
         }
       }
@@ -701,9 +809,7 @@ export default function Admin() {
 
       if (total) {
         totals.push(total)
-        for (const [key, value] of Object.entries(sectionValues)) {
-          if (value) sectionBuckets[key].push(value)
-        }
+        for (const [key, value] of Object.entries(sectionValues)) { if (value) sectionBuckets[key].push(value) }
         if (isPreTestId(tid)) totalsPre.push(total)
         else if (tid === analyticsExamConfig.finalTestId || (examMode === 'sat' && tid === FINAL_TEST_ID)) totalsFinal.push(total)
         else totalsExtra.push(total)
@@ -711,9 +817,7 @@ export default function Admin() {
         const row = byTest.get(tid) || { count: 0, totals: [], sections: Object.fromEntries(Object.keys(sectionBuckets).map((key) => [key, []])) }
         row.count += 1
         row.totals.push(total)
-        for (const [key, value] of Object.entries(sectionValues)) {
-          if (value) row.sections[key].push(value)
-        }
+        for (const [key, value] of Object.entries(sectionValues)) { if (value) row.sections[key].push(value) }
         byTest.set(tid, row)
       }
 
@@ -754,45 +858,22 @@ export default function Admin() {
     const testRows = Array.from(byTest.entries()).map(([id, row]) => {
       const totalsS = row.totals.slice().sort((a, b) => a - b)
       return {
-        id,
-        label: testLabel(id),
-        count: row.count,
+        id, label: testLabel(id), count: row.count,
         avgTotal: avg(row.totals),
         avgSections: Object.fromEntries(Object.entries(row.sections || {}).map(([key, values]) => [key, avg(values)])),
         median: quantile(totalsS, 0.5),
       }
     }).sort((a, b) => (b.count - a.count) || String(a.label).localeCompare(String(b.label)))
 
-    const topDomains = Array.from(weakByDomain.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-
-    const topChapters = Array.from(weakByChapter.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+    const topDomains = Array.from(weakByDomain.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    const topChapters = Array.from(weakByChapter.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10)
 
     const allDays = Array.from(new Set([...attemptsByDay.keys(), ...completesByDay.keys()])).sort()
     const activitySeries = {
-      labels: allDays.map(d => d),
+      labels: allDays,
       datasets: [
-        {
-          label: 'Attempts started',
-          data: allDays.map(d => attemptsByDay.get(d) || 0),
-          borderColor: '#0ea5e9',
-          backgroundColor: 'rgba(14,165,233,.08)',
-          pointRadius: 2,
-          tension: 0.25,
-          fill: true,
-        },
-        {
-          label: 'Attempts completed',
-          data: allDays.map(d => completesByDay.get(d) || 0),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,.06)',
-          pointRadius: 2,
-          tension: 0.25,
-          fill: true,
-        },
+        { label: 'Attempts started', data: allDays.map(d => attemptsByDay.get(d) || 0), borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,.08)', pointRadius: 2, tension: 0.25, fill: true },
+        { label: 'Attempts completed', data: allDays.map(d => completesByDay.get(d) || 0), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.06)', pointRadius: 2, tension: 0.25, fill: true },
       ],
     }
 
@@ -812,155 +893,154 @@ export default function Admin() {
       }
       return {
         labels: starts.map((start) => examMode === 'act' ? `${start}-${Math.min(36, start + 4)}` : `${start}-${Math.min(1600, start + 99)}`),
-        datasets: [{
-          label: 'Students',
-          data: counts,
-          backgroundColor: 'rgba(26,39,68,.85)',
-          borderRadius: 6,
-          borderSkipped: false,
-        }]
+        datasets: [{ label: 'Students', data: counts, backgroundColor: 'rgba(14,165,233,.7)', borderRadius: 6, borderSkipped: false }]
       }
     })()
 
     const byTestChart = {
       labels: testRows.map(r => r.label),
       datasets: [
-        {
-          label: examMode === 'act' ? 'Avg Composite' : 'Avg Total',
-          data: testRows.map(r => (Number.isFinite(Number(r.avgTotal)) ? Math.round(r.avgTotal) : null)),
-          backgroundColor: '#1a2744',
-          borderRadius: 6,
-          borderSkipped: false,
-        },
-        ...analyticsScoreColumns
-          .filter((column) => column.key !== 'total')
-          .map((column, index) => ({
-            label: `Avg ${column.label}`,
-            data: testRows.map((row) => (Number.isFinite(Number(row.avgSections?.[column.key])) ? Math.round(row.avgSections[column.key]) : null)),
-            backgroundColor: ['#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981'][index % 4],
-            borderRadius: 6,
-            borderSkipped: false,
-          })),
+        { label: examMode === 'act' ? 'Avg Composite' : 'Avg Total', data: testRows.map(r => (Number.isFinite(Number(r.avgTotal)) ? Math.round(r.avgTotal) : null)), backgroundColor: '#0c4a6e', borderRadius: 6, borderSkipped: false },
+        ...analyticsScoreColumns.filter((column) => column.key !== 'total').map((column, index) => ({
+          label: `Avg ${column.label}`,
+          data: testRows.map((row) => (Number.isFinite(Number(row.avgSections?.[column.key])) ? Math.round(row.avgSections[column.key]) : null)),
+          backgroundColor: ['#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981'][index % 4],
+          borderRadius: 6, borderSkipped: false,
+        })),
       ],
     }
 
     const domainsChart = {
       labels: topDomains.map(([d]) => d),
-      datasets: [{
-        label: 'Misses',
-        data: topDomains.map(([, c]) => c),
-        backgroundColor: topDomains.map((_, i) => ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#64748b'][i % 8]),
-        borderRadius: 6,
-        borderSkipped: false,
-      }]
+      datasets: [{ label: 'Misses', data: topDomains.map(([, c]) => c), backgroundColor: topDomains.map((_, i) => ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#64748b'][i % 8]), borderRadius: 6, borderSkipped: false }]
     }
 
     const chaptersChart = {
       labels: topChapters.map(([ch]) => `Ch ${ch}`),
-      datasets: [{
-        label: 'Misses',
-        data: topChapters.map(([, c]) => c),
-        backgroundColor: '#ef4444',
-        borderRadius: 6,
-        borderSkipped: false,
-      }]
+      datasets: [{ label: 'Misses', data: topChapters.map(([, c]) => c), backgroundColor: '#ef4444', borderRadius: 6, borderSkipped: false }]
     }
 
     return { summary, testRows, histogram, byTestChart, domainsChart, chaptersChart, activitySeries, topChapters, topDomains, scoreColumns: analyticsScoreColumns }
   }, [filteredAttempts, analyticsExam])
 
+  /* ═══════════ RENDER ═══════════ */
+
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Loading…</div>
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam="sat" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, height: '100vh', color: '#64748b', fontFamily: 'Sora, sans-serif', fontSize: 14 }}>
+        Loading...
+      </div>
+    </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent' }}>
-		      <nav className="nav">
-	        <BrandLink />
-	        <div className="nav-actions">
-	          <UserMenu profile={profile} />
-	          <button
-	            className="btn btn-outline"
-	            onClick={() => runRegrade({ silent: false })}
-	            disabled={regrading}
-	            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.9)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
-	            title="Regrade completed attempts using the latest answer-format logic"
-	          >
-	            {regrading ? 'Regrading…' : 'Regrade Attempts'}
-	          </button>
-	          <button
-	            className="btn btn-outline"
-	            onClick={resetMyData}
-	            disabled={resettingUserId === profile?.id}
-	            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.9)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}
-	            title="Reset your admin testing data"
-	          >
-	            {resettingUserId === profile?.id ? 'Resetting…' : 'Reset My Data'}
-	          </button>
-          <Link to="/dashboard" className="btn btn-outline" style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="back" size={15} />
-            Dashboard
-          </Link>
-          <button className="btn btn-outline" onClick={() => signOut().then(() => navigate('/login'))}
-            style={{ padding: '6px 14px', fontSize: 12, color: 'rgba(255,255,255,.7)', borderColor: 'rgba(255,255,255,.2)', background: 'rgba(255,255,255,.08)' }}>
-            Sign Out
-          </button>
-        </div>
-      </nav>
-
-      {/* Tab bar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e8ecf0', display: 'flex', padding: '0 32px' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: '14px 20px', border: 'none', background: 'none', fontFamily: 'Sora,sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: tab === t.id ? '#1a2744' : '#64748b', borderBottom: `3px solid ${tab === t.id ? '#f59e0b' : 'transparent'}`, transition: 'all .2s', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Icon name={t.icon} size={16} />
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className="app-layout has-sidebar">
+      <Sidebar currentExam="sat" />
 
       <div className="page fade-up">
-        {/* Summary stats */}
-        <div className="stats-grid" style={{ marginBottom: 24 }}>
+        {/* ── Header ── */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}
+        >
+          <div>
+            <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ ...iconBadge, width: 38, height: 38, borderRadius: 11, boxShadow: '0 4px 14px rgba(14,165,233,.25)' }}>
+                <Icon name="admin" size={18} />
+              </span>
+              Admin Panel
+            </h1>
+            <p style={{ fontSize: 13, color: '#64748b', marginTop: 6, marginBottom: 0 }}>
+              Manage students, tutors, and platform activity
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button style={actionBtn} onClick={() => runRegrade({ silent: false })} disabled={regrading}>
+              {regrading ? 'Regrading...' : 'Regrade Attempts'}
+            </button>
+            <button style={actionBtn} onClick={resetMyData} disabled={resettingUserId === profile?.id}>
+              {resettingUserId === profile?.id ? 'Resetting...' : 'Reset My Data'}
+            </button>
+          </div>
+        </motion.div>
+
+        {/* ── Summary stats row ── */}
+        <motion.div {...fadeCard} transition={{ duration: 0.35, delay: 0.05 }}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}
+        >
           {[
-            { label: 'Total Registered', val: students.length, icon: 'students', dark: false },
-            { label: 'Students', val: students.filter(s => s.role !== 'admin' && s.role !== 'tutor').length, icon: 'students', dark: false },
-            { label: 'Tutors', val: students.filter(s => s.role === 'tutor').length, icon: 'students', dark: false },
-            { label: 'Completed Tests', val: attempts.length, icon: 'check', dark: false },
-            { label: 'Paired Records', val: pairs.length, icon: 'chart', dark: false },
-            { label: 'Avg Improvement', val: avgImprovement !== null ? `+${avgImprovement} pts` : '—', icon: 'trend', dark: !!avgImprovement },
-          ].map(s => (
-            <div key={s.label} className={`stat-box${s.dark ? ' dark' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: s.dark ? 'rgba(255,255,255,.12)' : 'rgba(14,165,233,.10)',
-                color: s.dark ? 'white' : '#0f172a',
-              }}>
+            { label: 'Total Registered', val: students.length, icon: 'students' },
+            { label: 'Students', val: students.filter(s => s.role !== 'admin' && s.role !== 'tutor').length, icon: 'students' },
+            { label: 'Tutors', val: students.filter(s => s.role === 'tutor').length, icon: 'students' },
+            { label: 'Completed Tests', val: attempts.length, icon: 'check' },
+            { label: 'Paired Records', val: pairs.length, icon: 'chart' },
+            { label: 'Avg Improvement', val: avgImprovement !== null ? `+${avgImprovement} pts` : '\u2014', icon: 'trend', highlight: !!avgImprovement },
+          ].map((s, i) => (
+            <motion.div key={s.label} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.06 * i }}
+              style={{ ...statCard, ...(s.highlight ? { borderColor: 'rgba(16,185,129,.25)', background: 'rgba(16,185,129,.03)' } : {}) }}
+            >
+              <div style={statIconWrap}>
                 <Icon name={s.icon} size={20} />
               </div>
               <div>
-                <div className="stat-label">{s.label}</div>
-                <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px' }}>{s.label}</div>
+                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{s.val}</div>
               </div>
-            </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* ── Tab navigation ── */}
+        <div style={{
+          display: 'flex', gap: 4, marginBottom: 24, overflowX: 'auto',
+          borderBottom: '1.5px solid rgba(14,165,233,.10)', paddingBottom: 0,
+        }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              ...pillBtn(tab === t.id),
+              border: 'none',
+              borderBottom: `3px solid ${tab === t.id ? '#0ea5e9' : 'transparent'}`,
+              borderRadius: '8px 8px 0 0',
+              paddingBottom: 10,
+              background: tab === t.id ? 'rgba(14,165,233,.06)' : 'transparent',
+            }}>
+              <Icon name={t.icon} size={15} />
+              {t.label}
+            </button>
           ))}
         </div>
 
-        {/* Students tab */}
+        {/* ── Status message ── */}
+        {resetMsg && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            style={{
+              marginBottom: 16, fontSize: 13, fontWeight: 700, padding: '10px 16px', borderRadius: 10,
+              background: resetMsg.toLowerCase().startsWith('success:') ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+              color: resetMsg.toLowerCase().startsWith('success:') ? '#059669' : '#dc2626',
+              border: `1px solid ${resetMsg.toLowerCase().startsWith('success:') ? 'rgba(16,185,129,.2)' : 'rgba(239,68,68,.2)'}`,
+            }}
+          >
+            {resetMsg}
+          </motion.div>
+        )}
+
+        {/* ══════════════════════════════
+            TAB: Students
+            ══════════════════════════════ */}
         {tab === 'students' && (
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, margin: 0 }}>All Students</h3>
+          <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+              <h3 style={sectionHeading}>
+                <span style={iconBadge}><Icon name="students" size={16} /></span>
+                All Students
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, fontFamily: 'DM Sans, sans-serif' }}>({filteredStudents.length})</span>
+              </h3>
               {affiliationNames.length > 0 && (
                 <select
                   value={affiliationFilter}
                   onChange={(e) => setAffiliationFilter(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, fontFamily: 'Sora,sans-serif', fontWeight: 600, background: '#fff', color: '#1a2744', cursor: 'pointer' }}
+                  style={{ padding: '7px 14px', borderRadius: 9, border: '1.5px solid rgba(14,165,233,.15)', fontSize: 12, fontFamily: 'Sora, sans-serif', fontWeight: 600, background: '#fff', color: '#0f172a', cursor: 'pointer' }}
                 >
                   <option value="">All Affiliations</option>
                   {affiliationData.filter(a => !a.isUnaffiliated).map((a) => (
@@ -972,341 +1052,291 @@ export default function Admin() {
                 </select>
               )}
             </div>
-            {resetMsg && (
-              <div style={{ marginBottom: 12, fontSize: 13, color: resetMsg.toLowerCase().startsWith('success:') ? '#10b981' : '#ef4444', fontWeight: 700 }}>
-                {resetMsg}
-              </div>
-            )}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Name', 'Email', 'Role', 'Affiliation', 'Joined', 'Tests', 'Best Score', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map(s => {
-                  const userAttempts = computed.attemptsByUser.get(s.id) || []
-                  const best = computed.bestByUser.get(s.id) || null
-                  const isSelf = s.id === profile?.id
-                  return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>
-                        <Link to={`/dashboard?user=${encodeURIComponent(s.id)}`} style={{ color: '#1a2744', textDecoration: 'none' }}>
-                          {s.full_name || '—'}
-                        </Link>
-                      </td>
-                      <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{s.email}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: s.role === 'admin' ? '#fef3c7' : s.role === 'tutor' ? '#dbeafe' : '#f0fdf4', color: s.role === 'admin' ? '#92400e' : s.role === 'tutor' ? '#1e40af' : '#166534' }}>
-                          {s.role}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{s.affiliation || '—'}</td>
-                      <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(s.created_at).toLocaleDateString()}</td>
-                      <td style={{ padding: '12px' }}>{userAttempts.length}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#1a2744' }} title={best ? `${best.raw}/${best.totalQuestions} correct` : undefined}>
-                        {best?.display || '—'}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button
-                            className="btn btn-outline"
-                            style={{ padding: '6px 10px', fontSize: 12, opacity: resettingUserId === s.id ? 0.6 : 1 }}
-                            disabled={resettingUserId === s.id}
-                            onClick={() => resetStudentData(s.id, s.email)}
-                            title="Delete this student's tests, scores, and study progress"
-                          >
-                            {resettingUserId === s.id ? 'Resetting…' : 'Reset'}
-                          </button>
-                          <Link className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} to={`/dashboard?user=${encodeURIComponent(s.id)}`}>
-                            View UI →
-                          </Link>
-                          <Link className="btn btn-outline" style={{ padding: '6px 10px', fontSize: 12 }} to={`/report?user=${encodeURIComponent(s.id)}`}>
-                            Report →
-                          </Link>
-                          {!isSelf && (
-                            <button
-                              className="btn btn-outline"
-                              style={{ padding: '6px 10px', fontSize: 12, borderColor: '#fecaca', color: '#b91c1c' }}
-                              disabled={resettingUserId === s.id}
-                              onClick={() => deleteStudentAccount(s.id, s.email)}
-                              title="Permanently delete this user (requires server key on Vercel)"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {/* Results tab */}
-        {tab === 'results' && (
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>All Completed Tests</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Student', 'Exam', 'Test', 'Date', 'Breakdown', 'Total', 'Post-Test', 'Gain', 'Top Weakness', ''].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {attempts.map(a => {
-                  const student = computed.studentById.get(a.user_id)
-                  const post = computed.postByAttemptId.get(a.id)
-                  const exam = getExamFromTestId(a.test_id)
-                  const total = attemptTotalScore(a)
-                  const gain = post ? post.post_score - total : null
-                  return (
-                    <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: 700 }}>
-                        <Link to={`/dashboard?user=${encodeURIComponent(a.user_id)}`} style={{ color: '#1a2744', textDecoration: 'none' }}>
-                          {student?.full_name || 'Unknown'}
-                        </Link>
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: exam === 'act' ? 'rgba(59,130,246,.10)' : 'rgba(245,158,11,.12)', color: exam === 'act' ? '#2563eb' : '#b45309' }}>
-                          {exam.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', fontWeight: 800, color: '#1a2744' }}>{testLabel(a.test_id)}</td>
-                      <td style={{ padding: '12px', color: '#64748b', fontSize: 13 }}>{new Date(a.started_at).toLocaleDateString()}</td>
-                      <td style={{ padding: '12px', fontSize: 12, color: '#475569' }}>{formatAttemptBreakdown(a) || '—'}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, fontSize: 15, color: '#1a2744' }}>{total || '—'}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: '#10b981' }}>{post?.post_score || '—'}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 800, color: gain > 0 ? '#10b981' : gain < 0 ? '#ef4444' : '#64748b' }}>
-                        {gain !== null ? `${gain > 0 ? '+' : ''}${gain}` : '—'}
-                      </td>
-                      <td style={{ padding: '12px', fontSize: 12, color: '#475569' }}>
-                        {formatTopWeakness(a)}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <Link to={`/results/${a.id}?user=${encodeURIComponent(a.user_id)}`} style={{ fontSize: 12, color: '#1a2744', fontWeight: 600 }}>View →</Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Analytics tab */}
-        {tab === 'analytics' && (
-          <div style={{ display: 'grid', gap: 18 }}>
-            <div className="card">
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="chart" size={17} />
-                Program Analytics
-              </h3>
-              <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
-                Review completed {analyticsExam.toUpperCase()} attempts with separate analytics for SAT and ACT.
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-                {['sat', 'act'].map((mode) => (
-                  <button
-                    key={mode}
-                    className="btn btn-outline"
-                    onClick={() => setAnalyticsExam(mode)}
-                    style={{
-                      padding: '7px 12px',
-                      background: analyticsExam === mode ? 'rgba(14,165,233,.10)' : 'white',
-                      borderColor: analyticsExam === mode ? 'rgba(14,165,233,.35)' : '#e2e8f0',
-                      color: analyticsExam === mode ? '#0f172a' : '#64748b',
-                    }}
-                  >
-                    {mode.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* KPI grid */}
-            <div className="stats-grid" style={{ marginBottom: 0 }}>
-              {[
-                { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: 'activity' },
-                { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: 'calendar' },
-                { label: analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '—', sub: 'Across all tests', icon: 'chart' },
-                ...analytics.scoreColumns
-                  .filter((column) => column.key !== 'total')
-                  .slice(0, 3)
-                  .map((column, index) => ({
-                    label: `Avg ${column.label}`,
-                    val: analytics.summary.avgSections?.[column.key] ? Math.round(analytics.summary.avgSections[column.key]) : '—',
-                    sub: 'Section average',
-                    icon: index === 0 ? 'guide' : index === 1 ? 'math' : 'results',
-                  })),
-                { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '—', sub: 'Total score', icon: 'target' },
-              ].map(s => (
-                <div key={s.label} className="stat-box" style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(14,165,233,.10)',
-                    color: '#0f172a',
-                  }}>
-                    <Icon name={s.icon} size={20} />
-                  </div>
-                  <div>
-                    <div className="stat-label">{s.label}</div>
-                    <div className="stat-num" style={{ fontSize: 22 }}>{s.val}</div>
-                    <div className="stat-sub">{s.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Activity over time */}
-            <div className="card">
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="calendar" size={17} />
-                Activity Over Time
-              </h3>
-              <div style={{ height: 220 }}>
-                <Line data={analytics.activitySeries} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
-                  scales: {
-                    x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                    y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
-                  }
-                }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
-              {/* Score distribution */}
-              <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="chart" size={17} />
-                  Score Distribution
-                </h3>
-                <div style={{ height: 220 }}>
-                  <Bar data={analytics.histogram} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
-                    }
-                  }} />
-                </div>
-              </div>
-
-              {/* Averages by test */}
-              <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="final" size={17} />
-                  Averages by Test
-                </h3>
-                <div style={{ height: 220 }}>
-                  <Bar data={analytics.byTestChart} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                      y: { min: analyticsExam === 'act' ? 1 : 200, max: analyticsExam === 'act' ? 36 : 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } } }
-                    }
-                  }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Weakness analytics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
-              <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="warning" size={17} />
-                  Most Missed Domains
-                </h3>
-                <div style={{ height: 240 }}>
-                  <Bar data={analytics.domainsChart} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
-                    }
-                  }} />
-                </div>
-              </div>
-
-              <div className="card">
-                <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icon name="guide" size={17} />
-                  Most Missed Chapters
-                </h3>
-                <div style={{ height: 240 }}>
-                  <Bar data={analytics.chaptersChart} options={{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 } } },
-                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 10 } }, beginAtZero: true }
-                    }
-                  }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Test summary table */}
-            <div className="card" style={{ overflowX: 'auto' }}>
-              <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="results" size={17} />
-                Test Summary
-              </h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(14,165,233,.08)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
                 <thead>
                   <tr>
-                    {['Test', 'Attempts', analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', 'Median', ...analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => `Avg ${column.label}`)].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px', background: '#f8fafc', borderBottom: '1px solid #e8ecf0' }}>{h}</th>
+                    {['Name', 'Email', 'Role', 'Affiliation', 'Joined', 'Tests', 'Best Score', 'Actions'].map(h => (
+                      <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {analytics.testRows.map(r => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: 900, color: '#1a2744' }}>{r.label}</td>
-                      <td style={{ padding: '12px' }}>{r.count}</td>
-                      <td style={{ padding: '12px', fontFamily: 'Sora,sans-serif', fontWeight: 900 }}>{r.avgTotal ? Math.round(r.avgTotal) : '—'}</td>
-                      <td style={{ padding: '12px' }}>{r.median ? Math.round(r.median) : '—'}</td>
-                      {analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => (
-                        <td key={`${r.id}-${column.key}`} style={{ padding: '12px' }}>
-                          {r.avgSections?.[column.key] ? Math.round(r.avgSections[column.key]) : '—'}
+                  {filteredStudents.map(s => {
+                    const userAttempts = computed.attemptsByUser.get(s.id) || []
+                    const best = computed.bestByUser.get(s.id) || null
+                    const isSelf = s.id === profile?.id
+                    return (
+                      <tr key={s.id} style={{ borderBottom: '1px solid rgba(14,165,233,.06)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(14,165,233,.03)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ ...tdStyle, fontWeight: 700, color: '#0f172a' }}>
+                          <Link to={`/dashboard?user=${encodeURIComponent(s.id)}`} style={{ color: '#0f172a', textDecoration: 'none' }}>
+                            {s.full_name || '\u2014'}
+                          </Link>
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        <td style={{ ...tdStyle, color: '#64748b' }}>{s.email}</td>
+                        <td style={tdStyle}><span style={rolePill(s.role)}>{s.role}</span></td>
+                        <td style={{ ...tdStyle, color: '#64748b' }}>{s.affiliation || '\u2014'}</td>
+                        <td style={{ ...tdStyle, color: '#64748b' }}>{new Date(s.created_at).toLocaleDateString()}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>{userAttempts.length}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: '#0f172a' }} title={best ? `${best.raw}/${best.totalQuestions} correct` : undefined}>
+                          {best?.display || '\u2014'}
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button style={{ ...actionBtn, padding: '5px 10px', opacity: resettingUserId === s.id ? 0.5 : 1 }}
+                              disabled={resettingUserId === s.id} onClick={() => resetStudentData(s.id, s.email)}>
+                              {resettingUserId === s.id ? 'Resetting...' : 'Reset'}
+                            </button>
+                            <Link to={`/dashboard?user=${encodeURIComponent(s.id)}`} style={{ ...actionBtn, padding: '5px 10px', textDecoration: 'none', display: 'inline-block' }}>
+                              View
+                            </Link>
+                            <Link to={`/report?user=${encodeURIComponent(s.id)}`} style={{ ...actionBtn, padding: '5px 10px', textDecoration: 'none', display: 'inline-block' }}>
+                              Report
+                            </Link>
+                            {!isSelf && (
+                              <button style={{ ...actionBtnDanger, padding: '5px 10px' }}
+                                disabled={resettingUserId === s.id} onClick={() => deleteStudentAccount(s.id, s.email)}>
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
+          </motion.div>
+        )}
+
+        {/* ══════════════════════════════
+            TAB: Test Results
+            ══════════════════════════════ */}
+        {tab === 'results' && (
+          <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+            <h3 style={sectionHeading}>
+              <span style={iconBadge}><Icon name="results" size={16} /></span>
+              All Completed Tests
+              <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, fontFamily: 'DM Sans, sans-serif' }}>({attempts.length})</span>
+            </h3>
+
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(14,165,233,.08)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
+                <thead>
+                  <tr>
+                    {['Student', 'Exam', 'Test', 'Date', 'Breakdown', 'Total', 'Post-Test', 'Gain', 'Top Weakness', ''].map(h => (
+                      <th key={h} style={thStyle}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {attempts.map(a => {
+                    const student = computed.studentById.get(a.user_id)
+                    const post = computed.postByAttemptId.get(a.id)
+                    const exam = getExamFromTestId(a.test_id)
+                    const total = attemptTotalScore(a)
+                    const gain = post ? post.post_score - total : null
+                    return (
+                      <tr key={a.id} style={{ borderBottom: '1px solid rgba(14,165,233,.06)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(14,165,233,.03)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ ...tdStyle, fontWeight: 700, color: '#0f172a' }}>
+                          <Link to={`/dashboard?user=${encodeURIComponent(a.user_id)}`} style={{ color: '#0f172a', textDecoration: 'none' }}>
+                            {student?.full_name || 'Unknown'}
+                          </Link>
+                        </td>
+                        <td style={tdStyle}><span style={examPill(exam)}>{exam.toUpperCase()}</span></td>
+                        <td style={{ ...tdStyle, fontWeight: 800, color: '#0f172a' }}>{testLabel(a.test_id)}</td>
+                        <td style={{ ...tdStyle, color: '#64748b' }}>{new Date(a.started_at).toLocaleDateString()}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: '#475569' }}>{formatAttemptBreakdown(a) || '\u2014'}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'Sora, sans-serif', fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{total || '\u2014'}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: '#059669' }}>{post?.post_score || '\u2014'}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'Sora, sans-serif', fontWeight: 800, color: gain > 0 ? '#059669' : gain < 0 ? '#dc2626' : '#64748b' }}>
+                          {gain !== null ? `${gain > 0 ? '+' : ''}${gain}` : '\u2014'}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: '#475569', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {formatTopWeakness(a)}
+                        </td>
+                        <td style={tdStyle}>
+                          <Link to={`/results/${a.id}?user=${encodeURIComponent(a.user_id)}`} style={{ ...actionBtn, padding: '5px 10px', textDecoration: 'none', display: 'inline-block' }}>
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ══════════════════════════════
+            TAB: Analytics
+            ══════════════════════════════ */}
+        {tab === 'analytics' && (
+          <div style={{ display: 'grid', gap: 20 }}>
+            {/* Exam toggle */}
+            <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+              <h3 style={sectionHeading}>
+                <span style={iconBadge}><Icon name="chart" size={16} /></span>
+                Program Analytics
+              </h3>
+              <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, margin: '0 0 14px 0' }}>
+                Review completed {analyticsExam.toUpperCase()} attempts with separate analytics for SAT and ACT.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['sat', 'act'].map((mode) => (
+                  <button key={mode} style={pillBtn(analyticsExam === mode)} onClick={() => setAnalyticsExam(mode)}>
+                    {mode.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* KPI grid */}
+            <motion.div {...fadeCard} transition={{ duration: 0.35, delay: 0.05 }}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 14 }}
+            >
+              {[
+                { label: 'Active (7d)', val: analytics.summary.active7, sub: 'Students with a test this week', icon: 'activity' },
+                { label: 'Active (30d)', val: analytics.summary.active30, sub: 'Students with a test this month', icon: 'calendar' },
+                { label: analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', val: analytics.summary.avgTotal ? Math.round(analytics.summary.avgTotal) : '\u2014', sub: 'Across all tests', icon: 'chart' },
+                ...analytics.scoreColumns.filter((column) => column.key !== 'total').slice(0, 3).map((column, index) => ({
+                  label: `Avg ${column.label}`,
+                  val: analytics.summary.avgSections?.[column.key] ? Math.round(analytics.summary.avgSections[column.key]) : '\u2014',
+                  sub: 'Section average',
+                  icon: index === 0 ? 'guide' : index === 1 ? 'math' : 'results',
+                })),
+                { label: 'Median', val: analytics.summary.median ? Math.round(analytics.summary.median) : '\u2014', sub: 'Total score', icon: 'target' },
+              ].map((s, i) => (
+                <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.04 * i }} style={statCard}>
+                  <div style={statIconWrap}><Icon name={s.icon} size={20} /></div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px' }}>{s.label}</div>
+                    <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{s.val}</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{s.sub}</div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Activity over time */}
+            <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.1 }} style={cardStyle}>
+              <h3 style={sectionHeading}>
+                <span style={iconBadge}><Icon name="calendar" size={16} /></span>
+                Activity Over Time
+              </h3>
+              <div style={{ height: 220 }}>
+                <Line data={analytics.activitySeries} options={lineOpts()} />
+              </div>
+            </motion.div>
+
+            {/* Charts row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
+              <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.12 }} style={cardStyle}>
+                <h3 style={sectionHeading}>
+                  <span style={iconBadge}><Icon name="chart" size={16} /></span>
+                  Score Distribution
+                </h3>
+                <div style={{ height: 220 }}>
+                  <Bar data={analytics.histogram} options={barOpts({ legend: false })} />
+                </div>
+              </motion.div>
+
+              <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.14 }} style={cardStyle}>
+                <h3 style={sectionHeading}>
+                  <span style={iconBadge}><Icon name="final" size={16} /></span>
+                  Averages by Test
+                </h3>
+                <div style={{ height: 220 }}>
+                  <Bar data={analytics.byTestChart} options={barOpts({ yMin: analyticsExam === 'act' ? 1 : 200, yMax: analyticsExam === 'act' ? 36 : 1600 })} />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Weakness charts */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
+              <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.16 }} style={cardStyle}>
+                <h3 style={sectionHeading}>
+                  <span style={iconBadge}><Icon name="warning" size={16} /></span>
+                  Most Missed Domains
+                </h3>
+                <div style={{ height: 240 }}>
+                  <Bar data={analytics.domainsChart} options={barOpts({ legend: false })} />
+                </div>
+              </motion.div>
+
+              <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.18 }} style={cardStyle}>
+                <h3 style={sectionHeading}>
+                  <span style={iconBadge}><Icon name="guide" size={16} /></span>
+                  Most Missed Chapters
+                </h3>
+                <div style={{ height: 240 }}>
+                  <Bar data={analytics.chaptersChart} options={barOpts({ legend: false })} />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Test summary table */}
+            <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.2 }} style={cardStyle}>
+              <h3 style={sectionHeading}>
+                <span style={iconBadge}><Icon name="results" size={16} /></span>
+                Test Summary
+              </h3>
+              <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(14,165,233,.08)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Test', 'Attempts', analyticsExam === 'act' ? 'Avg Composite' : 'Avg Total', 'Median', ...analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => `Avg ${column.label}`)].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.testRows.map(r => (
+                      <tr key={r.id} style={{ borderBottom: '1px solid rgba(14,165,233,.06)' }}>
+                        <td style={{ ...tdStyle, fontWeight: 800, color: '#0f172a' }}>{r.label}</td>
+                        <td style={tdStyle}>{r.count}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'Sora, sans-serif', fontWeight: 800 }}>{r.avgTotal ? Math.round(r.avgTotal) : '\u2014'}</td>
+                        <td style={tdStyle}>{r.median ? Math.round(r.median) : '\u2014'}</td>
+                        {analytics.scoreColumns.filter((column) => column.key !== 'total').map((column) => (
+                          <td key={`${r.id}-${column.key}`} style={tdStyle}>
+                            {r.avgSections?.[column.key] ? Math.round(r.avgSections[column.key]) : '\u2014'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
           </div>
         )}
 
-        {/* Affiliations tab */}
+        {/* ══════════════════════════════
+            TAB: Affiliations
+            ══════════════════════════════ */}
         {tab === 'affiliations' && (
           <div style={{ display: 'grid', gap: 20 }}>
             {affiliationData.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>No affiliations found. Students and tutors can set their affiliation on signup.</div>
+              <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={{ ...cardStyle, textAlign: 'center', padding: 48, color: '#64748b' }}>
+                No affiliations found. Students and tutors can set their affiliation on signup.
+              </motion.div>
             ) : (
               <>
-                {/* Comparison bar chart */}
-                <div className="card">
-                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Affiliation Comparison</h3>
+                {/* Comparison chart */}
+                <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="students" size={16} /></span>
+                    Affiliation Comparison
+                  </h3>
                   <Bar
                     data={{
                       labels: affiliationData.map(a => a.name),
@@ -1315,53 +1345,57 @@ export default function Admin() {
                         { label: 'Test Attempts', data: affiliationData.map(a => a.attemptCount), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false },
                       ],
                     }}
-                    options={{ responsive: true, plugins: { legend: { labels: { font: { size: 11 } } } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true, ticks: { font: { size: 10 } } } } }}
+                    options={barOpts()}
                   />
-                </div>
+                </motion.div>
 
-                {/* Avg score comparison */}
+                {/* Average score chart */}
                 {affiliationData.some(a => a.avgScore) && (
-                  <div className="card">
-                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Average Score by Affiliation</h3>
+                  <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.05 }} style={cardStyle}>
+                    <h3 style={sectionHeading}>
+                      <span style={iconBadge}><Icon name="chart" size={16} /></span>
+                      Average Score by Affiliation
+                    </h3>
                     <Bar
                       data={{
                         labels: affiliationData.filter(a => a.avgScore).map(a => a.name),
                         datasets: [{
                           label: 'Avg Score',
                           data: affiliationData.filter(a => a.avgScore).map(a => Math.round(a.avgScore)),
-                          backgroundColor: affiliationData.filter(a => a.avgScore).map((_, i) => ['#1a2744', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#ef4444'][i % 8]),
-                          borderRadius: 6,
-                          borderSkipped: false,
+                          backgroundColor: affiliationData.filter(a => a.avgScore).map((_, i) => ['#0c4a6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#ef4444'][i % 8]),
+                          borderRadius: 6, borderSkipped: false,
                         }],
                       }}
-                      options={{ responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: false, ticks: { font: { size: 10 } } } } }}
+                      options={barOpts({ legend: false })}
                     />
-                  </div>
+                  </motion.div>
                 )}
 
-                {/* Per-affiliation stat cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-                  {affiliationData.map((aff) => (
-                    <div key={aff.name} className="card" style={{ cursor: 'pointer', borderLeft: aff.isUnaffiliated ? '3px solid #94a3b8' : undefined }} onClick={() => { setAffiliationFilter(aff.isUnaffiliated ? '__unaffiliated__' : aff.name); setTab('students') }}>
-                      <h4 style={{ fontFamily: 'Sora,sans-serif', fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#1a2744' }}>{aff.name}</h4>
+                {/* Per-affiliation cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                  {affiliationData.map((aff, i) => (
+                    <motion.div key={aff.name}
+                      initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.04 * i }}
+                      style={{ ...cardStyle, cursor: 'pointer', marginBottom: 0, borderLeft: aff.isUnaffiliated ? '3px solid #94a3b8' : `3px solid #0ea5e9` }}
+                      onClick={() => { setAffiliationFilter(aff.isUnaffiliated ? '__unaffiliated__' : aff.name); setTab('students') }}
+                    >
+                      <h4 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 700, marginBottom: 14, color: '#0f172a', margin: '0 0 14px 0' }}>{aff.name}</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Students</div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.studentCount}</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Tests</div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.attemptCount}</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Avg Score</div>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: '#1a2744' }}>{aff.avgScore ? Math.round(aff.avgScore) : '—'}</div>
-                        </div>
+                        {[
+                          { label: 'Students', val: aff.studentCount },
+                          { label: 'Tests', val: aff.attemptCount },
+                          { label: 'Avg Score', val: aff.avgScore ? Math.round(aff.avgScore) : '\u2014' },
+                        ].map(stat => (
+                          <div key={stat.label} style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>{stat.label}</div>
+                            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', fontFamily: 'Sora, sans-serif' }}>{stat.val}</div>
+                          </div>
+                        ))}
                       </div>
-                      <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
-                        {aff.median ? `Median: ${Math.round(aff.median)}` : ''} · Click to filter
+                      <div style={{ marginTop: 10, fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
+                        {aff.median ? `Median: ${Math.round(aff.median)}` : ''} {'\u00b7'} Click to filter
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </>
@@ -1369,52 +1403,47 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Proof of Impact tab */}
+        {/* ══════════════════════════════
+            TAB: Proof of Impact
+            ══════════════════════════════ */}
         {tab === 'impact' && (
-          <div>
+          <div style={{ display: 'grid', gap: 20 }}>
             {pairs.length < 2 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '60px 24px', color: '#94a3b8' }}>
-                <div style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'rgba(148,163,184,.12)', color: '#64748b' }}>
+              <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={{ ...cardStyle, textAlign: 'center', padding: '56px 28px' }}>
+                <div style={{ marginBottom: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'rgba(14,165,233,.08)', color: '#0ea5e9' }}>
                   <Icon name="clock" size={28} />
                 </div>
-                <h3 style={{ color: '#475569', marginBottom: 4 }}>Need at least 2 paired records</h3>
-                <p>Currently {pairs.length} student(s) with both pre and post scores. Add post-test scores in the database to generate the impact report.</p>
-              </div>
+                <h3 style={{ fontFamily: 'Sora, sans-serif', color: '#334155', marginBottom: 6, fontSize: 16, fontWeight: 700 }}>Need at least 2 paired records</h3>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Currently {pairs.length} student(s) with both pre and post scores. Add post-test scores in the database to generate the impact report.</p>
+              </motion.div>
             ) : (
               <>
-                {/* Charts */}
-                <div className="card" style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Score Comparison: Pre vs Post</h3>
+                {/* Pre vs Post chart */}
+                <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="chart" size={16} /></span>
+                    Score Comparison: Pre vs Post
+                  </h3>
                   <div style={{ height: 260 }}>
-                    <Bar data={chartData} options={{
-                      responsive: true, maintainAspectRatio: false,
-                      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
-                      scales: {
-                        x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
-                        y: { min: 300, max: 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
-                      }
-                    }} />
+                    <Bar data={chartData} options={barOpts({ yMin: 300, yMax: 1600 })} />
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="card" style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Point Gain Per Student</h3>
+                {/* Point Gain chart */}
+                <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.05 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="trend" size={16} /></span>
+                    Point Gain Per Student
+                  </h3>
                   <div style={{ height: 180 }}>
-                    <Bar data={gainData} options={{
-                      responsive: true, maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
-                        y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
-                      }
-                    }} />
+                    <Bar data={gainData} options={barOpts({ legend: false })} />
                   </div>
-                </div>
+                </motion.div>
 
                 {/* T-test stats */}
-                <div className="card" style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Icon name="math" size={17} />
+                <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.1 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="math" size={16} /></span>
                     Paired T-Test Statistics
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
@@ -1428,25 +1457,25 @@ export default function Admin() {
                       { l: 'P-Value (two-tailed)', v: stats.pLabel },
                       { l: "Cohen's d", v: stats.d.toFixed(2) },
                     ].map(s => (
-                      <div key={s.l} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px' }}>
-                        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 3 }}>{s.l}</div>
-                        <div style={{ fontFamily: 'Sora,sans-serif', fontWeight: 700, fontSize: 15, color: '#1a2744' }}>{s.v}</div>
+                      <div key={s.l} style={{ background: 'rgba(14,165,233,.04)', borderRadius: 10, padding: '12px 14px', border: '1px solid rgba(14,165,233,.08)' }}>
+                        <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px', marginBottom: 4 }}>{s.l}</div>
+                        <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{s.v}</div>
                       </div>
                     ))}
                   </div>
                   {stats && (
-                    <div style={{ marginTop: 12, fontSize: 13, color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: 8 }}>
+                    <div style={{ marginTop: 14, fontSize: 13, color: '#475569', background: 'rgba(14,165,233,.04)', padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(14,165,233,.08)' }}>
                       95% Confidence Interval: [+{stats.lo.toFixed(0)}, +{stats.hi.toFixed(0)}] points improvement
                     </div>
                   )}
-                </div>
+                </motion.div>
 
-                {/* Proof of impact box */}
+                {/* Proof box */}
                 {stats && (
-                  <div className="proof-box">
+                  <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.15 }} className="proof-box">
                     {stats.sig ? (
                       <>
-                        <div className="proof-verified">Proof of Impact — Statistically Verified</div>
+                        <div className="proof-verified">Proof of Impact -- Statistically Verified</div>
                         <div className="proof-statement">
                           "Our students improved by an average of {Math.round(stats.mean)} points."
                         </div>
@@ -1454,231 +1483,220 @@ export default function Admin() {
                           "There is a {stats.conf} probability this improvement was caused by our program, not chance ({stats.pLabel})."
                         </div>
                         <div className="proof-stats">
-                          Cohen's d = {stats.d.toFixed(2)} ({stats.d > 0.8 ? 'Large' : stats.d > 0.5 ? 'Medium' : 'Small'} effect size) ·
-                          CI₉₅: [+{stats.lo.toFixed(0)}, +{stats.hi.toFixed(0)}] ·
-                          n = {stats.n} students ·
+                          Cohen's d = {stats.d.toFixed(2)} ({stats.d > 0.8 ? 'Large' : stats.d > 0.5 ? 'Medium' : 'Small'} effect size) {'\u00b7'}
+                          CI{'\u2089\u2085'}: [+{stats.lo.toFixed(0)}, +{stats.hi.toFixed(0)}] {'\u00b7'}
+                          n = {stats.n} students {'\u00b7'}
                           t({stats.df}) = {stats.t.toFixed(3)}, {stats.pLabel}
                         </div>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontFamily: 'Sora,sans-serif', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>More data needed</div>
+                        <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>More data needed</div>
                         <div style={{ fontSize: 14, opacity: .8 }}>
                           With n={stats.n} students, the result has not yet reached statistical significance ({stats.pLabel}).
                           Continue collecting post-test scores to build the evidence base.
                         </div>
                       </>
                     )}
-                  </div>
+                  </motion.div>
                 )}
               </>
             )}
 
-            {/* Optional practice proof (best optional vs best pre) */}
-            <div style={{ marginTop: 20 }}>
-              {pairsOpt.length < 2 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '44px 24px', color: '#94a3b8' }}>
-                  <div style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 14, background: 'rgba(14,165,233,.10)', color: '#0ea5e9' }}>
-                    <Icon name="refresh" size={24} />
-                  </div>
-                  <h3 style={{ color: '#475569', marginBottom: 4 }}>Optional practice proof needs more data</h3>
-                  <p>Currently {pairsOpt.length} student(s) have both a pre-test score and at least one optional test score.</p>
+            {/* Optional practice proof */}
+            {pairsOpt.length < 2 ? (
+              <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.2 }} style={{ ...cardStyle, textAlign: 'center', padding: '44px 28px' }}>
+                <div style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 14, background: 'rgba(14,165,233,.08)', color: '#0ea5e9' }}>
+                  <Icon name="refresh" size={24} />
                 </div>
-              ) : (
-                <>
-                  <div className="card" style={{ marginBottom: 20 }}>
-                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Score Comparison: Pre vs Best Optional</h3>
-                    <div style={{ height: 260 }}>
-                      <Bar data={chartDataOpt} options={{
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 } } } },
-                        scales: {
-                          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
-                          y: { min: 300, max: 1600, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
-                        }
-                      }} />
-                    </div>
+                <h3 style={{ fontFamily: 'Sora, sans-serif', color: '#334155', marginBottom: 6, fontSize: 16, fontWeight: 700 }}>Optional practice proof needs more data</h3>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Currently {pairsOpt.length} student(s) have both a pre-test score and at least one optional test score.</p>
+              </motion.div>
+            ) : (
+              <>
+                <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.2 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="chart" size={16} /></span>
+                    Score Comparison: Pre vs Best Optional
+                  </h3>
+                  <div style={{ height: 260 }}>
+                    <Bar data={chartDataOpt} options={barOpts({ yMin: 300, yMax: 1600 })} />
                   </div>
+                </motion.div>
 
-                  <div className="card" style={{ marginBottom: 20 }}>
-                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Point Gain Per Student (Optional)</h3>
-                    <div style={{ height: 180 }}>
-                      <Bar data={gainDataOpt} options={{
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                          x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 } } },
-                          y: { grid: { color: '#f1f5f9' }, ticks: { font: { family: 'DM Sans', size: 11 } } }
-                        }
-                      }} />
-                    </div>
+                <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.25 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="trend" size={16} /></span>
+                    Point Gain Per Student (Optional)
+                  </h3>
+                  <div style={{ height: 180 }}>
+                    <Bar data={gainDataOpt} options={barOpts({ legend: false })} />
                   </div>
+                </motion.div>
 
-                  <div className="card">
-                    <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Icon name="math" size={17} />
-                      Paired T-Test (Optional)
-                    </h3>
-                    {statsOpt && (
-                      <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>
-                        n={statsOpt.n} · mean gain {statsOpt.mean.toFixed(1)} · {statsOpt.pLabel} · Cohen’s d {statsOpt.d.toFixed(2)} · avg gain {avgImprovementOpt} points
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                <motion.div {...fadeCard} transition={{ duration: 0.3, delay: 0.3 }} style={cardStyle}>
+                  <h3 style={sectionHeading}>
+                    <span style={iconBadge}><Icon name="math" size={16} /></span>
+                    Paired T-Test (Optional)
+                  </h3>
+                  {statsOpt && (
+                    <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>
+                      n={statsOpt.n} {'\u00b7'} mean gain {statsOpt.mean.toFixed(1)} {'\u00b7'} {statsOpt.pLabel} {'\u00b7'} Cohen's d {statsOpt.d.toFixed(2)} {'\u00b7'} avg gain {avgImprovementOpt} points
+                    </div>
+                  )}
+                </motion.div>
+              </>
+            )}
           </div>
         )}
 
-	        {/* Tests tab */}
-	        {tab === 'tests' && (
-	          <div className="card">
-	            <h3 style={{ fontFamily: 'Sora,sans-serif', fontSize: 15, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="test" size={17} />
-                Test Setup
-              </h3>
-	            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginBottom: 14 }}>
-	              Manage your test PDFs and answer keys. Skill Builder keys can be imported directly from the scoring guide PDFs.
-	            </div>
+        {/* ══════════════════════════════
+            TAB: Tests
+            ══════════════════════════════ */}
+        {tab === 'tests' && (
+          <motion.div {...fadeCard} transition={{ duration: 0.3 }} style={cardStyle}>
+            <h3 style={sectionHeading}>
+              <span style={iconBadge}><Icon name="test" size={16} /></span>
+              Test Setup
+            </h3>
+            <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, margin: '0 0 18px 0' }}>
+              Manage your test PDFs and answer keys. Skill Builder keys can be imported directly from the scoring guide PDFs.
+            </p>
 
-		            <div style={{ display: 'grid', gap: 12 }}>
-		              {TESTS.map((t) => {
-		                const builtIn = getAnswerKeyBySection(t.id)
-		                const stored = keysByTest?.[t.id] || null
-                    const bundledPdf = (!builtIn && !stored && t.akUrl) ? 'Bundled AK PDF (auto)' : null
-		                const builtInCount = countKey(builtIn)
-		                const storedCount = countKey(stored)
-		                const showCount = builtIn ? builtInCount : storedCount
-		                return (
-		                  <div key={t.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
-		                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-		                      <div>
-		                        <div style={{ fontWeight: 900, color: '#1a2744', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                              <span>{t.label}</span>
-                              <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: t.exam === 'act' ? 'rgba(59,130,246,.10)' : 'rgba(245,158,11,.12)', color: t.exam === 'act' ? '#2563eb' : '#b45309' }}>
-                                {(t.exam || 'sat').toUpperCase()}
-                              </span>
-                            </div>
-		                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-		                          Answer key: {builtIn
-		                            ? `Built-in (${builtInCount} answers)`
-		                            : (stored ? `Loaded (${storedCount} answers)` : (bundledPdf || 'Not set'))}
-		                          {stored && builtIn && storedCount !== builtInCount && (
-		                            <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 800 }}>
-		                              (DB has {storedCount})
-		                            </span>
-		                          )}
-		                        </div>
-		                      </div>
-		                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-		                        {t.akUrl && (
-		                          <a className="btn btn-outline" href={t.akUrl} target="_blank" rel="noreferrer" title="Open the answer key and explanations">
-		                            {t.explanationUrl ? 'Open AK + Explanations →' : 'Open AK →'}
-		                          </a>
-		                        )}
-		                        {builtIn && storedCount > 0 && storedCount !== builtInCount && (
-		                          <button
-		                            className="btn btn-outline"
-		                            disabled={testKeyStatus.loading}
-		                            onClick={async () => {
-		                              setTestKeyStatus({ loading: true, msg: `Fixing ${t.label} answer key to ${builtInCount}…` })
-		                              try {
-		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: builtIn, updated_at: new Date().toISOString() })
-		                                if (up.error) throw up.error
-		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: builtIn }))
-		                                setTestKeyStatus({ loading: false, msg: `Success: fixed ${t.label} (${builtInCount} answers)` })
-		                              } catch (e) {
-		                                setTestKeyStatus({ loading: false, msg: `Error: ${e?.message || 'Could not fix key'}` })
-		                              }
-		                            }}
-		                            title="Your database has an older/incomplete key. This overwrites it with the built-in full key."
-		                          >
-		                            Fix to {builtInCount}
-		                          </button>
-		                        )}
-		                        {t.akUrl && (
-		                          <button
-		                            className="btn btn-outline"
-		                            disabled={testKeyStatus.loading}
-		                            onClick={async () => {
-		                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key…` })
-		                              try {
-		                                // Prefer the app's bundled built-in key when available (avoids partial PDF parsing).
-		                                const fromBuiltIn = getAnswerKeyBySection(t.id)
-		                                const toSave = fromBuiltIn || (await (async () => {
-		                                  const res = await fetch(t.akUrl)
-		                                  if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
-		                                  const buf = new Uint8Array(await res.arrayBuffer())
-		                                  return await extractAnswerKeyFromPdf(buf)
-		                                })())
-		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: toSave, updated_at: new Date().toISOString() })
-		                                if (up.error) throw up.error
-		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: toSave }))
-		                                setTestKeyStatus({ loading: false, msg: `Success: imported ${t.label} (${countKey(toSave)} answers)` })
-		                              } catch (e) {
-		                                const msg = String(e?.message || 'Import failed')
-		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
-		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
-		                                  : ''
-		                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
-		                              }
-		                            }}
-	                            title="Import from the bundled scoring guide PDF"
-	                          >
-	                            Import bundled AK
-	                          </button>
-	                        )}
-		                        <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
-		                          Upload AK PDF…
-		                          <input
-		                            type="file"
-		                            accept="application/pdf"
-		                            style={{ display: 'none' }}
-		                            onChange={async (e) => {
-		                              const file = e.target.files?.[0]
-		                              if (!file) return
-		                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}…` })
-		                              try {
-		                                const buf = new Uint8Array(await file.arrayBuffer())
-		                                const parsed = await extractAnswerKeyFromPdf(buf)
-		                                const parsedCount = countKey(parsed)
-		                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
-		                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
-		                                if (up.error) throw up.error
-		                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
-		                                setTestKeyStatus({ loading: false, msg: `Success: saved ${t.label} (${parsedCount} answers)` })
-		                              } catch (err) {
-		                                const msg = String(err?.message || 'Could not parse PDF')
-		                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
-		                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
-		                                  : ''
-		                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
-		                              } finally {
-		                                e.target.value = ''
-		                              }
-		                            }}
-		                          />
-		                        </label>
-		                        <a className="btn btn-outline" href={t.pdfUrl} target="_blank" rel="noreferrer">Open PDF →</a>
-		                      </div>
-		                    </div>
-		                  </div>
-		                )
-		              })}
-		            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {TESTS.map((t, idx) => {
+                const builtIn = getAnswerKeyBySection(t.id)
+                const stored = keysByTest?.[t.id] || null
+                const bundledPdf = (!builtIn && !stored && t.akUrl) ? 'Bundled AK PDF (auto)' : null
+                const builtInCount = countKey(builtIn)
+                const storedCount = countKey(stored)
+                return (
+                  <motion.div key={t.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.03 * idx }}
+                    style={{ border: '1.5px solid rgba(14,165,233,.10)', borderRadius: 14, padding: '16px 18px', background: '#fff' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontFamily: 'Sora, sans-serif', fontSize: 14 }}>
+                          <span>{t.label}</span>
+                          <span style={examPill(t.exam || 'sat')}>{(t.exam || 'sat').toUpperCase()}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 5 }}>
+                          Answer key: {builtIn
+                            ? `Built-in (${builtInCount} answers)`
+                            : (stored ? `Loaded (${storedCount} answers)` : (bundledPdf || 'Not set'))}
+                          {stored && builtIn && storedCount !== builtInCount && (
+                            <span style={{ marginLeft: 8, color: '#dc2626', fontWeight: 800 }}>(DB has {storedCount})</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {t.akUrl && (
+                          <a style={{ ...actionBtn, textDecoration: 'none', display: 'inline-block' }} href={t.akUrl} target="_blank" rel="noreferrer">
+                            {t.explanationUrl ? 'AK + Explanations' : 'Open AK'}
+                          </a>
+                        )}
+                        {builtIn && storedCount > 0 && storedCount !== builtInCount && (
+                          <button style={actionBtn} disabled={testKeyStatus.loading}
+                            onClick={async () => {
+                              setTestKeyStatus({ loading: true, msg: `Fixing ${t.label} answer key to ${builtInCount}...` })
+                              try {
+                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: builtIn, updated_at: new Date().toISOString() })
+                                if (up.error) throw up.error
+                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: builtIn }))
+                                setTestKeyStatus({ loading: false, msg: `Success: fixed ${t.label} (${builtInCount} answers)` })
+                              } catch (e) {
+                                setTestKeyStatus({ loading: false, msg: `Error: ${e?.message || 'Could not fix key'}` })
+                              }
+                            }}
+                          >
+                            Fix to {builtInCount}
+                          </button>
+                        )}
+                        {t.akUrl && (
+                          <button style={actionBtn} disabled={testKeyStatus.loading}
+                            onClick={async () => {
+                              setTestKeyStatus({ loading: true, msg: `Importing ${t.label} answer key...` })
+                              try {
+                                const fromBuiltIn = getAnswerKeyBySection(t.id)
+                                const toSave = fromBuiltIn || (await (async () => {
+                                  const res = await fetch(t.akUrl)
+                                  if (!res.ok) throw new Error('Could not fetch bundled answer key PDF.')
+                                  const buf = new Uint8Array(await res.arrayBuffer())
+                                  return await extractAnswerKeyFromPdf(buf)
+                                })())
+                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: toSave, updated_at: new Date().toISOString() })
+                                if (up.error) throw up.error
+                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: toSave }))
+                                setTestKeyStatus({ loading: false, msg: `Success: imported ${t.label} (${countKey(toSave)} answers)` })
+                              } catch (e) {
+                                const msg = String(e?.message || 'Import failed')
+                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
+                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
+                                  : ''
+                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
+                              }
+                            }}
+                          >
+                            Import bundled AK
+                          </button>
+                        )}
+                        <label style={{ ...actionBtn, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                          Upload AK PDF...
+                          <input type="file" accept="application/pdf" style={{ display: 'none' }}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              setTestKeyStatus({ loading: true, msg: `Parsing ${t.label}...` })
+                              try {
+                                const buf = new Uint8Array(await file.arrayBuffer())
+                                const parsed = await extractAnswerKeyFromPdf(buf)
+                                const parsedCount = countKey(parsed)
+                                if (parsedCount < 10) throw new Error('Could not find enough answers in the PDF.')
+                                const up = await supabase.from('test_answer_keys').upsert({ test_id: t.id, answer_key: parsed, updated_at: new Date().toISOString() })
+                                if (up.error) throw up.error
+                                setKeysByTest(prev => ({ ...(prev || {}), [t.id]: parsed }))
+                                setTestKeyStatus({ loading: false, msg: `Success: saved ${t.label} (${parsedCount} answers)` })
+                              } catch (err) {
+                                const msg = String(err?.message || 'Could not parse PDF')
+                                const hint = msg.toLowerCase().includes('row-level security') || msg.toLowerCase().includes('not authorized')
+                                  ? ' (Tip: run the Supabase schema + make sure agora@admin.org has role=admin in profiles.)'
+                                  : ''
+                                setTestKeyStatus({ loading: false, msg: `Error: ${msg}${hint}` })
+                              } finally {
+                                e.target.value = ''
+                              }
+                            }}
+                          />
+                        </label>
+                        <a style={{ ...actionBtn, textDecoration: 'none', display: 'inline-block' }} href={t.pdfUrl} target="_blank" rel="noreferrer">
+                          Open PDF
+                        </a>
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
 
-	            {testKeyStatus.msg && (
-	              <div style={{ marginTop: 12, fontSize: 12, color: testKeyStatus.msg.toLowerCase().startsWith('success:') ? '#10b981' : '#ef4444', fontWeight: 900 }}>
-	                {testKeyStatus.loading ? 'Working: ' : ''}{testKeyStatus.msg}
-	              </div>
-	            )}
+            {testKeyStatus.msg && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                style={{
+                  marginTop: 14, fontSize: 12, fontWeight: 700, padding: '10px 16px', borderRadius: 10,
+                  background: testKeyStatus.msg.toLowerCase().startsWith('success:') ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+                  color: testKeyStatus.msg.toLowerCase().startsWith('success:') ? '#059669' : '#dc2626',
+                  border: `1px solid ${testKeyStatus.msg.toLowerCase().startsWith('success:') ? 'rgba(16,185,129,.2)' : 'rgba(239,68,68,.2)'}`,
+                }}
+              >
+                {testKeyStatus.loading ? 'Working: ' : ''}{testKeyStatus.msg}
+              </motion.div>
+            )}
 
-		            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-		              Final Test page: <Link to="/final" style={{ color: '#1a2744', fontWeight: 800 }}>Open →</Link>
-		            </div>
-		          </div>
-		        )}
+            <div style={{ marginTop: 14, fontSize: 12, color: '#64748b' }}>
+              Final Test page: <Link to="/final" style={{ color: '#0ea5e9', fontWeight: 700, textDecoration: 'none' }}>Open</Link>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   )
