@@ -931,17 +931,17 @@ export default function CollegeRecruiting() {
 
         {/* Bottom spacer */}
         <div style={{ height: 40 }} />
-
-        {/* ── College Detail Modal ── */}
-        {selectedCollege && (
-          <CollegeDetailModal
-            college={selectedCollege}
-            exam={exam}
-            activeScore={activeScore}
-            onClose={() => setSelectedCollege(null)}
-          />
-        )}
       </div>
+
+      {/* ── College Detail Modal — rendered outside .page to avoid overflow:clip ── */}
+      {selectedCollege && (
+        <CollegeDetailModal
+          college={selectedCollege}
+          exam={exam}
+          activeScore={activeScore}
+          onClose={() => setSelectedCollege(null)}
+        />
+      )}
     </div>
   )
 }
