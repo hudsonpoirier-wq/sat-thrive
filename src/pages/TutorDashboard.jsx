@@ -205,15 +205,35 @@ export default function TutorDashboard() {
 
   const fetchData = useCallback(async () => {
     if (!supabase) return { students: [], attempts: [], postScores: [] }
-    const [p, a, ps] = await Promise.allSettled([
-      supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false }),
-      supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
+    // Verify current user is actually a tutor server-side before fetching
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { students: [], attempts: [], postScores: [] }
+    const { data: currentProfile } = await supabase.from('profiles').select('role,affiliation').eq('id', user.id).maybeSingle()
+    if (!currentProfile || currentProfile.role !== 'tutor') return { students: [], attempts: [], postScores: [] }
+
+    // Only fetch students that share this tutor's affiliation
+    const tutorAffiliation = currentProfile.affiliation || ''
+    let profileQuery = supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').eq('role', 'student').order('created_at', { ascending: false })
+    if (tutorAffiliation) profileQuery = profileQuery.eq('affiliation', tutorAffiliation)
+
+    const [p] = await Promise.allSettled([profileQuery])
+    const studentList = p.status === 'fulfilled' ? (p.value.data || []) : []
+    const studentIds = studentList.map(s => s.id)
+
+    // Only fetch attempts and scores for the tutor's students
+    if (studentIds.length === 0) return { students: [], attempts: [], postScores: [] }
+    const [a, ps] = await Promise.allSettled([
+      supabase.from('test_attempts').select('id,user_id,test_id,started_at,completed_at,scores,weak_topics,answers').in('user_id', studentIds).not('completed_at', 'is', null).order('started_at', { ascending: false }).limit(2000),
       supabase.from('post_scores').select('attempt_id,post_score,post_rw,post_math,recorded_at').order('recorded_at', { ascending: false }).limit(5000),
     ])
+    // Filter post_scores to only those belonging to the tutor's students' attempts
+    const attemptList = a.status === 'fulfilled' ? (a.value.data || []) : []
+    const attemptIds = new Set(attemptList.map(at => at.id))
+    const allPostScores = ps.status === 'fulfilled' ? (ps.value.data || []) : []
     return {
-      students: (p.status === 'fulfilled' ? (p.value.data || []) : []).filter(s => s.role !== 'tutor' && s.role !== 'admin'),
-      attempts: a.status === 'fulfilled' ? (a.value.data || []) : [],
-      postScores: ps.status === 'fulfilled' ? (ps.value.data || []) : [],
+      students: studentList,
+      attempts: attemptList,
+      postScores: allPostScores.filter(p => attemptIds.has(p.attempt_id)),
     }
   }, [])
 

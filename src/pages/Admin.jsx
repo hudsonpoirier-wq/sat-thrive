@@ -361,6 +361,14 @@ export default function Admin() {
 
   /* ── data fetching ── */
   const fetchAdminSnapshot = useCallback(async () => {
+    // Verify current user is actually admin server-side before fetching any data
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { students: [], attempts: [], postScores: [], keysByTest: {} }
+    const { data: currentProfile } = await supabase.from('profiles').select('role,email').eq('id', user.id).maybeSingle()
+    if (!currentProfile || currentProfile.role !== 'admin' || String(currentProfile.email || '').toLowerCase() !== 'agora@admin.org') {
+      return { students: [], attempts: [], postScores: [], keysByTest: {} }
+    }
+
     let profileResult = await supabase.from('profiles').select('id,email,full_name,role,affiliation,created_at').order('created_at', { ascending: false })
     if (profileResult.error && !profileResult.data) {
       profileResult = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
