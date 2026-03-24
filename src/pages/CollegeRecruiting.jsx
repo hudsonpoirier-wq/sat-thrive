@@ -685,8 +685,8 @@ function CollegeLogo({ college, size = 36 }) {
   const initials = (college.alias || college.name).split(/[\s&]+/).filter(w => w.length > 1).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
   const sources = [
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=${size <= 64 ? 64 : 128}`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=${size <= 64 ? 64 : 128}`,
     `https://logo.clearbit.com/${domain}`,
   ]
 
