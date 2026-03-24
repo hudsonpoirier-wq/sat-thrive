@@ -230,6 +230,17 @@ export default function MorePractice() {
     setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filtered.length))
   }, [filtered.length])
 
+  const handleRetry = useCallback(
+    (questionId) => {
+      const next = { ...answered }
+      delete next[questionId]
+      setAnswered(next)
+      setSelected((prev) => { const s = { ...prev }; delete s[questionId]; return s })
+      saveAnswered(exam, next)
+    },
+    [answered, exam],
+  )
+
   const handleReset = useCallback(() => {
     if (!window.confirm('Reset all practice progress for this exam? This cannot be undone.')) return
     setAnswered({})
@@ -468,6 +479,20 @@ export default function MorePractice() {
                         }}>
                           {result?.correct ? 'Correct' : 'Incorrect'}
                         </span>
+                      )}
+                      {isAnswered && (
+                        <button
+                          onClick={() => handleRetry(q.id)}
+                          style={{
+                            fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 999,
+                            background: 'rgba(14,165,233,.08)', color: '#0ea5e9',
+                            border: '1px solid rgba(14,165,233,.2)', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            transition: 'all .2s ease',
+                          }}
+                        >
+                          <Icon name="refresh" size={11} /> Retry
+                        </button>
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
