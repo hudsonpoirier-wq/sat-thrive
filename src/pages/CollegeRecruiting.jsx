@@ -929,19 +929,14 @@ function CollegeLogo({ college, size = 36 }) {
   const domain = getCollegeDomain(college)
   const initials = (college.alias || college.name).split(/[\s&]+/).filter(w => w.length > 1).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
-  // Always fetch at 256px for crisp rendering; Google returns 150-256px actual
+  // Cascade: Google www → Google bare → icon.horse → DuckDuckGo
+  // www prefix fixes many Google 404s; icon.horse covers different gaps
   const sources = [
+    `https://www.google.com/s2/favicons?domain=www.${domain}&sz=256`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
+    `https://icon.horse/icon/${domain}`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
   ]
-
-  const handleLoad = (e) => {
-    const img = e.target
-    // Skip 16x16 or smaller — too blurry at display size, try next source
-    if (srcIndex === 0 && img.naturalWidth <= 16) {
-      setSrcIndex(i => i + 1)
-    }
-  }
 
   if (srcIndex >= sources.length) {
     return (
@@ -964,11 +959,11 @@ function CollegeLogo({ college, size = 36 }) {
       width={size}
       height={size}
       referrerPolicy="no-referrer"
-      onLoad={handleLoad}
       onError={() => setSrcIndex(i => i + 1)}
       style={{
         width: size, height: size, borderRadius: 10, flexShrink: 0,
         objectFit: 'contain', background: '#fff',
+        imageRendering: 'auto',
       }}
     />
   )
