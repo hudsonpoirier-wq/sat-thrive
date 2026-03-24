@@ -930,6 +930,7 @@ function CollegeLogo({ college, size = 36 }) {
   const initials = (college.alias || college.name).split(/[\s&]+/).filter(w => w.length > 1).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
   // Cascade: Google (fast CDN) → apple-touch-icon (180px+) → icon.horse → DDG
+  // Google returns a valid 16x16 globe PNG even for 404s, so we must detect and skip it
   const sources = [
     `https://www.google.com/s2/favicons?domain=www.${domain}&sz=256`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
@@ -940,7 +941,13 @@ function CollegeLogo({ college, size = 36 }) {
 
   const handleLoad = (e) => {
     const img = e.target
-    // Skip 1x1 empty placeholders or broken tiny responses
+    // Google returns a 16x16 generic globe for unknown schools (even on 404).
+    // Skip it from Google sources (0,1) so cascade reaches better sources.
+    if (srcIndex <= 1 && img.naturalWidth <= 16) {
+      setSrcIndex(i => i + 1)
+      return
+    }
+    // Skip 1x1 empty placeholders from any source
     if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
       setSrcIndex(i => i + 1)
     }
