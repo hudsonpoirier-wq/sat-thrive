@@ -686,8 +686,17 @@ function CollegeLogo({ college, size = 36 }) {
 
   const sources = [
     `https://www.google.com/s2/favicons?domain=${domain}&sz=${size <= 64 ? 64 : 128}`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://logo.clearbit.com/${domain}`,
   ]
+
+  const handleLoad = (e) => {
+    const img = e.target
+    // Google returns a tiny generic globe (16x16) for unknown domains
+    if (img.naturalWidth <= 16 && img.naturalHeight <= 16) {
+      setSrcIndex(i => i + 1)
+    }
+  }
 
   if (srcIndex >= sources.length) {
     return (
@@ -709,6 +718,8 @@ function CollegeLogo({ college, size = 36 }) {
       alt=""
       width={size}
       height={size}
+      crossOrigin="anonymous"
+      onLoad={handleLoad}
       onError={() => setSrcIndex(i => i + 1)}
       style={{
         width: size, height: size, borderRadius: 10, flexShrink: 0,
