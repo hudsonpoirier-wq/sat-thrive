@@ -718,7 +718,7 @@ function CollegeLogo({ college, size = 36 }) {
       alt=""
       width={size}
       height={size}
-      crossOrigin="anonymous"
+      referrerPolicy="no-referrer"
       onLoad={handleLoad}
       onError={() => setSrcIndex(i => i + 1)}
       style={{
