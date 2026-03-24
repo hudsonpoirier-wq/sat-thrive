@@ -929,14 +929,22 @@ function CollegeLogo({ college, size = 36 }) {
   const domain = getCollegeDomain(college)
   const initials = (college.alias || college.name).split(/[\s&]+/).filter(w => w.length > 1).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
-  // Cascade: Google www → Google bare → icon.horse → DuckDuckGo
-  // www prefix fixes many Google 404s; icon.horse covers different gaps
+  // Cascade: Google (fast CDN) → apple-touch-icon (180px+) → icon.horse → DDG
   const sources = [
     `https://www.google.com/s2/favicons?domain=www.${domain}&sz=256`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
+    `https://${domain}/apple-touch-icon.png`,
     `https://icon.horse/icon/${domain}`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
   ]
+
+  const handleLoad = (e) => {
+    const img = e.target
+    // Skip 1x1 empty placeholders or broken tiny responses
+    if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
+      setSrcIndex(i => i + 1)
+    }
+  }
 
   if (srcIndex >= sources.length) {
     return (
@@ -959,11 +967,11 @@ function CollegeLogo({ college, size = 36 }) {
       width={size}
       height={size}
       referrerPolicy="no-referrer"
+      onLoad={handleLoad}
       onError={() => setSrcIndex(i => i + 1)}
       style={{
         width: size, height: size, borderRadius: 10, flexShrink: 0,
         objectFit: 'contain', background: '#fff',
-        imageRendering: 'auto',
       }}
     />
   )
