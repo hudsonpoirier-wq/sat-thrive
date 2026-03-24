@@ -111,7 +111,9 @@ export default function Settings() {
 
     setUploadingAvatar(true)
     try {
-      const ext = file.name.split('.').pop()
+      const ALLOWED_EXTS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+      const ext = ALLOWED_EXTS[file.type]
+      if (!ext) throw new Error('Only JPG, PNG, and WebP images are allowed')
       const filePath = `avatars/${user.id}/${Date.now()}.${ext}`
 
       const { error: uploadError } = await supabase.storage

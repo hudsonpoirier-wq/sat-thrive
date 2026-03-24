@@ -490,7 +490,8 @@ export default function Admin() {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
     } catch (e) {
-      setResetMsg(`Error: reset failed: ${e?.message || 'Unknown error'}`)
+      console.error('[Admin] Operation failed:', e?.message)
+      setResetMsg('Error: operation failed. Please try again.')
     } finally {
       setResettingUserId(null)
     }
@@ -519,7 +520,8 @@ export default function Admin() {
       const p = await supabase.from('profiles').select('id,email,full_name,role,created_at').order('created_at', { ascending: false })
       setStudents(p.data || [])
     } catch (e) {
-      setResetMsg(`Error: delete failed: ${e?.message || 'Unknown error'}`)
+      console.error('[Admin] Delete failed:', e?.message)
+      setResetMsg('Error: delete failed. Please try again.')
     } finally {
       setResettingUserId(null)
     }
@@ -554,7 +556,8 @@ export default function Admin() {
       setResetMsg('Success: your data was reset.')
       setTimeout(() => { window.location.assign('/dashboard') }, 400)
     } catch (e) {
-      setResetMsg(`Error: reset failed: ${e?.message || 'Unknown error'}`)
+      console.error('[Admin] Operation failed:', e?.message)
+      setResetMsg('Error: operation failed. Please try again.')
     } finally {
       setResettingUserId(null)
     }
@@ -584,7 +587,8 @@ export default function Admin() {
       setAttempts(a.data || [])
       setPostScores(p.data || [])
     } catch (e) {
-      if (!silent) setResetMsg(`Error: regrade failed: ${e?.message || 'Unknown error'}`)
+      console.error('[Admin] Regrade failed:', e?.message)
+      if (!silent) setResetMsg('Error: regrade failed. Please try again.')
     } finally {
       setRegrading(false)
     }
