@@ -306,15 +306,13 @@ export default function Dashboard() {
 
         if (readOnlyView) return
         const needsPatch = rows.filter(r => (r.completed_at || r.scores?.total) && (!r.scores || !r.scores.total) && r.answers && Object.keys(r.answers || {}).length)
-        needsPatch.slice(0, 3).forEach(async (r) => {
+        Promise.allSettled(needsPatch.slice(0, 3).map(async (r) => {
           const computed = computeScoresFromAnswers(r)
           if (!computed?.total) return
-          try {
-            await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
-            if (cancelled) return
-            setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
-          } catch {}
-        })
+          const { error } = await supabase.from('test_attempts').update({ scores: computed }).eq('id', r.id)
+          if (cancelled || error) return
+          setAttempts(prev => (prev || []).map(x => x.id === r.id ? { ...x, scores: computed } : x))
+        }))
       } catch {
         if (cancelled) return
         setAttempts([])
