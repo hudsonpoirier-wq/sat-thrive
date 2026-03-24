@@ -14,6 +14,7 @@ const navItems = {
     { icon: 'star', label: 'More Practice', to: '/practice' },
     { icon: 'test', label: 'Extra Tests', to: '/extra-tests' },
     { icon: 'mistakes', label: 'Mistakes', to: '/mistakes' },
+    { icon: 'folder', label: 'Formula Sheet', to: '/formulas' },
     { section: 'PROGRESS' },
     { icon: 'report', label: 'Progress Report', to: '/report' },
     { icon: 'calendar', label: 'Calendar', to: '/calendar' },
@@ -69,7 +70,7 @@ export default function Sidebar({ currentExam = 'sat' }) {
           }}>
             {['sat', 'act'].map(ex => {
               const active = currentExam === ex
-              const examPages = ['/dashboard', '/tasks', '/guide', '/strategies', '/practice', '/extra-tests', '/mistakes', '/report', '/calendar', '/journey', '/college-recruiting']
+              const examPages = ['/dashboard', '/tasks', '/guide', '/strategies', '/practice', '/extra-tests', '/mistakes', '/formulas', '/report', '/calendar', '/journey', '/college-recruiting']
               const basePath = examPages.some(p => location.pathname === p || location.pathname.startsWith(p + '/'))
                 ? location.pathname
                 : '/dashboard'
@@ -111,7 +112,7 @@ export default function Sidebar({ currentExam = 'sat' }) {
           }
 
           const examParam = currentExam ? `?exam=${currentExam}` : ''
-          const examPages = ['/dashboard', '/tasks', '/guide', '/strategies', '/practice', '/extra-tests', '/mistakes', '/report', '/calendar', '/journey', '/college-recruiting']
+          const examPages = ['/dashboard', '/tasks', '/guide', '/strategies', '/practice', '/extra-tests', '/mistakes', '/formulas', '/report', '/calendar', '/journey', '/college-recruiting']
           const href = examPages.includes(item.to) ? `${item.to}${examParam}` : item.to
           const active = isActive(item.to)
 

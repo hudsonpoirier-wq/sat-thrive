@@ -36,6 +36,7 @@ const loadPickTestDate = () => import('./pages/PickTestDate.jsx')
 const loadTestStrategies = () => import('./pages/TestStrategies.jsx')
 const loadPriorScore = () => import('./pages/PriorScore.jsx')
 const loadCollegeRecruiting = () => import('./pages/CollegeRecruiting.jsx')
+const loadFormulaSheet = () => import('./pages/FormulaSheet.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -65,6 +66,7 @@ const PickTestDate = lazy(loadPickTestDate)
 const TestStrategies = lazy(loadTestStrategies)
 const PriorScore = lazy(loadPriorScore)
 const CollegeRecruiting = lazy(loadCollegeRecruiting)
+const FormulaSheet = lazy(loadFormulaSheet)
 
 function RouteLoader() {
   return (
@@ -181,6 +183,7 @@ function AnimatedRoutes() {
               <Route path="/journey" element={<ProtectedRoute><Journey /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/college-recruiting" element={<ProtectedRoute><CollegeRecruiting /></ProtectedRoute>} />
+              <Route path="/formulas" element={<ProtectedRoute><FormulaSheet /></ProtectedRoute>} />
               <Route path="/share" element={<Share />} />
               <Route path="*" element={<ProtectedRoute><RoleRedirect /></ProtectedRoute>} />
         </Routes>
