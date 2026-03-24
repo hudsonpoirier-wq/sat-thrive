@@ -588,13 +588,13 @@ export default function TestTaking() {
     }
   }
 
-  function startNextModule() {
+  async function startNextModule() {
     const idx = moduleOrder.indexOf(currentModule)
     const nextMod = moduleOrder[idx + 1]
     setShowBreak(false)
     setCurrentModule(nextMod)
     setCurrentQ(1)
-    saveProgress(answers, nextMod, moduleTimeLeft)
+    await saveProgress(answers, nextMod, moduleTimeLeft)
   }
 
   async function submitTest() {
@@ -681,7 +681,7 @@ export default function TestTaking() {
         const saved = await saveMistakes(user.id, capped)
         await ensureReviewItems(user.id, saved.items || capped)
       }
-    } catch {}
+    } catch (e) { console.error('[TestTaking] Failed to save mistakes:', e?.message) }
 
     // Auto-check Study Guide chapters that were mastered on the test (all questions correct for that chapter).
     try {
@@ -745,7 +745,7 @@ export default function TestTaking() {
 
         await supabase.from('studied_topics').upsert(upserts)
       }
-    } catch {}
+    } catch (e) { console.error('[TestTaking] Failed to update study progress:', e?.message) }
 
     navigate(`/results/${attemptId}`)
   }

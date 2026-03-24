@@ -109,7 +109,7 @@ export default function PriorScore() {
     const nowIso = new Date().toISOString()
     try {
       if (supabase && userId) {
-        await supabase.from('test_attempts').insert({
+        const { error: insertError } = await supabase.from('test_attempts').insert({
           user_id: userId,
           test_id: examConfig.preTestId,
           started_at: nowIso,
@@ -118,11 +118,20 @@ export default function PriorScore() {
           weak_topics: weakTopics,
           answers: {},
         })
+        if (insertError) {
+          console.error('[PriorScore] Failed to save:', insertError.message)
+          setSaving(false)
+          return
+        }
 
         // Unlock resources immediately
         setUnlockedResources(userId, exam, true)
       }
-    } catch {}
+    } catch (e) {
+      console.error('[PriorScore] Failed to save:', e?.message)
+      setSaving(false)
+      return
+    }
 
     setSaving(false)
     navigate(`/dashboard?exam=${exam}`, { replace: true })
