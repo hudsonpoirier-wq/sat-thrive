@@ -1256,8 +1256,9 @@ export default function CollegeRecruiting() {
             maxWidth: 600,
             lineHeight: 1.6,
           }}>
-            Explore colleges and see your estimated admission chances based on your {isAct ? 'ACT' : 'SAT'} scores.
-            Filter by region, size, cost, and more to find your best-fit schools.
+            See how you compare against colleges based strictly on your {isAct ? 'ACT' : 'SAT'} test score.
+            Our algorithm only factors in test scores — since most schools also consider GPA, extracurriculars,
+            essays, and other factors, your actual admission chances may be higher or lower than shown.
           </p>
         </div>
 
