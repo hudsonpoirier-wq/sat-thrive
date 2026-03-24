@@ -11,7 +11,7 @@ import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
-import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, allChaptersAsWeakTopics } from '../lib/studyPlan.js'
 
 function TaskCard({ task, index, completed = false }) {
   const doneAccent = '#059669'
@@ -391,14 +391,16 @@ export default function Tasks() {
     : false
 
   const journeySchedule = useMemo(() => {
-    if (!hasTakenPretest || !latestCompleted) return null
+    const weakTopics = latestCompleted
+      ? deriveWeakTopicsForAttempt(latestCompleted)
+      : allChaptersAsWeakTopics(exam)
     const schedule = buildAdaptiveSchedule({
-      weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+      weakTopics,
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
       totalReviewCount: allExamMistakes.length,
       hasViewedResults: viewedLatestResults,
-      hasTakenPretest: true,
+      hasTakenPretest: hasTakenPretest,
       prefs: studyPrefs,
       testDate: satDate,
       exam,
@@ -559,85 +561,8 @@ export default function Tasks() {
           </div>
         </motion.div>
 
-        {/* No pretest taken state */}
-        {!hasTakenPretest && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-          >
-            <div
-              className="card"
-              style={{
-                textAlign: 'center',
-                padding: '48px 32px',
-                background:
-                  'linear-gradient(135deg, rgba(14,165,233,.04), rgba(99,102,241,.04))',
-                border: '1.5px solid rgba(14,165,233,.15)',
-              }}
-            >
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 18,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background:
-                    'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                  color: 'white',
-                  marginBottom: 18,
-                  boxShadow: '0 6px 20px rgba(14,165,233,.25)',
-                }}
-              >
-                <Icon name="test" size={28} />
-              </div>
-              <h2
-                style={{
-                  fontFamily: 'Sora, sans-serif',
-                  fontSize: 20,
-                  fontWeight: 900,
-                  color: '#0f172a',
-                  marginBottom: 8,
-                }}
-              >
-                Take the Pre-Test First
-              </h2>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: '#64748b',
-                  lineHeight: 1.7,
-                  maxWidth: 460,
-                  margin: '0 auto 20px',
-                }}
-              >
-                Your personalized task schedule is generated after you
-                complete the {exam === 'act' ? 'ACT' : 'SAT'} Pre-Test.
-                It identifies your weak areas and builds a custom study
-                plan just for you.
-              </p>
-              <Link
-                to={viewHref('/dashboard')}
-                className="btn"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                  color: 'white',
-                  fontWeight: 800,
-                  padding: '10px 24px',
-                  fontSize: 14,
-                }}
-              >
-                Go to Dashboard to Start
-              </Link>
-            </div>
-          </motion.div>
-        )}
-
         {/* Tasks view */}
-        {hasTakenPretest && journeySchedule && (
+        {journeySchedule && (
           <>
             {/* Today's progress bar */}
             {totalTodayTasks > 0 && (

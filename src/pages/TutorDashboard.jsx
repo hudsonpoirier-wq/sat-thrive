@@ -666,23 +666,16 @@ export default function TutorDashboard() {
                           )}
                         </div>
                       </div>
-                      {/* Actions */}
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <Link to={`/dashboard?user=${st.id}`} style={{
-                          width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'rgba(14,165,233,.08)', color: '#0ea5e9', textDecoration: 'none',
-                          transition: 'background .15s',
-                        }} title="View Dashboard">
-                          <Icon name="eye" size={15} />
-                        </Link>
-                        <Link to={`/report?user=${st.id}`} style={{
-                          width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'rgba(139,92,246,.08)', color: '#8b5cf6', textDecoration: 'none',
-                          transition: 'background .15s',
-                        }} title="View Report">
-                          <Icon name="report" size={15} />
-                        </Link>
-                      </div>
+                      {/* Tunnel into student button */}
+                      <Link to={`/dashboard?user=${st.id}`} style={{
+                        padding: '6px 14px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6,
+                        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: '#fff',
+                        textDecoration: 'none', fontSize: 11, fontWeight: 700, fontFamily: 'Sora, sans-serif',
+                        flexShrink: 0, transition: 'opacity .15s',
+                      }} title="View this student's full account">
+                        <Icon name="eye" size={13} />
+                        View Account
+                      </Link>
                     </div>
 
                     {/* Card body */}
@@ -747,7 +740,7 @@ export default function TutorDashboard() {
                       </div>
 
                       {/* Last active */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <span style={{ fontSize: 11, color: '#94a3b8' }}>
                           <Icon name="clock" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
                           {lastActive ? relativeTime(new Date(lastActive).toISOString()) : 'No activity'}
@@ -755,6 +748,27 @@ export default function TutorDashboard() {
                         {best?.display && (
                           <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{best.display}</span>
                         )}
+                      </div>
+
+                      {/* Quick access links */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 10, borderTop: '1px solid rgba(14,165,233,.08)' }}>
+                        {[
+                          { label: 'Dashboard', icon: 'home', path: '/dashboard' },
+                          { label: 'Guide', icon: 'guide', path: '/guide' },
+                          { label: 'Mistakes', icon: 'mistakes', path: '/mistakes' },
+                          { label: 'Report', icon: 'report', path: '/report' },
+                          { label: 'Calendar', icon: 'calendar', path: '/calendar' },
+                          { label: 'Tasks', icon: 'tasks', path: '/tasks' },
+                        ].map(link => (
+                          <Link key={link.label} to={`${link.path}?user=${st.id}`} style={{
+                            padding: '4px 10px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4,
+                            background: 'rgba(14,165,233,.06)', color: '#0284c7', textDecoration: 'none',
+                            fontSize: 10, fontWeight: 600, transition: 'background .15s',
+                          }}>
+                            <Icon name={link.icon} size={11} />
+                            {link.label}
+                          </Link>
+                        ))}
                       </div>
                     </div>
                   </motion.div>

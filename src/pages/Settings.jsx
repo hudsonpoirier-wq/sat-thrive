@@ -103,17 +103,21 @@ export default function Settings() {
   // --- Avatar upload ---
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0]
+    // Reset file input so re-selecting the same file triggers onChange again
+    if (fileInputRef.current) fileInputRef.current.value = ''
     if (!file) return
-
-    // Show local preview immediately
-    const previewUrl = URL.createObjectURL(file)
-    setAvatarPreview(previewUrl)
 
     setUploadingAvatar(true)
     try {
       const ALLOWED_EXTS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
       const ext = ALLOWED_EXTS[file.type]
       if (!ext) throw new Error('Only JPG, PNG, and WebP images are allowed')
+      if (file.size > 2 * 1024 * 1024) throw new Error('Image must be under 2 MB')
+
+      // Show local preview immediately
+      const previewUrl = URL.createObjectURL(file)
+      setAvatarPreview(previewUrl)
+
       const filePath = `avatars/${user.id}/${Date.now()}.${ext}`
 
       const { error: uploadError } = await supabase.storage

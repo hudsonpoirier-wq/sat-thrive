@@ -289,7 +289,7 @@ function pairedTTest(pairs) {
   const variance = diffs.reduce((s, d) => s + Math.pow(d - mean, 2), 0) / (n - 1)
   const sd = Math.sqrt(variance)
   const se = sd / Math.sqrt(n)
-  const t = mean / se
+  const t = se === 0 ? 0 : mean / se
   const df = n - 1
   const tAbs = Math.abs(t)
   const crit = [
@@ -304,7 +304,7 @@ function pairedTTest(pairs) {
   if (tAbs > cv[2]) { pLabel = 'p < 0.01'; conf = '99%'; sig = true }
   else if (tAbs > cv[1]) { pLabel = 'p < 0.05'; conf = '95%'; sig = true }
   else { pLabel = 'p \u2265 0.05'; conf = '<95%'; sig = false }
-  const d = mean / sd
+  const d = sd === 0 ? 0 : mean / sd
   const ci = 1.96 * se
   return { n, mean, sd, se, t, df, pLabel, conf, sig, d, ci, lo: mean - ci, hi: mean + ci }
 }
@@ -643,8 +643,10 @@ export default function Admin() {
     for (const a of attempts) {
       const post = postByAttemptId.get(a.id)
       if (!post) continue
+      const pre = Number(a.scores?.composite || a.scores?.total || 0)
+      if (!pre || !post.post_score) continue
       const student = studentById.get(a.user_id)
-      pairsPost.push({ pre: a.scores?.total, post: post.post_score, name: student?.full_name || 'Unknown' })
+      pairsPost.push({ pre, post: post.post_score, name: student?.full_name || 'Unknown' })
     }
     const pairsOptional = []
     for (const [userId, pre] of bestPreByUser.entries()) {
@@ -1141,8 +1143,8 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
                 <thead>
                   <tr>
-                    {['Student', 'Exam', 'Test', 'Date', 'Breakdown', 'Total', 'Post-Test', 'Gain', 'Top Weakness', ''].map(h => (
-                      <th key={h} style={thStyle}>{h}</th>
+                    {['Student', 'Exam', 'Test', 'Date', 'Breakdown', 'Total', 'Post-Test', 'Gain', 'Top Weakness', 'Actions'].map((h, i) => (
+                      <th key={i} style={thStyle}>{h === 'Actions' ? '' : h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1349,16 +1351,18 @@ export default function Admin() {
                     <span style={iconBadge}><Icon name="students" size={16} /></span>
                     Affiliation Comparison
                   </h3>
-                  <Bar
-                    data={{
-                      labels: affiliationData.map(a => a.name),
-                      datasets: [
-                        { label: 'Students', data: affiliationData.map(a => a.studentCount), backgroundColor: '#3b82f6', borderRadius: 6, borderSkipped: false },
-                        { label: 'Test Attempts', data: affiliationData.map(a => a.attemptCount), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false },
-                      ],
-                    }}
-                    options={barOpts()}
-                  />
+                  <div style={{ height: 260 }}>
+                    <Bar
+                      data={{
+                        labels: affiliationData.map(a => a.name),
+                        datasets: [
+                          { label: 'Students', data: affiliationData.map(a => a.studentCount), backgroundColor: '#3b82f6', borderRadius: 6, borderSkipped: false },
+                          { label: 'Test Attempts', data: affiliationData.map(a => a.attemptCount), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false },
+                        ],
+                      }}
+                      options={barOpts()}
+                    />
+                  </div>
                 </motion.div>
 
                 {/* Average score chart */}
@@ -1368,18 +1372,20 @@ export default function Admin() {
                       <span style={iconBadge}><Icon name="chart" size={16} /></span>
                       Average Score by Affiliation
                     </h3>
-                    <Bar
-                      data={{
-                        labels: affiliationData.filter(a => a.avgScore).map(a => a.name),
-                        datasets: [{
-                          label: 'Avg Score',
-                          data: affiliationData.filter(a => a.avgScore).map(a => Math.round(a.avgScore)),
-                          backgroundColor: affiliationData.filter(a => a.avgScore).map((_, i) => ['#0c4a6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#ef4444'][i % 8]),
-                          borderRadius: 6, borderSkipped: false,
-                        }],
-                      }}
-                      options={barOpts({ legend: false })}
-                    />
+                    <div style={{ height: 260 }}>
+                      <Bar
+                        data={{
+                          labels: affiliationData.filter(a => a.avgScore).map(a => a.name),
+                          datasets: [{
+                            label: 'Avg Score',
+                            data: affiliationData.filter(a => a.avgScore).map(a => Math.round(a.avgScore)),
+                            backgroundColor: affiliationData.filter(a => a.avgScore).map((_, i) => ['#0c4a6e', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#06b6d4', '#ef4444'][i % 8]),
+                            borderRadius: 6, borderSkipped: false,
+                          }],
+                        }}
+                        options={barOpts({ legend: false })}
+                      />
+                    </div>
                   </motion.div>
                 )}
 
@@ -1437,7 +1443,7 @@ export default function Admin() {
                     Score Comparison: Pre vs Post
                   </h3>
                   <div style={{ height: 260 }}>
-                    <Bar data={chartData} options={barOpts({ yMin: 300, yMax: 1600 })} />
+                    <Bar data={chartData} options={barOpts({ yMin: Math.min(...pairs.map(p => Math.min(p.pre, p.post))) - 50, yMax: Math.max(...pairs.map(p => Math.max(p.pre, p.post))) + 50 })} />
                   </div>
                 </motion.div>
 
@@ -1477,7 +1483,7 @@ export default function Admin() {
                   </div>
                   {stats && (
                     <div style={{ marginTop: 14, fontSize: 13, color: '#475569', background: 'rgba(14,165,233,.04)', padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(14,165,233,.08)' }}>
-                      95% Confidence Interval: [+{stats.lo.toFixed(0)}, +{stats.hi.toFixed(0)}] points improvement
+                      95% Confidence Interval: [{stats.lo >= 0 ? '+' : ''}{stats.lo.toFixed(0)}, {stats.hi >= 0 ? '+' : ''}{stats.hi.toFixed(0)}] points improvement
                     </div>
                   )}
                 </motion.div>
@@ -1496,7 +1502,7 @@ export default function Admin() {
                         </div>
                         <div className="proof-stats">
                           Cohen's d = {stats.d.toFixed(2)} ({stats.d > 0.8 ? 'Large' : stats.d > 0.5 ? 'Medium' : 'Small'} effect size) {'\u00b7'}
-                          CI{'\u2089\u2085'}: [+{stats.lo.toFixed(0)}, +{stats.hi.toFixed(0)}] {'\u00b7'}
+                          CI{'\u2089\u2085'}: [{stats.lo >= 0 ? '+' : ''}{stats.lo.toFixed(0)}, {stats.hi >= 0 ? '+' : ''}{stats.hi.toFixed(0)}] {'\u00b7'}
                           n = {stats.n} students {'\u00b7'}
                           t({stats.df}) = {stats.t.toFixed(3)}, {stats.pLabel}
                         </div>
@@ -1532,7 +1538,7 @@ export default function Admin() {
                     Score Comparison: Pre vs Best Optional
                   </h3>
                   <div style={{ height: 260 }}>
-                    <Bar data={chartDataOpt} options={barOpts({ yMin: 300, yMax: 1600 })} />
+                    <Bar data={chartDataOpt} options={barOpts({ yMin: Math.min(...pairsOpt.map(p => Math.min(p.pre, p.post))) - 50, yMax: Math.max(...pairsOpt.map(p => Math.max(p.pre, p.post))) + 50 })} />
                   </div>
                 </motion.div>
 
