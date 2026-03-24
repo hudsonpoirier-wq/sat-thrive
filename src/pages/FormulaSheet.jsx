@@ -353,7 +353,7 @@ export default function FormulaSheet() {
               borderRadius: 20, padding: '32px 34px', color: '#fff', marginBottom: 24,
             }}>
               <h1 style={{
-                fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 900,
+                fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 900, color: '#fff',
                 display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8,
               }}>
                 <Icon name="folder" size={24} />
