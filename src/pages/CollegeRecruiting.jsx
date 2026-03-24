@@ -684,16 +684,16 @@ function CollegeLogo({ college, size = 36 }) {
   const domain = getCollegeDomain(college)
   const initials = (college.alias || college.name).split(/[\s&]+/).filter(w => w.length > 1).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
+  // Always fetch at 256px for crisp rendering; Google returns 150-256px actual
   const sources = [
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=256`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-    `https://www.google.com/s2/favicons?domain=${domain}&sz=${size <= 64 ? 64 : 128}`,
-    `https://logo.clearbit.com/${domain}`,
   ]
 
   const handleLoad = (e) => {
     const img = e.target
-    // Google returns a tiny generic globe (16x16) for unknown domains
-    if (img.naturalWidth <= 16 && img.naturalHeight <= 16) {
+    // Skip tiny/generic icons (some schools return 16x16 or 32x32 blurry placeholders)
+    if (img.naturalWidth <= 48 && img.naturalHeight <= 48) {
       setSrcIndex(i => i + 1)
     }
   }
@@ -723,8 +723,7 @@ function CollegeLogo({ college, size = 36 }) {
       onError={() => setSrcIndex(i => i + 1)}
       style={{
         width: size, height: size, borderRadius: 10, flexShrink: 0,
-        objectFit: 'contain', background: '#f8fafc',
-        border: '1px solid #e2e8f0',
+        objectFit: 'contain', background: '#fff',
       }}
     />
   )
