@@ -8,14 +8,16 @@ export function isTutorRole(profile) {
   return profile?.role === 'tutor'
 }
 
-export function resolveViewContext({ userId, profile, search = '' }) {
+export function resolveViewContext({ userId, profile, search = '', studentIds }) {
   const params = new URLSearchParams(search || '')
   const raw = String(params.get('user') || '').trim()
   // Only accept valid UUIDs for the user parameter
   const requestedUserId = isValidUUID(raw) ? raw : ''
   const isAdmin = isAgoraAdmin(profile)
   const isTutor = isTutorRole(profile)
-  const canPreview = Boolean((isAdmin || isTutor) && requestedUserId)
+  // Tutors can only preview students they have access to (if studentIds list provided)
+  const tutorAllowed = isTutor && requestedUserId && (!studentIds || studentIds.includes(requestedUserId))
+  const canPreview = Boolean((isAdmin || tutorAllowed) && requestedUserId)
   const viewUserId = canPreview ? requestedUserId : (userId || '')
   const isAdminPreview = Boolean(canPreview && String(requestedUserId) !== String(userId || ''))
   return { requestedUserId, viewUserId, isAdminPreview, isAdmin, isTutor }
