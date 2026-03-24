@@ -11,6 +11,16 @@ const READING_DOMAINS = new Set([
 
 const ALL_CHAPTERS = { ...CHAPTERS, ...ACT_CHAPTERS }
 
+/** Return every chapter for the given exam as a weak topic (count=5 each). */
+export function allChaptersAsWeakTopics(exam = 'sat') {
+  const source = exam === 'act' ? ACT_CHAPTERS : CHAPTERS
+  return Object.entries(source).map(([ch, meta]) => ({
+    ...meta,
+    ch,
+    count: 5,
+  }))
+}
+
 function lsKeyTestDate(userId, exam = 'sat') {
   return `agora_${exam}_test_date_v2:${userId || 'anon'}`
 }

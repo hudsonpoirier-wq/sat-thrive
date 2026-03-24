@@ -11,7 +11,7 @@ import { loadDashboardViewData } from '../lib/dashboardData.js'
 import { resolveViewContext, withExam, withViewUser } from '../lib/viewAs.js'
 import { getInitialPreferredExam } from '../lib/examChoice.js'
 import { hasUnlockedResources } from '../lib/pretestGate.js'
-import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, normalizeWeakTopics } from '../lib/studyPlan.js'
+import { buildAdaptiveSchedule, loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, allChaptersAsWeakTopics } from '../lib/studyPlan.js'
 
 function statusColor(status) {
   if (status === 'DONE') return '#10b981'
@@ -163,8 +163,7 @@ export default function Journey() {
 
   const reviewJourneyStatus = (() => {
     const total = latestMistakes.length
-    if (!hasTakenPretest) return 'LOCKED'
-    if (total === 0) return 'DONE'
+    if (total === 0) return hasTakenPretest ? 'DONE' : 'NOT STARTED'
     if (latestValidated === 0) return 'NOT STARTED'
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
@@ -192,14 +191,16 @@ export default function Journey() {
 
   // Build the adaptive schedule to extract the full list of journey tasks
   const schedule = useMemo(() => {
-    if (!hasTakenPretest || !latestCompleted) return null
+    const weakTopics = latestCompleted
+      ? deriveWeakTopicsForAttempt(latestCompleted)
+      : allChaptersAsWeakTopics(exam)
     return buildAdaptiveSchedule({
-      weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+      weakTopics,
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
       totalReviewCount: allExamMistakes.length,
       hasViewedResults: viewedLatestResults,
-      hasTakenPretest: true,
+      hasTakenPretest: hasTakenPretest,
       prefs: studyPrefs,
       testDate: satDate,
       exam,
@@ -240,24 +241,22 @@ export default function Journey() {
     },
     {
       title: '2) Study Plan',
-      status: !hasTakenPretest ? 'LOCKED' : (hasStudyPlan ? 'DONE' : 'TODO'),
+      status: hasStudyPlan ? 'DONE' : 'TODO',
       desc: `Set your ${examConfig.label} date and use the adaptive plan for daily guidance.`,
       href: viewHref('/calendar'),
     },
     {
       title: '3) Review Results',
-      status: !hasTakenPretest ? 'LOCKED' : (viewedLatestResults ? 'DONE' : 'TODO'),
+      status: viewedLatestResults ? 'DONE' : 'TODO',
       desc: latestCompleted?.id
         ? 'Open your most recent results and identify weak topics.'
-        : 'Complete a test to unlock results.',
+        : 'Complete a test to see results.',
       href: latestCompleted ? viewHref(`/results/${latestCompleted.id}`) : viewHref('/dashboard'),
     },
     {
       title: '4) Review Missed Questions',
-      status: !hasTakenPretest ? 'LOCKED' : reviewJourneyStatus,
-      desc: !hasTakenPretest
-        ? 'Take the Pre Test to generate your mistake list.'
-        : `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
+      status: reviewJourneyStatus,
+      desc: `To review: ${toReview} · Validated: ${latestValidated}/${latestMistakes.length}`,
       href: viewHref('/mistakes'),
     },
     {

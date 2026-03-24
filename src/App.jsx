@@ -82,8 +82,11 @@ function ProtectedRoute({ children }) {
 }
 
 function PublicRoute({ children }) {
-  const { user, profile } = useAuth()
+  const { user, profile, loading } = useAuth()
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:'Sora,sans-serif',color:'#64748b'}}>Loading…</div>
   if (user) {
+    // Wait for profile to load before redirecting so we route to the correct page
+    if (!profile) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:'Sora,sans-serif',color:'#64748b'}}>Loading…</div>
     const role = profile?.role
     if (role === 'tutor') return <Navigate to="/tutor" replace />
     if (role === 'admin') return <Navigate to="/admin" replace />
@@ -97,6 +100,7 @@ function PublicRoute({ children }) {
 
 function RoleRedirect() {
   const { profile } = useAuth()
+  if (!profile) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontFamily:'Sora,sans-serif',color:'#64748b'}}>Loading…</div>
   const role = profile?.role
   if (role === 'tutor') return <Navigate to="/tutor" replace />
   if (role === 'admin') return <Navigate to="/admin" replace />

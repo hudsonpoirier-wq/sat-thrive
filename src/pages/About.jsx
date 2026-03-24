@@ -9,40 +9,67 @@ const features = [
   {
     icon: 'clock',
     title: 'Timed Practice Tests',
-    desc: 'Realistic SAT and ACT sections with built-in timers that mirror actual test conditions.',
+    desc: 'Full-length SAT and ACT practice tests with built-in timers, module-by-module pacing, and automatic scoring that mirrors real test conditions.',
   },
   {
     icon: 'guide',
     title: 'Adaptive Study Guide',
-    desc: 'Personalized chapter-by-chapter learning tailored to your diagnostic results.',
+    desc: 'Personalized chapter-by-chapter learning with interactive lessons, strategy tips, and targeted practice questions tailored to your weak areas.',
   },
   {
     icon: 'calendar',
-    title: 'Smart Journey Calendar',
-    desc: 'Day-by-day study plans that fit your schedule and keep you on track.',
+    title: 'Smart Calendar & Study Plan',
+    desc: 'Set your test date and get a day-by-day adaptive study schedule that balances review, practice, and new material across your available days.',
   },
   {
     icon: 'mistakes',
     title: 'Mistake Notebook',
-    desc: 'Track and review every error with spaced repetition so you never repeat the same mistake.',
+    desc: 'Every missed question is tracked with hints and explanations. Review and validate each one to ensure you never repeat the same mistake.',
   },
   {
     icon: 'folder',
-    title: 'More Practice',
-    desc: '800+ extra questions per test to sharpen your skills beyond the core curriculum.',
+    title: 'Extra Practice & Tests',
+    desc: 'Hundreds of additional practice questions and optional extra tests to sharpen your skills beyond the core curriculum.',
   },
   {
     icon: 'chart',
-    title: 'Progress Tracking',
-    desc: 'Charts, reports, and improvement metrics that show exactly how far you\u2019ve come.',
+    title: 'Progress Reports & Score Trends',
+    desc: 'Detailed score breakdowns, improvement charts, superscore tracking, and exportable progress reports that show exactly how far you\u2019ve come.',
+  },
+  {
+    icon: 'target',
+    title: 'Journey Planner',
+    desc: 'A step-by-step roadmap from diagnostic to test day. Track milestones like completing the study guide, reviewing mistakes, and hitting score targets.',
+  },
+  {
+    icon: 'star',
+    title: 'College Recruiting',
+    desc: 'Explore 780+ colleges with admission chance estimates based on your scores. Filter by region, size, cost, and major to find your best-fit schools.',
+  },
+  {
+    icon: 'compare',
+    title: 'SAT vs ACT Comparison',
+    desc: 'Take both exams and compare your results side by side. AGORA helps you decide which test plays to your strengths.',
+  },
+  {
+    icon: 'test',
+    title: 'Test Strategies',
+    desc: 'Section-by-section strategy guides with time management tips, elimination techniques, and question-type breakdowns for both SAT and ACT.',
+  },
+  {
+    icon: 'settings',
+    title: 'Profile & Settings',
+    desc: 'Customize your profile picture, manage your account, change your password, and set your school affiliation.',
   },
 ]
 
 const steps = [
-  { num: 1, label: 'Take a diagnostic pre-test', desc: 'A full-length practice exam identifies your starting point and pinpoints every area that needs work.' },
-  { num: 2, label: 'Get your personalized study plan', desc: 'AGORA builds a custom calendar and study guide based on your weak areas and available time.' },
-  { num: 3, label: 'Work through study guide chapters and practice', desc: 'Focused lessons and targeted drills reinforce concepts until they stick.' },
-  { num: 4, label: 'Take the final test and see your improvement', desc: 'A second full-length exam measures your growth so you can walk into test day with confidence.' },
+  { num: 1, label: 'Create your account and choose SAT or ACT', desc: 'Sign up, pick your exam, and optionally set your test date. All study resources are immediately available.' },
+  { num: 2, label: 'Take a diagnostic pre-test', desc: 'A full-length timed practice exam identifies your starting point and pinpoints every area that needs work.' },
+  { num: 3, label: 'Get your personalized study plan', desc: 'AGORA builds a custom calendar and adaptive study guide based on your weak areas and available time.' },
+  { num: 4, label: 'Work through study guide chapters and practice', desc: 'Interactive lessons, targeted drills, and mistake review reinforce concepts until they stick.' },
+  { num: 5, label: 'Take extra tests and track improvement', desc: 'Additional practice tests and the score trend chart let you measure growth and adjust your plan.' },
+  { num: 6, label: 'Walk into test day confident', desc: 'With weak areas conquered and strategies mastered, you\u2019re ready to hit your goal score.' },
 ]
 
 const card = {

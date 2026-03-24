@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { supabase } from '../lib/supabase.js'
-import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule } from '../lib/studyPlan.js'
+import { loadSatTestDate, loadStudyPrefs, normalizeWeakTopics, buildAdaptiveSchedule, allChaptersAsWeakTopics } from '../lib/studyPlan.js'
 import UserMenu from '../components/UserMenu.jsx'
 import BrandLink from '../components/BrandLink.jsx'
 import Icon from '../components/AppIcons.jsx'
@@ -505,8 +505,7 @@ export default function Dashboard() {
   }).length
   const reviewJourneyStatus = (() => {
     const total = latestMistakes.length
-    if (!hasTakenPretest) return 'LOCKED'
-    if (total === 0) return 'DONE'
+    if (total === 0) return hasTakenPretest ? 'DONE' : 'NOT STARTED'
     if (latestValidated === 0) return 'NOT STARTED'
     if (latestValidated < total) return 'IN PROGRESS'
     return 'DONE'
@@ -514,14 +513,16 @@ export default function Dashboard() {
   const reviewTodoCount = Math.max(0, allExamMistakes.length - allExamValidated)
 
   const journeySchedule = useMemo(() => {
-    if (!hasTakenPretest || !latestCompleted) return null
+    const weakTopics = latestCompleted
+      ? deriveWeakTopicsForAttempt(latestCompleted)
+      : allChaptersAsWeakTopics(exam)
     const schedule = buildAdaptiveSchedule({
-      weakTopics: deriveWeakTopicsForAttempt(latestCompleted),
+      weakTopics,
       studiedMap: studiedForExam,
       reviewCount: reviewTodoCount,
       totalReviewCount: allExamMistakes.length,
       hasViewedResults: viewedLatestResults,
-      hasTakenPretest: true,
+      hasTakenPretest: hasTakenPretest,
       prefs: studyPrefs,
       testDate: satDate,
       exam,
@@ -547,7 +548,7 @@ export default function Dashboard() {
   }, [journeySchedule])
 
   useEffect(() => {
-    setUnlockedResources(viewUserId, exam, hasTakenPretest)
+    setUnlockedResources(viewUserId, exam, true)
   }, [viewUserId, exam, hasTakenPretest])
 
   // Toast notifications for newly completed tasks
@@ -565,7 +566,7 @@ export default function Dashboard() {
   }, [exam])
 
   useEffect(() => {
-    if (!addToast || !hasTakenPretest) return
+    if (!addToast) return
     const currentKeys = new Set(Object.keys(studiedForExam).filter((k) => studiedForExam[k]))
     if (prevStudiedRef.current) {
       for (const key of currentKeys) {
@@ -580,7 +581,7 @@ export default function Dashboard() {
   }, [studiedForExam, chaptersForExam, addToast, hasTakenPretest])
 
   useEffect(() => {
-    if (!addToast || !hasTakenPretest) return
+    if (!addToast) return
     if (prevReviewTodoRef.current !== null && reviewTodoCount < prevReviewTodoRef.current) {
       const diff = prevReviewTodoRef.current - reviewTodoCount
       if (reviewTodoCount === 0) {
