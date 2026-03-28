@@ -32,6 +32,7 @@ const STATS = [
   { value: 2000, suffix: '+', label: 'Practice Questions' },
   { value: 17, suffix: '', label: 'Full Practice Tests' },
   { value: 420, suffix: '+', label: 'Avg Point Gain' },
+  { value: 100, suffix: '%', label: 'Free' },
 ]
 
 const SAT_SECTIONS = [
@@ -46,21 +47,105 @@ const ACT_SECTIONS = [
   { name: 'Science', topics: 'Data Representation, Research Summaries, Conflicting Viewpoints' },
 ]
 
-/* ═══ 3D SCENE — lightweight, no jank ═══ */
-function FloatingShape({ position, geometry, color, speed, scale = 1 }) {
-  const mesh = useRef()
+/* ═══ 3D SCENE — educational tools, spread wide ═══ */
+function FloatingGroup({ position, children, speed = 1 }) {
+  const group = useRef()
   useFrame(({ clock }) => {
-    if (!mesh.current) return
+    if (!group.current) return
     const t = clock.getElapsedTime() * speed
-    mesh.current.rotation.y = t * 0.15
-    mesh.current.rotation.x = Math.sin(t * 0.1) * 0.08
-    mesh.current.position.y = position[1] + Math.sin(t * 0.2) * 0.3
+    group.current.rotation.y = Math.sin(t * 0.12) * 0.15
+    group.current.rotation.x = Math.sin(t * 0.08) * 0.06
+    group.current.position.y = position[1] + Math.sin(t * 0.18) * 0.25
   })
+  return <group ref={group} position={position}>{children}</group>
+}
+
+/* Pencil */
+function Pencil({ position, speed, rot = 0.5, color = '#f59e0b' }) {
   return (
-    <mesh ref={mesh} position={position} scale={scale}>
-      {geometry}
-      <meshBasicMaterial color={color} wireframe transparent opacity={0.06} />
-    </mesh>
+    <FloatingGroup position={position} speed={speed}>
+      <group rotation={[0, 0, rot]}>
+        <mesh><cylinderGeometry args={[0.04, 0.04, 1.3, 6]} /><meshBasicMaterial color={color} transparent opacity={0.1} /></mesh>
+        <mesh position={[0, 0.7, 0]}><coneGeometry args={[0.04, 0.15, 6]} /><meshBasicMaterial color="#334155" transparent opacity={0.1} /></mesh>
+        <mesh position={[0, -0.65, 0]}><cylinderGeometry args={[0.045, 0.04, 0.06, 6]} /><meshBasicMaterial color="#fbbf24" transparent opacity={0.08} /></mesh>
+      </group>
+    </FloatingGroup>
+  )
+}
+
+/* Calculator */
+function Calculator({ position, speed }) {
+  return (
+    <FloatingGroup position={position} speed={speed}>
+      {/* Body */}
+      <mesh><boxGeometry args={[0.6, 0.9, 0.08]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.08} /></mesh>
+      {/* Screen */}
+      <mesh position={[0, 0.22, 0.045]}><boxGeometry args={[0.46, 0.22, 0.01]} /><meshBasicMaterial color="#38bdf8" transparent opacity={0.12} /></mesh>
+      {/* Button grid */}
+      {[[-0.15, -0.08], [0, -0.08], [0.15, -0.08], [-0.15, -0.22], [0, -0.22], [0.15, -0.22], [-0.15, -0.36], [0, -0.36], [0.15, -0.36]].map(([x, y], i) => (
+        <mesh key={i} position={[x, y, 0.045]}><boxGeometry args={[0.1, 0.09, 0.01]} /><meshBasicMaterial color="#1e3a8a" transparent opacity={0.07} /></mesh>
+      ))}
+    </FloatingGroup>
+  )
+}
+
+/* Bar Graph */
+function BarGraph({ position, speed }) {
+  return (
+    <FloatingGroup position={position} speed={speed}>
+      {[[-0.25, 0.25, '#38bdf8'], [-0.08, 0.4, '#0ea5e9'], [0.09, 0.55, '#0ea5e9'], [0.26, 0.45, '#38bdf8']].map(([x, h, c], i) => (
+        <mesh key={i} position={[x, h / 2 - 0.3, 0]}><boxGeometry args={[0.12, h, 0.05]} /><meshBasicMaterial color={c} transparent opacity={0.09} /></mesh>
+      ))}
+      <mesh position={[0, -0.3, 0]}><boxGeometry args={[0.7, 0.015, 0.05]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.06} /></mesh>
+      <mesh position={[-0.35, 0, 0]} rotation={[0, 0, 0]}><boxGeometry args={[0.015, 0.7, 0.05]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.06} /></mesh>
+    </FloatingGroup>
+  )
+}
+
+/* Ruler */
+function Ruler({ position, speed, rot = 0.3 }) {
+  return (
+    <FloatingGroup position={position} speed={speed}>
+      <group rotation={[0, 0, rot]}>
+        <mesh><boxGeometry args={[1.4, 0.2, 0.03]} /><meshBasicMaterial color="#f59e0b" transparent opacity={0.07} /></mesh>
+        {/* Tick marks */}
+        {Array.from({ length: 9 }, (_, i) => (
+          <mesh key={i} position={[-0.56 + i * 0.14, -0.06, 0.02]}><boxGeometry args={[0.01, i % 2 === 0 ? 0.08 : 0.05, 0.01]} /><meshBasicMaterial color="#f59e0b" transparent opacity={0.1} /></mesh>
+        ))}
+      </group>
+    </FloatingGroup>
+  )
+}
+
+/* Open Book */
+function OpenBook({ position, speed }) {
+  return (
+    <FloatingGroup position={position} speed={speed}>
+      {/* Left page */}
+      <mesh position={[-0.3, 0, 0]} rotation={[0, 0.15, 0]}><boxGeometry args={[0.55, 0.7, 0.02]} /><meshBasicMaterial color="#e2e8f0" transparent opacity={0.06} /></mesh>
+      {/* Right page */}
+      <mesh position={[0.3, 0, 0]} rotation={[0, -0.15, 0]}><boxGeometry args={[0.55, 0.7, 0.02]} /><meshBasicMaterial color="#e2e8f0" transparent opacity={0.06} /></mesh>
+      {/* Spine */}
+      <mesh position={[0, 0, -0.02]}><boxGeometry args={[0.04, 0.72, 0.04]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
+      {/* Text lines on left page */}
+      {[-0.15, -0.05, 0.05, 0.15].map((y, i) => (
+        <mesh key={i} position={[-0.3, y, 0.015]}><boxGeometry args={[0.35, 0.02, 0.005]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.05} /></mesh>
+      ))}
+    </FloatingGroup>
+  )
+}
+
+/* Pi symbol (math) */
+function MathSymbol({ position, speed }) {
+  return (
+    <FloatingGroup position={position} speed={speed}>
+      {/* Top bar */}
+      <mesh position={[0, 0.25, 0]}><boxGeometry args={[0.5, 0.05, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
+      {/* Left leg */}
+      <mesh position={[-0.15, -0.05, 0]}><boxGeometry args={[0.05, 0.55, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
+      {/* Right leg (curved) */}
+      <mesh position={[0.15, -0.02, 0]}><boxGeometry args={[0.05, 0.5, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
+    </FloatingGroup>
   )
 }
 
@@ -68,18 +153,19 @@ function Scene3D() {
   return (
     <>
       <ambientLight intensity={0.2} />
-      {/* Books as simple boxes */}
-      <FloatingShape position={[-3.2, 1, -3]} geometry={<boxGeometry args={[0.7, 1, 0.12]} />} color="#0ea5e9" speed={0.8} scale={0.9} />
-      <FloatingShape position={[3.5, -0.5, -4]} geometry={<boxGeometry args={[0.6, 0.9, 0.1]} />} color="#1e3a8a" speed={0.6} scale={0.7} />
-      <FloatingShape position={[-1.5, -1.8, -5]} geometry={<boxGeometry args={[0.5, 0.7, 0.08]} />} color="#38bdf8" speed={1.0} scale={0.6} />
-      {/* Pencil as cylinder */}
-      <FloatingShape position={[2.2, 1.8, -3.5]} geometry={<cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />} color="#f59e0b" speed={0.7} />
-      <FloatingShape position={[-2.5, -1.2, -4]} geometry={<cylinderGeometry args={[0.03, 0.03, 1, 6]} />} color="#f59e0b" speed={0.9} />
-      {/* Globe */}
-      <FloatingShape position={[0.5, 1.5, -6]} geometry={<sphereGeometry args={[0.5, 12, 12]} />} color="#0ea5e9" speed={0.5} />
-      {/* Background wireframes */}
-      <FloatingShape position={[0, 0, -9]} geometry={<icosahedronGeometry args={[2.5, 1]} />} color="#0ea5e9" speed={0.2} />
-      <FloatingShape position={[3, -2, -7]} geometry={<octahedronGeometry args={[1.2, 0]} />} color="#38bdf8" speed={0.3} />
+      {/* Spread wide — covers full viewport */}
+      <Pencil position={[-5, 2.5, -4]} speed={0.7} rot={0.6} />
+      <Pencil position={[5.5, -1.5, -5]} speed={0.9} rot={-0.4} color="#fb923c" />
+      <Calculator position={[4.5, 2, -4]} speed={0.6} />
+      <BarGraph position={[-4.5, -1, -3.5]} speed={0.8} />
+      <Ruler position={[0, 3, -5]} speed={0.5} rot={0.15} />
+      <Ruler position={[-3, -2.5, -6]} speed={0.6} rot={-0.25} />
+      <OpenBook position={[-2, 1.5, -5]} speed={0.5} />
+      <OpenBook position={[3, -2.5, -6]} speed={0.7} />
+      <MathSymbol position={[5, 0.5, -5.5]} speed={0.4} />
+      <MathSymbol position={[-5.5, -0.5, -6]} speed={0.55} />
+      {/* Very subtle background wireframe */}
+      <mesh position={[0, 0, -10]}><icosahedronGeometry args={[3, 1]} /><meshBasicMaterial color="#0ea5e9" wireframe transparent opacity={0.012} /></mesh>
     </>
   )
 }
