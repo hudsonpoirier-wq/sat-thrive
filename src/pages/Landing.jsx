@@ -47,104 +47,168 @@ const ACT_SECTIONS = [
   { name: 'Science', topics: 'Data Representation, Research Summaries, Conflicting Viewpoints' },
 ]
 
-/* ═══ 3D SCENE — educational tools, spread wide ═══ */
+/* ═══ 3D SCENE — polished educational tools ═══ */
 function FloatingGroup({ position, children, speed = 1 }) {
   const group = useRef()
   useFrame(({ clock }) => {
     if (!group.current) return
     const t = clock.getElapsedTime() * speed
-    group.current.rotation.y = Math.sin(t * 0.12) * 0.15
-    group.current.rotation.x = Math.sin(t * 0.08) * 0.06
-    group.current.position.y = position[1] + Math.sin(t * 0.18) * 0.25
+    group.current.rotation.y = Math.sin(t * 0.12) * 0.2
+    group.current.rotation.x = Math.sin(t * 0.08 + 1) * 0.08
+    group.current.position.y = position[1] + Math.sin(t * 0.18) * 0.3
+    group.current.position.x = position[0] + Math.sin(t * 0.1 + 2) * 0.1
   })
   return <group ref={group} position={position}>{children}</group>
 }
 
-/* Pencil */
-function Pencil({ position, speed, rot = 0.5, color = '#f59e0b' }) {
+const M = (color, opts = {}) => <meshStandardMaterial color={color} transparent opacity={opts.o ?? 0.55} roughness={opts.r ?? 0.3} metalness={opts.m ?? 0.1} />
+
+function Pencil({ position, speed, rot = 0.5 }) {
   return (
     <FloatingGroup position={position} speed={speed}>
       <group rotation={[0, 0, rot]}>
-        <mesh><cylinderGeometry args={[0.04, 0.04, 1.3, 6]} /><meshBasicMaterial color={color} transparent opacity={0.1} /></mesh>
-        <mesh position={[0, 0.7, 0]}><coneGeometry args={[0.04, 0.15, 6]} /><meshBasicMaterial color="#334155" transparent opacity={0.1} /></mesh>
-        <mesh position={[0, -0.65, 0]}><cylinderGeometry args={[0.045, 0.04, 0.06, 6]} /><meshBasicMaterial color="#fbbf24" transparent opacity={0.08} /></mesh>
+        {/* Wood body */}
+        <mesh><cylinderGeometry args={[0.045, 0.045, 1.3, 12]} />{M('#f59e0b', { o: 0.5, r: 0.5 })}</mesh>
+        {/* Graphite tip */}
+        <mesh position={[0, 0.72, 0]}><coneGeometry args={[0.045, 0.18, 12]} />{M('#1e293b', { o: 0.6, r: 0.2 })}</mesh>
+        {/* Exposed wood at tip */}
+        <mesh position={[0, 0.6, 0]}><coneGeometry args={[0.045, 0.08, 12]} />{M('#fde68a', { o: 0.45, r: 0.6 })}</mesh>
+        {/* Metal band */}
+        <mesh position={[0, -0.58, 0]}><cylinderGeometry args={[0.05, 0.05, 0.1, 12]} />{M('#94a3b8', { o: 0.5, m: 0.6, r: 0.15 })}</mesh>
+        {/* Eraser */}
+        <mesh position={[0, -0.68, 0]}><cylinderGeometry args={[0.042, 0.042, 0.1, 12]} />{M('#f87171', { o: 0.5, r: 0.7 })}</mesh>
       </group>
     </FloatingGroup>
   )
 }
 
-/* Calculator */
 function Calculator({ position, speed }) {
   return (
     <FloatingGroup position={position} speed={speed}>
-      {/* Body */}
-      <mesh><boxGeometry args={[0.6, 0.9, 0.08]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.08} /></mesh>
+      {/* Body with rounded look */}
+      <mesh><boxGeometry args={[0.65, 0.95, 0.1]} />{M('#1e293b', { o: 0.55, r: 0.4 })}</mesh>
       {/* Screen */}
-      <mesh position={[0, 0.22, 0.045]}><boxGeometry args={[0.46, 0.22, 0.01]} /><meshBasicMaterial color="#38bdf8" transparent opacity={0.12} /></mesh>
-      {/* Button grid */}
-      {[[-0.15, -0.08], [0, -0.08], [0.15, -0.08], [-0.15, -0.22], [0, -0.22], [0.15, -0.22], [-0.15, -0.36], [0, -0.36], [0.15, -0.36]].map(([x, y], i) => (
-        <mesh key={i} position={[x, y, 0.045]}><boxGeometry args={[0.1, 0.09, 0.01]} /><meshBasicMaterial color="#1e3a8a" transparent opacity={0.07} /></mesh>
+      <mesh position={[0, 0.24, 0.056]}><boxGeometry args={[0.5, 0.24, 0.01]} />{M('#0ea5e9', { o: 0.4, r: 0.1, m: 0.2 })}</mesh>
+      {/* Screen bezel */}
+      <mesh position={[0, 0.24, 0.052]}><boxGeometry args={[0.54, 0.28, 0.005]} />{M('#334155', { o: 0.5, r: 0.2 })}</mesh>
+      {/* Buttons - 4x4 grid */}
+      {[
+        [-0.18, 0.0], [-0.06, 0.0], [0.06, 0.0], [0.18, 0.0],
+        [-0.18, -0.12], [-0.06, -0.12], [0.06, -0.12], [0.18, -0.12],
+        [-0.18, -0.24], [-0.06, -0.24], [0.06, -0.24], [0.18, -0.24],
+        [-0.18, -0.36], [-0.06, -0.36], [0.06, -0.36], [0.18, -0.36],
+      ].map(([x, y], i) => (
+        <mesh key={i} position={[x, y, 0.056]}>
+          <boxGeometry args={[0.09, 0.08, 0.02]} />
+          {M(i >= 12 ? '#0ea5e9' : i % 4 === 3 ? '#f59e0b' : '#475569', { o: 0.5, r: 0.35 })}
+        </mesh>
       ))}
     </FloatingGroup>
   )
 }
 
-/* Bar Graph */
 function BarGraph({ position, speed }) {
   return (
     <FloatingGroup position={position} speed={speed}>
-      {[[-0.25, 0.25, '#38bdf8'], [-0.08, 0.4, '#0ea5e9'], [0.09, 0.55, '#0ea5e9'], [0.26, 0.45, '#38bdf8']].map(([x, h, c], i) => (
-        <mesh key={i} position={[x, h / 2 - 0.3, 0]}><boxGeometry args={[0.12, h, 0.05]} /><meshBasicMaterial color={c} transparent opacity={0.09} /></mesh>
+      {/* Bars with gradient-like colors */}
+      {[
+        [-0.28, 0.3, '#38bdf8'],
+        [-0.1, 0.48, '#0ea5e9'],
+        [0.08, 0.65, '#0284c7'],
+        [0.26, 0.52, '#0ea5e9'],
+      ].map(([x, h, c], i) => (
+        <mesh key={i} position={[x, h / 2 - 0.35, 0]}>
+          <boxGeometry args={[0.13, h, 0.06]} />
+          {M(c, { o: 0.5, r: 0.25 })}
+        </mesh>
       ))}
-      <mesh position={[0, -0.3, 0]}><boxGeometry args={[0.7, 0.015, 0.05]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.06} /></mesh>
-      <mesh position={[-0.35, 0, 0]} rotation={[0, 0, 0]}><boxGeometry args={[0.015, 0.7, 0.05]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.06} /></mesh>
+      {/* X axis */}
+      <mesh position={[0, -0.35, 0]}><boxGeometry args={[0.8, 0.02, 0.06]} />{M('#64748b', { o: 0.4, r: 0.3 })}</mesh>
+      {/* Y axis */}
+      <mesh position={[-0.38, 0, 0]}><boxGeometry args={[0.02, 0.8, 0.06]} />{M('#64748b', { o: 0.4, r: 0.3 })}</mesh>
+      {/* Trend line */}
+      <mesh position={[-0.15, -0.1, 0.04]} rotation={[0, 0, 0.45]}><boxGeometry args={[0.7, 0.015, 0.01]} />{M('#f59e0b', { o: 0.45 })}</mesh>
     </FloatingGroup>
   )
 }
 
-/* Ruler */
 function Ruler({ position, speed, rot = 0.3 }) {
   return (
     <FloatingGroup position={position} speed={speed}>
       <group rotation={[0, 0, rot]}>
-        <mesh><boxGeometry args={[1.4, 0.2, 0.03]} /><meshBasicMaterial color="#f59e0b" transparent opacity={0.07} /></mesh>
+        {/* Body */}
+        <mesh><boxGeometry args={[1.5, 0.22, 0.035]} />{M('#fbbf24', { o: 0.45, r: 0.5 })}</mesh>
+        {/* Edge strip */}
+        <mesh position={[0, -0.09, 0.005]}><boxGeometry args={[1.5, 0.03, 0.035]} />{M('#f59e0b', { o: 0.5, r: 0.4 })}</mesh>
         {/* Tick marks */}
-        {Array.from({ length: 9 }, (_, i) => (
-          <mesh key={i} position={[-0.56 + i * 0.14, -0.06, 0.02]}><boxGeometry args={[0.01, i % 2 === 0 ? 0.08 : 0.05, 0.01]} /><meshBasicMaterial color="#f59e0b" transparent opacity={0.1} /></mesh>
+        {Array.from({ length: 15 }, (_, i) => (
+          <mesh key={i} position={[-0.63 + i * 0.09, -0.04, 0.02]}>
+            <boxGeometry args={[0.008, i % 5 === 0 ? 0.1 : i % 2 === 0 ? 0.06 : 0.04, 0.005]} />
+            {M('#92400e', { o: 0.5 })}
+          </mesh>
         ))}
       </group>
     </FloatingGroup>
   )
 }
 
-/* Open Book */
 function OpenBook({ position, speed }) {
   return (
     <FloatingGroup position={position} speed={speed}>
       {/* Left page */}
-      <mesh position={[-0.3, 0, 0]} rotation={[0, 0.15, 0]}><boxGeometry args={[0.55, 0.7, 0.02]} /><meshBasicMaterial color="#e2e8f0" transparent opacity={0.06} /></mesh>
+      <mesh position={[-0.32, 0, 0.02]} rotation={[0, 0.18, 0]}>
+        <boxGeometry args={[0.58, 0.75, 0.015]} />{M('#f1f5f9', { o: 0.5, r: 0.7 })}
+      </mesh>
       {/* Right page */}
-      <mesh position={[0.3, 0, 0]} rotation={[0, -0.15, 0]}><boxGeometry args={[0.55, 0.7, 0.02]} /><meshBasicMaterial color="#e2e8f0" transparent opacity={0.06} /></mesh>
+      <mesh position={[0.32, 0, 0.02]} rotation={[0, -0.18, 0]}>
+        <boxGeometry args={[0.58, 0.75, 0.015]} />{M('#f8fafc', { o: 0.5, r: 0.7 })}
+      </mesh>
+      {/* Cover underneath left */}
+      <mesh position={[-0.33, 0, -0.01]} rotation={[0, 0.22, 0]}>
+        <boxGeometry args={[0.6, 0.78, 0.02]} />{M('#0ea5e9', { o: 0.45, r: 0.35 })}
+      </mesh>
+      {/* Cover underneath right */}
+      <mesh position={[0.33, 0, -0.01]} rotation={[0, -0.22, 0]}>
+        <boxGeometry args={[0.6, 0.78, 0.02]} />{M('#0ea5e9', { o: 0.45, r: 0.35 })}
+      </mesh>
       {/* Spine */}
-      <mesh position={[0, 0, -0.02]}><boxGeometry args={[0.04, 0.72, 0.04]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
-      {/* Text lines on left page */}
-      {[-0.15, -0.05, 0.05, 0.15].map((y, i) => (
-        <mesh key={i} position={[-0.3, y, 0.015]}><boxGeometry args={[0.35, 0.02, 0.005]} /><meshBasicMaterial color="#94a3b8" transparent opacity={0.05} /></mesh>
+      <mesh position={[0, 0, -0.015]}><cylinderGeometry args={[0.025, 0.025, 0.78, 8]} rotation={[Math.PI / 2, 0, 0]} />{M('#0284c7', { o: 0.5 })}</mesh>
+      {/* Text lines on pages */}
+      {[-0.2, -0.1, 0, 0.1, 0.2].map((y, i) => (
+        <mesh key={`l${i}`} position={[-0.32, y, 0.03]}>
+          <boxGeometry args={[0.38 - (i % 3) * 0.06, 0.015, 0.003]} />{M('#cbd5e1', { o: 0.3 })}
+        </mesh>
+      ))}
+      {[-0.2, -0.1, 0, 0.1].map((y, i) => (
+        <mesh key={`r${i}`} position={[0.32, y, 0.03]}>
+          <boxGeometry args={[0.36 - (i % 2) * 0.08, 0.015, 0.003]} />{M('#cbd5e1', { o: 0.3 })}
+        </mesh>
       ))}
     </FloatingGroup>
   )
 }
 
-/* Pi symbol (math) */
-function MathSymbol({ position, speed }) {
+function Protractor({ position, speed }) {
   return (
     <FloatingGroup position={position} speed={speed}>
-      {/* Top bar */}
-      <mesh position={[0, 0.25, 0]}><boxGeometry args={[0.5, 0.05, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
-      {/* Left leg */}
-      <mesh position={[-0.15, -0.05, 0]}><boxGeometry args={[0.05, 0.55, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
-      {/* Right leg (curved) */}
-      <mesh position={[0.15, -0.02, 0]}><boxGeometry args={[0.05, 0.5, 0.03]} /><meshBasicMaterial color="#0ea5e9" transparent opacity={0.1} /></mesh>
+      {/* Half circle body */}
+      <mesh rotation={[0, 0, 0]}>
+        <cylinderGeometry args={[0.5, 0.5, 0.03, 24, 1, false, 0, Math.PI]} />
+        {M('#38bdf8', { o: 0.35, r: 0.3 })}
+      </mesh>
+      {/* Flat edge */}
+      <mesh position={[0, 0, 0]}><boxGeometry args={[1, 0.03, 0.03]} />{M('#0ea5e9', { o: 0.45, r: 0.25 })}</mesh>
+      {/* Center dot */}
+      <mesh position={[0, 0, 0.02]}><sphereGeometry args={[0.03, 8, 8]} />{M('#0284c7', { o: 0.5 })}</mesh>
+      {/* Degree marks */}
+      {Array.from({ length: 7 }, (_, i) => {
+        const angle = (Math.PI / 8) * (i + 1)
+        return (
+          <mesh key={i} position={[Math.cos(angle) * 0.42, Math.sin(angle) * 0.42, 0.02]}>
+            <sphereGeometry args={[0.012, 6, 6]} />{M('#0ea5e9', { o: 0.5 })}
+          </mesh>
+        )
+      })}
     </FloatingGroup>
   )
 }
@@ -152,20 +216,23 @@ function MathSymbol({ position, speed }) {
 function Scene3D() {
   return (
     <>
-      <ambientLight intensity={0.2} />
-      {/* Spread wide — covers full viewport */}
-      <Pencil position={[-5, 2.5, -4]} speed={0.7} rot={0.6} />
-      <Pencil position={[5.5, -1.5, -5]} speed={0.9} rot={-0.4} color="#fb923c" />
-      <Calculator position={[4.5, 2, -4]} speed={0.6} />
-      <BarGraph position={[-4.5, -1, -3.5]} speed={0.8} />
-      <Ruler position={[0, 3, -5]} speed={0.5} rot={0.15} />
-      <Ruler position={[-3, -2.5, -6]} speed={0.6} rot={-0.25} />
-      <OpenBook position={[-2, 1.5, -5]} speed={0.5} />
-      <OpenBook position={[3, -2.5, -6]} speed={0.7} />
-      <MathSymbol position={[5, 0.5, -5.5]} speed={0.4} />
-      <MathSymbol position={[-5.5, -0.5, -6]} speed={0.55} />
-      {/* Very subtle background wireframe */}
-      <mesh position={[0, 0, -10]}><icosahedronGeometry args={[3, 1]} /><meshBasicMaterial color="#0ea5e9" wireframe transparent opacity={0.012} /></mesh>
+      {/* Lighting for solid materials */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 5, 5]} intensity={0.6} color="#e2e8f0" />
+      <directionalLight position={[-3, 3, 2]} intensity={0.3} color="#38bdf8" />
+      <pointLight position={[0, -2, 4]} intensity={0.2} color="#f59e0b" />
+
+      {/* Spread wide across viewport */}
+      <Pencil position={[-5.2, 2.2, -3.5]} speed={0.6} rot={0.55} />
+      <Pencil position={[5.8, -1.8, -4.5]} speed={0.8} rot={-0.35} />
+      <Calculator position={[4.8, 2.3, -4]} speed={0.5} />
+      <BarGraph position={[-4.8, -1.2, -3]} speed={0.65} />
+      <Ruler position={[0.5, 3.2, -5]} speed={0.45} rot={0.12} />
+      <Ruler position={[-3.5, -2.8, -5.5]} speed={0.55} rot={-0.2} />
+      <OpenBook position={[-2.2, 1.8, -4.5]} speed={0.45} />
+      <OpenBook position={[3.2, -2.8, -5.5]} speed={0.6} />
+      <Protractor position={[5.2, 0.3, -5]} speed={0.4} />
+      <Protractor position={[-5.5, -0.3, -5.5]} speed={0.5} />
     </>
   )
 }
@@ -180,8 +247,7 @@ function Background3D() {
   return (
     <WebGLBoundary>
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        <Canvas camera={{ position: [0, 0, 5], fov: 55 }} dpr={[1, 1.5]} frameloop="demand" gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }} style={{ background: 'transparent' }}
-          onCreated={({ gl, invalidate }) => { setInterval(invalidate, 50) }}>
+        <Canvas camera={{ position: [0, 0, 5], fov: 60 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true, powerPreference: 'default' }} style={{ background: 'transparent' }}>
           <Scene3D />
         </Canvas>
       </div>
