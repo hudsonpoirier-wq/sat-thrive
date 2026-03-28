@@ -414,6 +414,8 @@ export default function Dashboard() {
   const inProgress = examAttempts.filter(a => !a.completed_at)
   const latestCompleted = completed.length ? completed[0] : null
   const completedPre = completed.filter(a => normalizeTestId(a.test_id) === examConfig.preTestId)
+  const completedRealPre = completedPre.filter(a => a.scores?.source !== 'prior_score')
+  const onlyPriorScore = completedPre.length > 0 && completedRealPre.length === 0
   const preInProgress = inProgress.find(a => normalizeTestId(a.test_id) === examConfig.preTestId)
   const completedWithScores = completed
     .map((attempt) => ({ attempt, scores: attempt.scores?.total ? attempt.scores : (computeScoresFromAnswers(attempt) || attempt.scores || {}) }))
@@ -781,54 +783,6 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-	        {/* Pre Test CTA (hidden after completion, hidden for tutors) */}
-        {!isTutor && (completedPre.length === 0 || preInProgress) && (
-          <AnimateOnScroll animation="anim-slide-up" duration={600} delay={200}>
-	          <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#0c4a6e,#1e3a8a)', color:'white'}}>
-	            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
-	              <div>
-	                <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
-	                  <Icon name="test" size={18} />
-	                  {preTestConfig?.label || 'Pre Test'}
-	                </div>
-	                <div style={{fontSize:13, opacity:.7}}>
-	                  {examConfig.moduleOrder.length} sections · {totalQuestions} questions · {totalDuration} · Timed like the real {examConfig.label}
-	                </div>
-	              </div>
-	              {preInProgress ? (
-	                <div style={{display:'flex', gap:10}}>
-	                  <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
-	                    style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
-	                    {readOnlyView ? 'Preview only' : '▶ Resume'}
-	                  </button>
-	                </div>
-	              ) : (
-	                <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
-	                  style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
-	                  {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting…</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
-	                </button>
-	              )}
-	            </div>
-	            {confirmStart && (
-	              <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
-	                <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
-	                <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
-	                  This is a full timed {examConfig.label} test ({totalDuration}). Once you start, your timer runs.
-	                </div>
-	                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-	                  <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
-	                    Cancel
-	                  </button>
-	                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#0f172a', fontWeight: 800 }}>
-	                    {readOnlyView ? 'Preview only' : 'Start Test'}
-	                  </button>
-	                </div>
-	              </div>
-	            )}
-	          </div>
-          </AnimateOnScroll>
-	        )}
-
         {/* Score overview — students only */}
         {!isTutor && (
           <AnimateOnScroll animation="anim-fade-up" stagger={120} as="div" className="stats-grid">
@@ -880,6 +834,56 @@ export default function Dashboard() {
               dark={Boolean(superscore)}
             />
         </AnimateOnScroll>
+        )}
+
+        {/* Pre Test CTA — shown under stats when not yet taken (or only prior score entered) */}
+        {!isTutor && (completedRealPre.length === 0 || preInProgress) && (
+          <AnimateOnScroll animation="anim-slide-up" duration={600} delay={200}>
+            <div className="card dashboard-pretest-card" style={{marginBottom:24, background:'linear-gradient(135deg,#0c4a6e,#1e3a8a)', color:'white'}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16}}>
+                <div>
+                  <div style={{fontFamily:'Sora,sans-serif', fontSize:18, fontWeight:800, marginBottom:4, display: 'flex', alignItems: 'center', gap: 8}}>
+                    <Icon name="test" size={18} />
+                    {preTestConfig?.label || 'Pre Test'}
+                  </div>
+                  <div style={{fontSize:13, opacity:.7}}>
+                    {onlyPriorScore
+                      ? `You entered a prior score. Take the full diagnostic to get a detailed breakdown of your strengths and weaknesses.`
+                      : `${examConfig.moduleOrder.length} sections · ${totalQuestions} questions · ${totalDuration} · Timed like the real ${examConfig.label}`}
+                  </div>
+                </div>
+                {preInProgress ? (
+                  <div style={{display:'flex', gap:10}}>
+                    <button className="btn" disabled={readOnlyView} onClick={() => navigate(`/test/${preInProgress.id}`)}
+                      style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
+                      {readOnlyView ? 'Preview only' : 'Resume'}
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={startingTest || readOnlyView}
+                    style={{background:'#f59e0b', color:'#0f172a', fontWeight:700}}>
+                    {readOnlyView ? 'Preview only' : startingTest ? <><span className="spinner" style={{borderTopColor:'#1a2744'}} /> Starting...</> : `Start ${preTestConfig?.shortLabel || 'Pre Test'}`}
+                  </button>
+                )}
+              </div>
+              {confirmStart && (
+                <div style={{ marginTop: 14, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, padding: 14 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Ready to start?</div>
+                  <div style={{ fontSize: 13, opacity: .8, lineHeight: 1.6 }}>
+                    This is a full timed {examConfig.label} test ({totalDuration}). Once you start, your timer runs.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button className="btn" onClick={() => setConfirmStart(false)} style={{ background: 'rgba(255,255,255,.14)', color: 'white' }}>
+                      Cancel
+                    </button>
+                    <button className="btn" onClick={() => startNewTest(examConfig.preTestId)} disabled={readOnlyView} style={{ background: '#f59e0b', color: '#0f172a', fontWeight: 800 }}>
+                      {readOnlyView ? 'Preview only' : 'Start Test'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </AnimateOnScroll>
         )}
 
         {/* Resource cards grid */}
