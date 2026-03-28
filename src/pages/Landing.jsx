@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, Component } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Float } from '@react-three/drei'
-import * as THREE from 'three'
 
 const C = {
   primary: '#0ea5e9', primaryDark: '#0284c7', accent: '#f59e0b',
@@ -48,101 +46,40 @@ const ACT_SECTIONS = [
   { name: 'Science', topics: 'Data Representation, Research Summaries, Conflicting Viewpoints' },
 ]
 
-/* ═══ 3D SCENE ═══ */
-function FloatingBook({ position, color, speed, scale = 1 }) {
+/* ═══ 3D SCENE — lightweight, no jank ═══ */
+function FloatingShape({ position, geometry, color, speed, scale = 1 }) {
   const mesh = useRef()
   useFrame(({ clock }) => {
     if (!mesh.current) return
-    const t = clock.getElapsedTime()
-    mesh.current.rotation.y = t * speed * 0.2
-    mesh.current.rotation.x = Math.sin(t * speed * 0.15) * 0.1
-    mesh.current.rotation.z = Math.cos(t * speed * 0.1) * 0.05
+    const t = clock.getElapsedTime() * speed
+    mesh.current.rotation.y = t * 0.15
+    mesh.current.rotation.x = Math.sin(t * 0.1) * 0.08
+    mesh.current.position.y = position[1] + Math.sin(t * 0.2) * 0.3
   })
   return (
-    <Float speed={speed * 0.8} rotationIntensity={0.2} floatIntensity={0.4}>
-      <group ref={mesh} position={position} scale={scale}>
-        {/* Book cover */}
-        <mesh><boxGeometry args={[0.7, 1, 0.12]} /><meshPhysicalMaterial color={color} transparent opacity={0.09} roughness={0.3} /></mesh>
-        {/* Pages */}
-        <mesh position={[0.02, 0, 0]}><boxGeometry args={[0.62, 0.92, 0.08]} /><meshPhysicalMaterial color="#e2e8f0" transparent opacity={0.05} /></mesh>
-        {/* Spine */}
-        <mesh position={[-0.35, 0, 0]}><boxGeometry args={[0.04, 1, 0.14]} /><meshPhysicalMaterial color={color} transparent opacity={0.12} /></mesh>
-      </group>
-    </Float>
-  )
-}
-
-function FloatingPencil({ position, speed, rotation = [0, 0, 0.5] }) {
-  const mesh = useRef()
-  useFrame(({ clock }) => {
-    if (!mesh.current) return
-    const t = clock.getElapsedTime()
-    mesh.current.rotation.z = rotation[2] + Math.sin(t * speed * 0.2) * 0.15
-    mesh.current.rotation.y = Math.sin(t * speed * 0.1) * 0.1
-  })
-  return (
-    <Float speed={speed * 0.6} rotationIntensity={0.15} floatIntensity={0.3}>
-      <group ref={mesh} position={position}>
-        <mesh><cylinderGeometry args={[0.035, 0.035, 1.4, 6]} /><meshPhysicalMaterial color="#f59e0b" transparent opacity={0.08} /></mesh>
-        <mesh position={[0, 0.72, 0]}><coneGeometry args={[0.035, 0.12, 6]} /><meshPhysicalMaterial color="#0f172a" transparent opacity={0.1} /></mesh>
-      </group>
-    </Float>
-  )
-}
-
-function FloatingGlobe({ position, speed }) {
-  const mesh = useRef()
-  useFrame(({ clock }) => {
-    if (!mesh.current) return
-    mesh.current.rotation.y = clock.getElapsedTime() * speed * 0.15
-  })
-  return (
-    <Float speed={speed * 0.5} rotationIntensity={0.1} floatIntensity={0.3}>
-      <group ref={mesh} position={position}>
-        <mesh><sphereGeometry args={[0.5, 16, 16]} /><meshPhysicalMaterial color="#0ea5e9" transparent opacity={0.04} wireframe /></mesh>
-        <mesh><torusGeometry args={[0.55, 0.015, 16, 48]} /><meshPhysicalMaterial color="#0ea5e9" transparent opacity={0.06} /></mesh>
-        <mesh rotation={[Math.PI / 3, 0, 0]}><torusGeometry args={[0.55, 0.015, 16, 48]} /><meshPhysicalMaterial color="#38bdf8" transparent opacity={0.04} /></mesh>
-      </group>
-    </Float>
-  )
-}
-
-function FloatingGraph({ position, speed }) {
-  const mesh = useRef()
-  useFrame(({ clock }) => {
-    if (!mesh.current) return
-    mesh.current.rotation.y = Math.sin(clock.getElapsedTime() * speed * 0.1) * 0.2
-  })
-  return (
-    <Float speed={speed * 0.4} rotationIntensity={0.1} floatIntensity={0.25}>
-      <group ref={mesh} position={position}>
-        {/* Bars */}
-        {[[-0.3, 0.2], [-0.1, 0.35], [0.1, 0.5], [0.3, 0.4]].map(([x, h], i) => (
-          <mesh key={i} position={[x, h / 2 - 0.2, 0]}><boxGeometry args={[0.12, h, 0.06]} /><meshPhysicalMaterial color={i === 2 ? '#0ea5e9' : '#38bdf8'} transparent opacity={0.08} /></mesh>
-        ))}
-        {/* Base line */}
-        <mesh position={[0, -0.2, 0]}><boxGeometry args={[0.9, 0.015, 0.06]} /><meshPhysicalMaterial color="#94a3b8" transparent opacity={0.06} /></mesh>
-      </group>
-    </Float>
+    <mesh ref={mesh} position={position} scale={scale}>
+      {geometry}
+      <meshBasicMaterial color={color} wireframe transparent opacity={0.06} />
+    </mesh>
   )
 }
 
 function Scene3D() {
   return (
     <>
-      <ambientLight intensity={0.15} />
-      <pointLight position={[6, 4, 6]} intensity={0.25} color="#0ea5e9" />
-      <pointLight position={[-5, -2, 4]} intensity={0.15} color="#f59e0b" />
-      <FloatingBook position={[-3.5, 1.2, -3]} color="#0ea5e9" speed={1.0} scale={0.9} />
-      <FloatingBook position={[3.8, -0.8, -4]} color="#1e3a8a" speed={0.7} scale={0.7} />
-      <FloatingBook position={[-1.5, -2, -5]} color="#38bdf8" speed={1.3} scale={0.6} />
-      <FloatingPencil position={[2.5, 2, -3]} speed={0.9} rotation={[0, 0, 0.4]} />
-      <FloatingPencil position={[-2.8, -1.5, -4.5]} speed={1.1} rotation={[0, 0, -0.3]} />
-      <FloatingGlobe position={[0.5, 1.8, -6]} speed={0.8} />
-      <FloatingGraph position={[-1, 0.5, -4]} speed={1.0} />
-      {/* Subtle background geometry */}
-      <mesh position={[0, 0, -10]}><icosahedronGeometry args={[3, 1]} /><meshBasicMaterial color="#0ea5e9" wireframe transparent opacity={0.015} /></mesh>
-      <mesh position={[3, -2, -8]} rotation={[0.3, 0.5, 0]}><octahedronGeometry args={[1.5, 0]} /><meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.02} /></mesh>
+      <ambientLight intensity={0.2} />
+      {/* Books as simple boxes */}
+      <FloatingShape position={[-3.2, 1, -3]} geometry={<boxGeometry args={[0.7, 1, 0.12]} />} color="#0ea5e9" speed={0.8} scale={0.9} />
+      <FloatingShape position={[3.5, -0.5, -4]} geometry={<boxGeometry args={[0.6, 0.9, 0.1]} />} color="#1e3a8a" speed={0.6} scale={0.7} />
+      <FloatingShape position={[-1.5, -1.8, -5]} geometry={<boxGeometry args={[0.5, 0.7, 0.08]} />} color="#38bdf8" speed={1.0} scale={0.6} />
+      {/* Pencil as cylinder */}
+      <FloatingShape position={[2.2, 1.8, -3.5]} geometry={<cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />} color="#f59e0b" speed={0.7} />
+      <FloatingShape position={[-2.5, -1.2, -4]} geometry={<cylinderGeometry args={[0.03, 0.03, 1, 6]} />} color="#f59e0b" speed={0.9} />
+      {/* Globe */}
+      <FloatingShape position={[0.5, 1.5, -6]} geometry={<sphereGeometry args={[0.5, 12, 12]} />} color="#0ea5e9" speed={0.5} />
+      {/* Background wireframes */}
+      <FloatingShape position={[0, 0, -9]} geometry={<icosahedronGeometry args={[2.5, 1]} />} color="#0ea5e9" speed={0.2} />
+      <FloatingShape position={[3, -2, -7]} geometry={<octahedronGeometry args={[1.2, 0]} />} color="#38bdf8" speed={0.3} />
     </>
   )
 }
@@ -157,7 +94,8 @@ function Background3D() {
   return (
     <WebGLBoundary>
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        <Canvas camera={{ position: [0, 0, 5], fov: 55 }} dpr={[1, 1.5]} gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }} style={{ background: 'transparent' }}>
+        <Canvas camera={{ position: [0, 0, 5], fov: 55 }} dpr={[1, 1.5]} frameloop="demand" gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }} style={{ background: 'transparent' }}
+          onCreated={({ gl, invalidate }) => { setInterval(invalidate, 50) }}>
           <Scene3D />
         </Canvas>
       </div>
@@ -289,30 +227,24 @@ export default function Landing() {
             </a>
           </motion.div>
 
-          {/* Floating interactive score cards */}
-          <div style={{ position: 'relative', height: 160, marginTop: 48, maxWidth: 600, margin: '48px auto 0' }}>
+          {/* Score cards with CSS float animation (no jank) */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 48, flexWrap: 'wrap' }}>
             {[
-              { label: 'Score', val: '1420', c: C.primary, x: '5%', y: '10%', delay: 0.7, float: { y: [-6, 6, -6], x: [-3, 3, -3] } },
-              { label: 'Improvement', val: '+420', c: C.green, x: '38%', y: '25%', delay: 0.8, float: { y: [5, -7, 5], x: [4, -2, 4] } },
-              { label: 'Streak', val: '14 days', c: C.accent, x: '68%', y: '5%', delay: 0.9, float: { y: [-8, 4, -8], x: [-2, 5, -2] } },
+              { label: 'Score', val: '1420', c: C.primary, delay: 0.7, anim: 'floatA' },
+              { label: 'Improvement', val: '+420', c: C.green, delay: 0.8, anim: 'floatB' },
+              { label: 'Streak', val: '14 days', c: C.accent, delay: 0.9, anim: 'floatC' },
             ].map((d) => (
               <motion.div
                 key={d.label}
-                initial={{ opacity: 0, y: 40, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1, ...d.float }}
-                transition={{
-                  opacity: { delay: d.delay, duration: 0.5 },
-                  y: { delay: d.delay + 0.5, duration: 4 + Math.random() * 2, repeat: Infinity, ease: 'easeInOut' },
-                  x: { delay: d.delay + 0.5, duration: 5 + Math.random() * 2, repeat: Infinity, ease: 'easeInOut' },
-                  scale: { delay: d.delay, duration: 0.4, type: 'spring' },
-                }}
-                whileHover={{ scale: 1.08, boxShadow: `0 12px 36px ${d.c}33`, borderColor: `${d.c}44` }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: d.delay, duration: 0.5, type: 'spring', stiffness: 100 }}
+                className={d.anim}
                 style={{
-                  position: 'absolute', left: d.x, top: d.y,
                   background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(14px)',
                   border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14,
                   padding: '14px 22px', minWidth: 120, cursor: 'default',
-                  transition: 'box-shadow 0.3s, border-color 0.3s',
+                  transition: 'box-shadow 0.3s, border-color 0.3s, transform 0.3s',
                 }}>
                 <div style={{ color: C.lightGray, fontSize: 11, marginBottom: 3 }}>{d.label}</div>
                 <div style={{ fontFamily: "'Sora'", fontSize: 24, fontWeight: 800, color: d.c }}>{d.val}</div>
@@ -477,6 +409,27 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ABOUT US */}
+      <section style={{ padding: 'clamp(80px, 10vw, 110px) clamp(20px, 4vw, 48px)', background: C.offWhite }}>
+        <div style={{ maxWidth: 800, margin: '0 auto' }}>
+          <SectionHeading label="About Us">
+            Why We Built This
+          </SectionHeading>
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+            style={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 18, padding: 'clamp(28px, 4vw, 40px)', boxShadow: '0 4px 20px rgba(0,0,0,.04)' }}>
+            <p style={{ color: C.gray, fontSize: 16, lineHeight: 1.8, marginBottom: 20 }}>
+              AGORA started because we saw the same problem over and over: students spending hundreds of hours studying the wrong things. Expensive prep courses teach to the middle. Textbooks cover everything but prioritize nothing. Students walk into test day hoping they studied enough instead of knowing they did.
+            </p>
+            <p style={{ color: C.gray, fontSize: 16, lineHeight: 1.8, marginBottom: 20 }}>
+              We built AGORA to fix that. The platform starts with a diagnostic that maps exactly where you lose points — not just "math" or "reading," but the specific question types and concepts that cost you the most. From there, every study session, every practice question, and every review is targeted at closing those gaps.
+            </p>
+            <p style={{ color: C.gray, fontSize: 16, lineHeight: 1.8 }}>
+              It supports both the SAT and ACT, adapts to your schedule, and tracks your progress down to the individual topic. No filler. No busywork. Just the work that actually moves your score. And it is completely free.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section style={{ padding: 'clamp(90px, 10vw, 140px) 20px', textAlign: 'center', background: C.navy, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
@@ -508,6 +461,18 @@ export default function Landing() {
       </footer>
 
       <style>{`
+        @keyframes floatA { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes floatB { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes floatC { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        .floatA { animation: floatA 4s ease-in-out infinite; }
+        .floatB { animation: floatB 4.5s ease-in-out 0.5s infinite; }
+        .floatC { animation: floatC 3.8s ease-in-out 1s infinite; }
+        .floatA:hover, .floatB:hover, .floatC:hover {
+          animation-play-state: paused;
+          transform: translateY(-4px) scale(1.05) !important;
+          box-shadow: 0 12px 36px rgba(14,165,233,0.15);
+          border-color: rgba(14,165,233,0.2);
+        }
         @media (max-width: 900px) {
           #features > div > div:last-child { grid-template-columns: repeat(2, 1fr) !important; }
         }
