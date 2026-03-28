@@ -32,7 +32,7 @@ const STEPS = [
 
 const STATS = [
   { value: 2000, suffix: '+', label: 'Practice Questions' },
-  { value: 11, suffix: '', label: 'Full Practice Tests' },
+  { value: 17, suffix: '', label: 'Full Practice Tests' },
   { value: 420, suffix: '+', label: 'Avg Point Gain' },
 ]
 
