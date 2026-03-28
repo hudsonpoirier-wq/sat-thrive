@@ -63,20 +63,15 @@ function FloatingGroup({ position, children, speed = 1 }) {
 
 const M = (color, opts = {}) => <meshStandardMaterial color={color} transparent opacity={opts.o ?? 0.55} roughness={opts.r ?? 0.3} metalness={opts.m ?? 0.1} />
 
-function Pencil({ position, speed, rot = 0.5 }) {
+function Pencil({ position, speed, rot = 0.5, tint = '#0ea5e9' }) {
   return (
     <FloatingGroup position={position} speed={speed}>
       <group rotation={[0, 0, rot]}>
-        {/* Wood body */}
-        <mesh><cylinderGeometry args={[0.045, 0.045, 1.3, 12]} />{M('#f59e0b', { o: 0.5, r: 0.5 })}</mesh>
-        {/* Graphite tip */}
-        <mesh position={[0, 0.72, 0]}><coneGeometry args={[0.045, 0.18, 12]} />{M('#1e293b', { o: 0.6, r: 0.2 })}</mesh>
-        {/* Exposed wood at tip */}
-        <mesh position={[0, 0.6, 0]}><coneGeometry args={[0.045, 0.08, 12]} />{M('#fde68a', { o: 0.45, r: 0.6 })}</mesh>
-        {/* Metal band */}
+        <mesh><cylinderGeometry args={[0.045, 0.045, 1.3, 12]} />{M(tint, { o: 0.5, r: 0.5 })}</mesh>
+        <mesh position={[0, 0.72, 0]}><coneGeometry args={[0.045, 0.18, 12]} />{M('#0f172a', { o: 0.6, r: 0.2 })}</mesh>
+        <mesh position={[0, 0.6, 0]}><coneGeometry args={[0.045, 0.08, 12]} />{M('#bae6fd', { o: 0.45, r: 0.6 })}</mesh>
         <mesh position={[0, -0.58, 0]}><cylinderGeometry args={[0.05, 0.05, 0.1, 12]} />{M('#94a3b8', { o: 0.5, m: 0.6, r: 0.15 })}</mesh>
-        {/* Eraser */}
-        <mesh position={[0, -0.68, 0]}><cylinderGeometry args={[0.042, 0.042, 0.1, 12]} />{M('#f87171', { o: 0.5, r: 0.7 })}</mesh>
+        <mesh position={[0, -0.68, 0]}><cylinderGeometry args={[0.042, 0.042, 0.1, 12]} />{M('#7dd3fc', { o: 0.5, r: 0.7 })}</mesh>
       </group>
     </FloatingGroup>
   )
@@ -85,13 +80,9 @@ function Pencil({ position, speed, rot = 0.5 }) {
 function Calculator({ position, speed }) {
   return (
     <FloatingGroup position={position} speed={speed}>
-      {/* Body with rounded look */}
-      <mesh><boxGeometry args={[0.65, 0.95, 0.1]} />{M('#1e293b', { o: 0.55, r: 0.4 })}</mesh>
-      {/* Screen */}
-      <mesh position={[0, 0.24, 0.056]}><boxGeometry args={[0.5, 0.24, 0.01]} />{M('#0ea5e9', { o: 0.4, r: 0.1, m: 0.2 })}</mesh>
-      {/* Screen bezel */}
-      <mesh position={[0, 0.24, 0.052]}><boxGeometry args={[0.54, 0.28, 0.005]} />{M('#334155', { o: 0.5, r: 0.2 })}</mesh>
-      {/* Buttons - 4x4 grid */}
+      <mesh><boxGeometry args={[0.65, 0.95, 0.1]} />{M('#1e3a8a', { o: 0.55, r: 0.4 })}</mesh>
+      <mesh position={[0, 0.24, 0.056]}><boxGeometry args={[0.5, 0.24, 0.01]} />{M('#7dd3fc', { o: 0.45, r: 0.1, m: 0.2 })}</mesh>
+      <mesh position={[0, 0.24, 0.052]}><boxGeometry args={[0.54, 0.28, 0.005]} />{M('#0f172a', { o: 0.5, r: 0.2 })}</mesh>
       {[
         [-0.18, 0.0], [-0.06, 0.0], [0.06, 0.0], [0.18, 0.0],
         [-0.18, -0.12], [-0.06, -0.12], [0.06, -0.12], [0.18, -0.12],
@@ -100,7 +91,7 @@ function Calculator({ position, speed }) {
       ].map(([x, y], i) => (
         <mesh key={i} position={[x, y, 0.056]}>
           <boxGeometry args={[0.09, 0.08, 0.02]} />
-          {M(i >= 12 ? '#0ea5e9' : i % 4 === 3 ? '#f59e0b' : '#475569', { o: 0.5, r: 0.35 })}
+          {M(i >= 12 ? '#38bdf8' : i % 4 === 3 ? '#0ea5e9' : '#1e3a8a', { o: 0.5, r: 0.35 })}
         </mesh>
       ))}
     </FloatingGroup>
@@ -127,7 +118,7 @@ function BarGraph({ position, speed }) {
       {/* Y axis */}
       <mesh position={[-0.38, 0, 0]}><boxGeometry args={[0.02, 0.8, 0.06]} />{M('#64748b', { o: 0.4, r: 0.3 })}</mesh>
       {/* Trend line */}
-      <mesh position={[-0.15, -0.1, 0.04]} rotation={[0, 0, 0.45]}><boxGeometry args={[0.7, 0.015, 0.01]} />{M('#f59e0b', { o: 0.45 })}</mesh>
+      <mesh position={[-0.15, -0.1, 0.04]} rotation={[0, 0, 0.45]}><boxGeometry args={[0.7, 0.015, 0.01]} />{M('#7dd3fc', { o: 0.45 })}</mesh>
     </FloatingGroup>
   )
 }
@@ -136,15 +127,12 @@ function Ruler({ position, speed, rot = 0.3 }) {
   return (
     <FloatingGroup position={position} speed={speed}>
       <group rotation={[0, 0, rot]}>
-        {/* Body */}
-        <mesh><boxGeometry args={[1.5, 0.22, 0.035]} />{M('#fbbf24', { o: 0.45, r: 0.5 })}</mesh>
-        {/* Edge strip */}
-        <mesh position={[0, -0.09, 0.005]}><boxGeometry args={[1.5, 0.03, 0.035]} />{M('#f59e0b', { o: 0.5, r: 0.4 })}</mesh>
-        {/* Tick marks */}
+        <mesh><boxGeometry args={[1.5, 0.22, 0.035]} />{M('#38bdf8', { o: 0.45, r: 0.5 })}</mesh>
+        <mesh position={[0, -0.09, 0.005]}><boxGeometry args={[1.5, 0.03, 0.035]} />{M('#0284c7', { o: 0.5, r: 0.4 })}</mesh>
         {Array.from({ length: 15 }, (_, i) => (
           <mesh key={i} position={[-0.63 + i * 0.09, -0.04, 0.02]}>
             <boxGeometry args={[0.008, i % 5 === 0 ? 0.1 : i % 2 === 0 ? 0.06 : 0.04, 0.005]} />
-            {M('#92400e', { o: 0.5 })}
+            {M('#0f172a', { o: 0.5 })}
           </mesh>
         ))}
       </group>
@@ -220,11 +208,11 @@ function Scene3D() {
       <ambientLight intensity={0.4} />
       <directionalLight position={[5, 5, 5]} intensity={0.6} color="#e2e8f0" />
       <directionalLight position={[-3, 3, 2]} intensity={0.3} color="#38bdf8" />
-      <pointLight position={[0, -2, 4]} intensity={0.2} color="#f59e0b" />
+      <pointLight position={[0, -2, 4]} intensity={0.2} color="#7dd3fc" />
 
       {/* Pushed to far edges + deeper Z so they don't overlap text */}
-      <Pencil position={[-7, 3, -6]} speed={0.6} rot={0.55} />
-      <Pencil position={[7.5, -2.5, -7]} speed={0.8} rot={-0.35} />
+      <Pencil position={[-7, 3, -6]} speed={0.6} rot={0.55} tint="#0ea5e9" />
+      <Pencil position={[7.5, -2.5, -7]} speed={0.8} rot={-0.35} tint="#38bdf8" />
       <Calculator position={[6.5, 3, -6.5]} speed={0.5} />
       <BarGraph position={[-6.5, -2, -5.5]} speed={0.65} />
       <Ruler position={[-1, 4.5, -8]} speed={0.45} rot={0.12} />
