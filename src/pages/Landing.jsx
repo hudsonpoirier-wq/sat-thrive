@@ -228,7 +228,7 @@ function Scene3D() {
       <Calculator position={[6.5, 3, -6.5]} speed={0.5} />
       <BarGraph position={[-6.5, -2, -5.5]} speed={0.65} />
       <Ruler position={[-1, 4.5, -8]} speed={0.45} rot={0.12} />
-      <Ruler position={[1, -4.5, -8]} speed={0.55} rot={-0.2} />
+      <Ruler position={[1, -3, -6]} speed={0.55} rot={-0.2} />
       <OpenBook position={[-6, 0.5, -7]} speed={0.45} />
       <OpenBook position={[6, -3.5, -8]} speed={0.6} />
       <Protractor position={[7, 1, -7.5]} speed={0.4} />
