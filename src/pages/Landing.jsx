@@ -222,17 +222,17 @@ function Scene3D() {
       <directionalLight position={[-3, 3, 2]} intensity={0.3} color="#38bdf8" />
       <pointLight position={[0, -2, 4]} intensity={0.2} color="#f59e0b" />
 
-      {/* Spread wide across viewport */}
-      <Pencil position={[-5.2, 2.2, -3.5]} speed={0.6} rot={0.55} />
-      <Pencil position={[5.8, -1.8, -4.5]} speed={0.8} rot={-0.35} />
-      <Calculator position={[4.8, 2.3, -4]} speed={0.5} />
-      <BarGraph position={[-4.8, -1.2, -3]} speed={0.65} />
-      <Ruler position={[0.5, 3.2, -5]} speed={0.45} rot={0.12} />
-      <Ruler position={[-3.5, -2.8, -5.5]} speed={0.55} rot={-0.2} />
-      <OpenBook position={[-2.2, 1.8, -4.5]} speed={0.45} />
-      <OpenBook position={[3.2, -2.8, -5.5]} speed={0.6} />
-      <Protractor position={[5.2, 0.3, -5]} speed={0.4} />
-      <Protractor position={[-5.5, -0.3, -5.5]} speed={0.5} />
+      {/* Pushed to far edges + deeper Z so they don't overlap text */}
+      <Pencil position={[-7, 3, -6]} speed={0.6} rot={0.55} />
+      <Pencil position={[7.5, -2.5, -7]} speed={0.8} rot={-0.35} />
+      <Calculator position={[6.5, 3, -6.5]} speed={0.5} />
+      <BarGraph position={[-6.5, -2, -5.5]} speed={0.65} />
+      <Ruler position={[-1, 4.5, -8]} speed={0.45} rot={0.12} />
+      <Ruler position={[1, -4.5, -8]} speed={0.55} rot={-0.2} />
+      <OpenBook position={[-6, 0.5, -7]} speed={0.45} />
+      <OpenBook position={[6, -3.5, -8]} speed={0.6} />
+      <Protractor position={[7, 1, -7.5]} speed={0.4} />
+      <Protractor position={[-7.5, -1, -8]} speed={0.5} />
     </>
   )
 }
