@@ -33,7 +33,7 @@ const STEPS = [
 const STATS = [
   { value: 2000, suffix: '+', label: 'Practice Questions' },
   { value: 11, suffix: '', label: 'Full Practice Tests' },
-  { value: 200, suffix: '+', label: 'Avg Point Gain' },
+  { value: 420, suffix: '+', label: 'Avg Point Gain' },
 ]
 
 const SAT_SECTIONS = [
@@ -293,7 +293,7 @@ export default function Landing() {
           <div style={{ position: 'relative', height: 160, marginTop: 48, maxWidth: 600, margin: '48px auto 0' }}>
             {[
               { label: 'Score', val: '1420', c: C.primary, x: '5%', y: '10%', delay: 0.7, float: { y: [-6, 6, -6], x: [-3, 3, -3] } },
-              { label: 'Improvement', val: '+340', c: C.green, x: '38%', y: '25%', delay: 0.8, float: { y: [5, -7, 5], x: [4, -2, 4] } },
+              { label: 'Improvement', val: '+420', c: C.green, x: '38%', y: '25%', delay: 0.8, float: { y: [5, -7, 5], x: [4, -2, 4] } },
               { label: 'Streak', val: '14 days', c: C.accent, x: '68%', y: '5%', delay: 0.9, float: { y: [-8, 4, -8], x: [-2, 5, -2] } },
             ].map((d) => (
               <motion.div
