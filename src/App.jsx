@@ -37,6 +37,7 @@ const loadTestStrategies = () => import('./pages/TestStrategies.jsx')
 const loadPriorScore = () => import('./pages/PriorScore.jsx')
 const loadCollegeRecruiting = () => import('./pages/CollegeRecruiting.jsx')
 const loadFormulaSheet = () => import('./pages/FormulaSheet.jsx')
+const loadLanding = () => import('./pages/Landing.jsx')
 
 const Dashboard = lazy(loadDashboard)
 const TestTaking = lazy(loadTestTaking)
@@ -67,6 +68,7 @@ const TestStrategies = lazy(loadTestStrategies)
 const PriorScore = lazy(loadPriorScore)
 const CollegeRecruiting = lazy(loadCollegeRecruiting)
 const FormulaSheet = lazy(loadFormulaSheet)
+const Landing = lazy(loadLanding)
 
 function RouteLoader() {
   return (
@@ -155,6 +157,7 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <motion.div key={location.pathname} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} style={{ minHeight: '100vh' }}>
         <Routes location={location}>
+              <Route path="/" element={<Landing />} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/reset" element={<ResetPassword />} />
@@ -185,7 +188,7 @@ function AnimatedRoutes() {
               <Route path="/college-recruiting" element={<ProtectedRoute><CollegeRecruiting /></ProtectedRoute>} />
               <Route path="/formulas" element={<ProtectedRoute><FormulaSheet /></ProtectedRoute>} />
               <Route path="/share" element={<Share />} />
-              <Route path="*" element={<ProtectedRoute><RoleRedirect /></ProtectedRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

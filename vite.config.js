@@ -13,6 +13,7 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('pdfjs-dist')) return 'pdfjs'
           if (id.includes('@supabase')) return 'supabase'
+          if (id.includes('three') || id.includes('@react-three')) return 'three'
         }
       }
     }
